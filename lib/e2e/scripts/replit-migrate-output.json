@@ -1,0 +1,8 @@
+{
+  "loggedIn": false,
+  "replUrl": null,
+  "repls": [],
+  "oldDatabaseUrls": [],
+  "migrationOutput": "",
+  "error": "Error: No accessible VNDRLY repl found"
+}

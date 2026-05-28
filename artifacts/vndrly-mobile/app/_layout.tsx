@@ -29,7 +29,7 @@ import { startLiveLocationReporter, stopLiveLocationReporter } from "@/lib/liveL
 import { initSentry, setSentryUser, wrapRoot } from "@/lib/sentry";
 import "@/lib/i18n";
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
 initSentry();
 initApi();
 
@@ -221,7 +221,7 @@ function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      void SplashScreen.hideAsync().catch(() => undefined);
     }
   }, [fontsLoaded, fontError]);
 

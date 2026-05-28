@@ -1,0 +1,480 @@
+CREATE SEQUENCE "public"."hotlist_comment_events_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+CREATE SEQUENCE "public"."live_location_events_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+CREATE SEQUENCE "public"."ticket_events_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+CREATE SEQUENCE "public"."visit_events_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1;
+CREATE TABLE "accounting_connection_items" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"connection_id" integer NOT NULL,
+	"line_type" text NOT NULL,
+	"qbo_item_id" text NOT NULL,
+	"qbo_account_id" text,
+	"qbo_account_name" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "accounting_connection_reminder_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"connection_id" integer NOT NULL,
+	"reason" text NOT NULL,
+	"dedupe_key" text NOT NULL,
+	"sent_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"recipient_count" integer DEFAULT 0 NOT NULL,
+	"failure_message" text
+);
+CREATE TABLE "accounting_connections" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"provider" text NOT NULL,
+	"realm_id" text,
+	"display_name" text,
+	"access_token_enc" text NOT NULL,
+	"refresh_token_enc" text,
+	"access_token_expires_at" timestamp with time zone,
+	"scopes" text,
+	"status" text DEFAULT 'active' NOT NULL,
+	"api_base_url" text,
+	"created_by_user_id" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "accounting_pushed_invoices" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"provider" text NOT NULL,
+	"invoice_number" text NOT NULL,
+	"external_invoice_id" text,
+	"external_doc_number" text,
+	"pushed_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "ap_payment_digest_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"partner_id" integer NOT NULL,
+	"week_label" text NOT NULL,
+	"dedupe_key" text NOT NULL,
+	"sent_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"ticket_count" integer DEFAULT 0 NOT NULL,
+	"failure_message" text
+);
+CREATE TABLE "assistant_conversations" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"title" text DEFAULT 'New conversation' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "assistant_messages" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"conversation_id" integer NOT NULL,
+	"role" text NOT NULL,
+	"content" text DEFAULT '' NOT NULL,
+	"tool_calls" jsonb DEFAULT '[]'::jsonb,
+	"first_token_ms" integer,
+	"refusal" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "certification_reminder_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"certification_id" integer NOT NULL,
+	"threshold" text NOT NULL,
+	"dedupe_key" text NOT NULL,
+	"sent_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"sent_to_vendor_id" integer,
+	"failure_message" text
+);
+CREATE TABLE "comment_read_receipts" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"source" text NOT NULL,
+	"comment_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"seen_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "dashboard_1099_delivery_jobs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"scope" text NOT NULL,
+	"partner_id" integer,
+	"tax_year" integer NOT NULL,
+	"form_type" text NOT NULL,
+	"recipient_vendor_ids" jsonb,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"total_count" integer DEFAULT 0 NOT NULL,
+	"attempted" integer DEFAULT 0 NOT NULL,
+	"delivered" integer DEFAULT 0 NOT NULL,
+	"skipped_no_consent" integer DEFAULT 0 NOT NULL,
+	"errors_json" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"last_error_message" text,
+	"created_by_user_id" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"started_at" timestamp with time zone,
+	"finished_at" timestamp with time zone
+);
+CREATE TABLE "dashboard_1099_email_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"scope" text NOT NULL,
+	"partner_id" integer,
+	"tax_year" integer NOT NULL,
+	"cadence" text NOT NULL,
+	"period_label" text NOT NULL,
+	"dedupe_key" text NOT NULL,
+	"recipient_emails_csv" text DEFAULT '' NOT NULL,
+	"formats_csv" text DEFAULT '' NOT NULL,
+	"report_export_audit_ids_csv" text,
+	"sent_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"failure_message" text
+);
+CREATE TABLE "dashboard_1099_email_settings" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"scope" text NOT NULL,
+	"partner_id" integer,
+	"enabled" boolean DEFAULT false NOT NULL,
+	"formats" text DEFAULT 'pdf' NOT NULL,
+	"recipient_emails" text DEFAULT '' NOT NULL,
+	"tax_year_override" integer,
+	"updated_by_user_id" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "demo_user_label_overrides" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"username" text NOT NULL,
+	"locale" text NOT NULL,
+	"label" text NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "direct_assignments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"partner_id" integer NOT NULL,
+	"site_location_id" integer NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"scope_of_work" text,
+	"start_date" date NOT NULL,
+	"end_date" date NOT NULL,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"pass_reason" text,
+	"created_by_user_id" integer,
+	"responded_by_user_id" integer,
+	"responded_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "direct_assignments_status_check" CHECK ("direct_assignments"."status" IN ('pending','committed','passed','cancelled'))
+);
+CREATE TABLE "employee_certifications" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"employee_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"issuer" text,
+	"cert_number" text,
+	"issued_date" date,
+	"expiration_date" date,
+	"document_url" text,
+	"document_path" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone,
+	"deleted_by" text
+);
+CREATE TABLE "field_employee_notes" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"employee_id" integer NOT NULL,
+	"content" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "field_push_tokens" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"expo_token" text NOT NULL,
+	"platform" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "field_push_tokens_expo_token_unique" UNIQUE("expo_token")
+);
+CREATE TABLE "fire_transmitter_settings" (
+	"id" integer PRIMARY KEY NOT NULL,
+	"tcc" text,
+	"ein" text,
+	"name" text,
+	"address" text,
+	"contact_name" text,
+	"contact_email" text,
+	"contact_phone" text,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_by_user_id" integer
+);
+CREATE TABLE "fire_transmitter_settings_audit_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"changes" jsonb NOT NULL,
+	"actor_user_id" integer,
+	"actor_role" text NOT NULL,
+	"actor_ip" text,
+	"actor_user_agent" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "gps_logs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"ticket_id" integer NOT NULL,
+	"latitude" double precision NOT NULL,
+	"longitude" double precision NOT NULL,
+	"event_type" text NOT NULL,
+	"battery_level" real,
+	"speed_mps" real,
+	"recorded_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "hotlist_bids" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"job_id" integer NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"amount_usd" numeric(12, 2) NOT NULL,
+	"eta_days" integer,
+	"notes" text,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "hotlist_comments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"job_id" integer NOT NULL,
+	"content" text NOT NULL,
+	"attachments" text[],
+	"mentions" integer[],
+	"edit_history" jsonb,
+	"updated_at" timestamp with time zone,
+	"deleted_at" timestamp with time zone,
+	"deleted_by_id" integer,
+	"created_by_id" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "hotlist_jobs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"partner_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"description" text,
+	"location_address" text NOT NULL,
+	"latitude" double precision,
+	"longitude" double precision,
+	"deadline" date,
+	"estimated_duration_days" integer,
+	"status" text DEFAULT 'open' NOT NULL,
+	"awarded_bid_id" integer,
+	"awarded_vendor_id" integer,
+	"converted_ticket_id" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone
+);
+CREATE TABLE "onboarding_progress" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"org_type" text NOT NULL,
+	"partner_id" integer,
+	"vendor_id" integer,
+	"vendor_people_id" integer,
+	"current_step" text DEFAULT '' NOT NULL,
+	"completed_steps" text[] DEFAULT '{}' NOT NULL,
+	"skipped_steps" text[] DEFAULT '{}' NOT NULL,
+	"payload" jsonb DEFAULT '{}'::jsonb NOT NULL,
+	"started_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"completed_at" timestamp with time zone,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "partners" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"contact_name" text NOT NULL,
+	"contact_email" text NOT NULL,
+	"contact_phone" text,
+	"physical_address" text,
+	"billing_address" text,
+	"business_phone" text,
+	"hours_of_operation" text,
+	"state_tax_id" text,
+	"federal_tax_id" text,
+	"blurb" text,
+	"operating_radius_miles" integer,
+	"logo_url" text,
+	"logo_square_url" text,
+	"brand_primary_color" text,
+	"brand_accent_color" text,
+	"email_1099_subject" text,
+	"email_1099_body" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "platform_settings" (
+	"id" integer PRIMARY KEY NOT NULL,
+	"name" text DEFAULT 'VNDRLY' NOT NULL,
+	"contact_name" text,
+	"contact_email" text,
+	"contact_phone" text,
+	"physical_address" text,
+	"billing_address" text,
+	"business_phone" text,
+	"hours_of_operation" text,
+	"blurb" text,
+	"logo_url" text,
+	"logo_square_url" text,
+	"brand_primary_color" text,
+	"brand_accent_color" text,
+	"qb_bulk_action_retention_days" integer,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "platform_settings_audit_log" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"field" text NOT NULL,
+	"prev_value" text,
+	"new_value" text,
+	"actor_user_id" integer,
+	"actor_role" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "partner_contacts" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"partner_id" integer NOT NULL,
+	"job_title" text NOT NULL,
+	"name" text NOT NULL,
+	"email" text NOT NULL,
+	"phone" text,
+	"roles" text[] DEFAULT '{}' NOT NULL,
+	"photo_url" text,
+	"preferred_locale" text DEFAULT 'en' NOT NULL,
+	"user_id" integer,
+	"invite_token" text,
+	"invite_sent_at" timestamp with time zone,
+	"accepted_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone,
+	"deleted_by" text,
+	CONSTRAINT "partner_contacts_invite_token_unique" UNIQUE("invite_token")
+);
+CREATE TABLE "partner_notes" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"partner_id" integer NOT NULL,
+	"content" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "vendor_people" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"vendor_role" text DEFAULT 'office' NOT NULL,
+	"roles" text[] DEFAULT '{}' NOT NULL,
+	"job_title" text,
+	"first_name" text NOT NULL,
+	"last_name" text DEFAULT '' NOT NULL,
+	"email" text NOT NULL,
+	"phone" text,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"pec_certification" boolean DEFAULT false NOT NULL,
+	"pec_expiration_date" date,
+	"photo_url" text,
+	"profile_photo_path" text,
+	"hourly_rate" numeric(8, 2),
+	"rate_kind" text DEFAULT 'hourly' NOT NULL,
+	"daily_rate" numeric(10, 2),
+	"user_id" integer,
+	"invite_token" text,
+	"invite_sent_at" timestamp with time zone,
+	"preferred_language" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone,
+	"deleted_by" text,
+	CONSTRAINT "vendor_people_user_id_unique" UNIQUE("user_id"),
+	CONSTRAINT "vendor_people_invite_token_unique" UNIQUE("invite_token")
+);
+CREATE TABLE "vendor_notes" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"content" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "vendors" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"contact_name" text NOT NULL,
+	"contact_email" text NOT NULL,
+	"contact_phone" text,
+	"physical_address" text,
+	"billing_address" text,
+	"operating_radius_miles" integer,
+	"latitude" double precision,
+	"longitude" double precision,
+	"geocoded_at" timestamp with time zone,
+	"state_tax_id" text,
+	"federal_tax_id" text,
+	"business_phone" text,
+	"hours_of_operation" text,
+	"blurb" text,
+	"logo_url" text,
+	"logo_square_url" text,
+	"brand_primary_color" text,
+	"brand_accent_color" text,
+	"daily_ot_hours" numeric(5, 2),
+	"weekly_ot_hours" numeric(5, 2),
+	"overtime_multiplier" numeric(4, 2),
+	"insurance_carrier" text,
+	"insurance_policy_number" text,
+	"insurance_expiration_date" text,
+	"coi_document_url" text,
+	"wc_carrier" text,
+	"wc_policy_number" text,
+	"wc_expiration_date" text,
+	"wc_document_url" text,
+	"gl_carrier" text,
+	"gl_policy_number" text,
+	"gl_expiration_date" text,
+	"gl_document_url" text,
+	"auto_liability_carrier" text,
+	"auto_liability_policy_number" text,
+	"auto_liability_expiration_date" text,
+	"auto_liability_document_url" text,
+	"w9_document_url" text,
+	"w9_last_updated_at" timestamp with time zone,
+	"current_catalog_version_id" integer,
+	"catalog_authority_attested_at" timestamp with time zone,
+	"catalog_authority_attested_by_user_id" integer,
+	"aging_threshold_days" jsonb DEFAULT '[1,15,30]'::jsonb NOT NULL,
+	"e_delivery_consent" boolean DEFAULT false NOT NULL,
+	"e_delivery_consent_at" timestamp with time zone,
+	"e_delivery_email" text,
+	"accounting_failure_notifications_enabled" boolean DEFAULT true NOT NULL,
+	"accounting_reconciliation_notifications_enabled" boolean DEFAULT false NOT NULL,
+	"accounting_reconciliation_digest_cadence" text DEFAULT 'per_push' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "work_types" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"category" text NOT NULL,
+	"description" text,
+	"estimated_duration" text,
+	"estimated_price" numeric(12, 2),
+	"required_certifications" text[],
+	"blocking_certifications" text[]
+);
+CREATE TABLE "vendor_work_types" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"work_type_id" integer NOT NULL,
+	"unit_price" numeric(12, 2),
+	"unit" text,
+	"currency" text DEFAULT 'USD' NOT NULL,
+	"notes" text,
+	"price_authority_acknowledged_at" timestamp with time zone,
+	"last_price_change_reason" text
+);
+CREATE TABLE "vendor_catalog_versions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"version" integer NOT NULL,
+	"published_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"published_by_user_id" integer,
+	"change_summary" text,
+	"rates_snapshot" jsonb NOT NULL,
+	"work_types_snapshot" jsonb NOT NULL,
+	"compliance_snapshot" jsonb NOT NULL,
+	"eula_text" text NOT NULL,
+	"eula_hash" text
+);
+CREATE TABLE "partner_eula_acceptances" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"partner_id" integer NOT NULL,
+	"vendor_id" integer NOT NULL,
+	"vendor_catalog_version_id" integer NOT NULL,
+	"accepted_by_user_id" integer NOT NULL,
+	"accepted_eula_hash" text NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"accepted_at" timestamp with time zone DEFAULT now() NOT NULL
+);

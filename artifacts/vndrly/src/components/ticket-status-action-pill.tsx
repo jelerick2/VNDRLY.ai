@@ -20,7 +20,8 @@ export default function TicketStatusActionPill({ status }: TicketStatusActionPil
   const { icon: Icon } = meta.actionPill;
   const testId = `status-${meta.testIdStem}`;
   const label = t(meta.badgeLabelKey);
-  const cfg = ticketLifecyclePills[meta.badgeColor];
+  const cfg = meta.badgeColor ? ticketLifecyclePills[meta.badgeColor] : null;
+  if (!cfg) return null;
 
   return (
     <button

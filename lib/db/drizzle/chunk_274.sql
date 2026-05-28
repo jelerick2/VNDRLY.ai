@@ -1,0 +1,1 @@
+CREATE INDEX "dashboard_1099_email_log_scope_idx" ON "dashboard_1099_email_log" USING btree ("scope","partner_id","sent_at");

@@ -1,0 +1,1 @@
+ALTER TABLE "invoice_lines" ADD CONSTRAINT "invoice_lines_ticket_id_tickets_id_fk" FOREIGN KEY ("ticket_id") REFERENCES "public"."tickets"("id") ON DELETE set null ON UPDATE no action;

@@ -1,0 +1,1 @@
+ALTER TABLE "accounting_pushed_invoices" ADD CONSTRAINT "accounting_pushed_invoices_vendor_id_vendors_id_fk" FOREIGN KEY ("vendor_id") REFERENCES "public"."vendors"("id") ON DELETE cascade ON UPDATE no action;

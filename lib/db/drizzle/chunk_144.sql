@@ -1,0 +1,1 @@
+ALTER TABLE "partner_vendor_approval_events" ADD CONSTRAINT "partner_vendor_approval_events_vendor_catalog_version_id_vendor_catalog_versions_id_fk" FOREIGN KEY ("vendor_catalog_version_id") REFERENCES "public"."vendor_catalog_versions"("id") ON DELETE set null ON UPDATE no action;

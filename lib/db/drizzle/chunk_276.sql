@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "dashboard_1099_email_settings_admin_unique" ON "dashboard_1099_email_settings" USING btree ("scope") WHERE "dashboard_1099_email_settings"."scope" = 'admin';

@@ -1,0 +1,1 @@
+ALTER TABLE "hotlist_bids" ADD CONSTRAINT "hotlist_bids_job_id_hotlist_jobs_id_fk" FOREIGN KEY ("job_id") REFERENCES "public"."hotlist_jobs"("id") ON DELETE cascade ON UPDATE no action;

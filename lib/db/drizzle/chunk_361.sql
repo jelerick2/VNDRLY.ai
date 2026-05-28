@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "reconciliation_weekly_recap_log_dedupe_unique" ON "reconciliation_weekly_recap_log" USING btree ("dedupe_key");

@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_ticket_link_ticket_idx" ON "invoice_ticket_links" USING btree ("ticket_id");

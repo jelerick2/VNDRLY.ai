@@ -10,6 +10,7 @@ out-tsc
 
 # dependencies
 node_modules
+.pnpm-store/
 
 # IDEs and editors
 /.idea
@@ -36,6 +37,10 @@ npm-debug.log
 yarn-error.log
 testem.log
 /typings
+.tmp_*
+tsconfig.zip
+*.err.log
+*.out.log
 
 # System Files
 .DS_Store
@@ -43,6 +48,11 @@ Thumbs.db
 
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
+
+# Environment (secrets)
+.env
+.env.local
+.env.*.local
 
 # Replit
 .cache/

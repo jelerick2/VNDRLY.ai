@@ -1,0 +1,1 @@
+ALTER TABLE "certification_reminder_log" ADD CONSTRAINT "certification_reminder_log_certification_id_employee_certifications_id_fk" FOREIGN KEY ("certification_id") REFERENCES "public"."employee_certifications"("id") ON DELETE cascade ON UPDATE no action;

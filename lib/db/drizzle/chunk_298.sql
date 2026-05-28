@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "work_type_site_location_unique" ON "work_type_site_locations" USING btree ("work_type_id","site_location_id");

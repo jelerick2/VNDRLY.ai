@@ -1,0 +1,1 @@
+ALTER TABLE "invoice_send_log" ADD CONSTRAINT "invoice_send_log_sent_by_user_id_users_id_fk" FOREIGN KEY ("sent_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

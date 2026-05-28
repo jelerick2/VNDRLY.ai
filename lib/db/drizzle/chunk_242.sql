@@ -1,0 +1,1 @@
+ALTER TABLE "site_location_admin_audit_log" ADD CONSTRAINT "site_location_admin_audit_log_site_location_id_site_locations_id_fk" FOREIGN KEY ("site_location_id") REFERENCES "public"."site_locations"("id") ON DELETE set null ON UPDATE no action;

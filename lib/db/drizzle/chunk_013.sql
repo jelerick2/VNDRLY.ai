@@ -1,0 +1,20 @@
+CREATE TABLE "dashboard_1099_delivery_jobs" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"scope" text NOT NULL,
+	"partner_id" integer,
+	"tax_year" integer NOT NULL,
+	"form_type" text NOT NULL,
+	"recipient_vendor_ids" jsonb,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"total_count" integer DEFAULT 0 NOT NULL,
+	"attempted" integer DEFAULT 0 NOT NULL,
+	"delivered" integer DEFAULT 0 NOT NULL,
+	"skipped_no_consent" integer DEFAULT 0 NOT NULL,
+	"errors_json" jsonb DEFAULT '[]'::jsonb NOT NULL,
+	"last_error_message" text,
+	"created_by_user_id" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"started_at" timestamp with time zone,
+	"finished_at" timestamp with time zone
+);

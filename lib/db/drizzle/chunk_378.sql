@@ -1,0 +1,1 @@
+CREATE INDEX "tax_1099_filings_payer_idx" ON "tax_1099_filings" USING btree ("payer_partner_id","tax_year");

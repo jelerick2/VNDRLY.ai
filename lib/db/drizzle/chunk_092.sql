@@ -1,0 +1,1 @@
+ALTER TABLE "accounting_connection_items" ADD CONSTRAINT "accounting_connection_items_connection_id_accounting_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."accounting_connections"("id") ON DELETE cascade ON UPDATE no action;

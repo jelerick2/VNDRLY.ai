@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "signup_assistant_counters_ns_key_uniq" ON "signup_assistant_counters" USING btree ("namespace","key");

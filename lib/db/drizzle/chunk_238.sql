@@ -1,0 +1,1 @@
+ALTER TABLE "reconciliation_weekly_recap_log" ADD CONSTRAINT "reconciliation_weekly_recap_log_vendor_id_vendors_id_fk" FOREIGN KEY ("vendor_id") REFERENCES "public"."vendors"("id") ON DELETE cascade ON UPDATE no action;

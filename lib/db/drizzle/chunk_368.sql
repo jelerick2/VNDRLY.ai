@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "qb_account_mapping_scope_line_type" ON "qb_account_mapping" USING btree ("vendor_id","partner_id","line_type");

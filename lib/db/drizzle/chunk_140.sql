@@ -1,0 +1,1 @@
+ALTER TABLE "partner_eula_acceptances" ADD CONSTRAINT "partner_eula_acceptances_vendor_catalog_version_id_vendor_catalog_versions_id_fk" FOREIGN KEY ("vendor_catalog_version_id") REFERENCES "public"."vendor_catalog_versions"("id") ON DELETE cascade ON UPDATE no action;

@@ -1,5 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isElementDisabled } from "../../lib/testDomHelpers";
 
 // Task #686 — verifies the ticket detail screen behaves correctly when
 // the per-session rate limiter (Task #675) trips. Two scenarios:
@@ -278,9 +279,9 @@ describe("TicketDetailScreen — Task #686 rate-limit gate", () => {
     // And the screen actually renders the ticket — the refresh button
     // (only mounted in the loaded branch) is in the DOM and enabled.
     await waitFor(() => {
-      const btn = screen.queryByTestId("button-refresh-ticket-detail") as HTMLButtonElement | null;
+      const btn = screen.queryByTestId("button-refresh-ticket-detail");
       expect(btn).toBeTruthy();
-      expect(btn?.disabled).toBe(false);
+      expect(isElementDisabled(btn)).toBe(false);
     });
   });
 
@@ -325,7 +326,7 @@ describe("TicketDetailScreen — Task #686 rate-limit gate", () => {
     // Wait for the initial load() so the loaded branch (with the
     // header refresh button) is mounted.
     const button = await screen.findByTestId("button-refresh-ticket-detail");
-    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(isElementDisabled(button)).toBe(false);
     // Pre-condition: no rate-limit toast on a happy screen.
     expect(screen.queryAllByTestId("toast-ticket-rate-limited").length).toBe(0);
 
@@ -356,8 +357,8 @@ describe("TicketDetailScreen — Task #686 rate-limit gate", () => {
     // And the header refresh button must be disabled so a follow-up
     // tap can't immediately re-trip the limiter.
     await waitFor(() => {
-      const btn = screen.getByTestId("button-refresh-ticket-detail") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      const btn = screen.getByTestId("button-refresh-ticket-detail");
+      expect(isElementDisabled(btn)).toBe(true);
     });
   });
 
@@ -392,7 +393,7 @@ describe("TicketDetailScreen — Task #686 rate-limit gate", () => {
     render(<TicketDetailScreen />);
 
     const button = await screen.findByTestId("button-refresh-ticket-detail");
-    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(isElementDisabled(button)).toBe(false);
 
     // Now arm the cooldown manually (simulating the gate hook
     // observing a 429 from any caller). The hook's subscriber should
@@ -409,8 +410,8 @@ describe("TicketDetailScreen — Task #686 rate-limit gate", () => {
     // And the manual refresh button must be disabled — a tap during
     // cooldown would just re-trip the limiter.
     await waitFor(() => {
-      const btn = screen.getByTestId("button-refresh-ticket-detail") as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      const btn = screen.getByTestId("button-refresh-ticket-detail");
+      expect(isElementDisabled(btn)).toBe(true);
     });
   });
 });

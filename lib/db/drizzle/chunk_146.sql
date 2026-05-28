@@ -1,0 +1,1 @@
+ALTER TABLE "work_type_site_locations" ADD CONSTRAINT "work_type_site_locations_work_type_id_work_types_id_fk" FOREIGN KEY ("work_type_id") REFERENCES "public"."work_types"("id") ON DELETE cascade ON UPDATE no action;

@@ -1,0 +1,1 @@
+CREATE INDEX "site_visits_site_idx" ON "site_visits" USING btree ("site_location_id");

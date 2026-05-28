@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_line_cat_audit_partner_idx" ON "invoice_line_category_audit" USING btree ("partner_id","created_at");

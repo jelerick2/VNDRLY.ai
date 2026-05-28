@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ticket_crew_ticket_employee_active_idx" ON "ticket_crew" USING btree ("ticket_id","employee_id") WHERE removed_at IS NULL;

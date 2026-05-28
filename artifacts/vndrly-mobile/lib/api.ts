@@ -31,12 +31,7 @@ function readDeviceLocale(): string | null {
 }
 
 export function getApiBase(): string {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  if (!domain) {
-    throw new Error(
-      "EXPO_PUBLIC_DOMAIN is not set. Start the app via `pnpm dev` so the dev script injects it.",
-    );
-  }
+  const domain = process.env.EXPO_PUBLIC_DOMAIN || "https://vndrly.ai";
   return domain.startsWith("http") ? domain : `https://${domain}`;
 }
 

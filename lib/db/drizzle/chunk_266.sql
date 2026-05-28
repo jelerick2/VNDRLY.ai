@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ap_payment_digest_log_dedupe_unique" ON "ap_payment_digest_log" USING btree ("dedupe_key");

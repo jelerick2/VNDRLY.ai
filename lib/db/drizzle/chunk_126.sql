@@ -1,0 +1,1 @@
+ALTER TABLE "onboarding_progress" ADD CONSTRAINT "onboarding_progress_vendor_people_id_vendor_people_id_fk" FOREIGN KEY ("vendor_people_id") REFERENCES "public"."vendor_people"("id") ON DELETE cascade ON UPDATE no action;

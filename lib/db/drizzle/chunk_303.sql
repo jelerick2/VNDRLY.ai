@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "site_locations_partner_source_ref_uniq" ON "site_locations" USING btree ("partner_id","source_ref") WHERE "site_locations"."source_ref" IS NOT NULL;

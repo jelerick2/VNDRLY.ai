@@ -1,0 +1,1 @@
+CREATE INDEX "invoices_partner_status_idx" ON "invoices" USING btree ("partner_id","status");

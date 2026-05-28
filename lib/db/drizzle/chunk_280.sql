@@ -1,0 +1,1 @@
+CREATE INDEX "direct_assignments_vendor_status_idx" ON "direct_assignments" USING btree ("vendor_id","status");

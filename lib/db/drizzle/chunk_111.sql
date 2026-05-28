@@ -1,0 +1,1 @@
+ALTER TABLE "direct_assignments" ADD CONSTRAINT "direct_assignments_responded_by_user_id_users_id_fk" FOREIGN KEY ("responded_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

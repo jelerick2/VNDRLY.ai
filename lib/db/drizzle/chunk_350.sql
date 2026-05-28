@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_line_cat_audit_batch_idx" ON "invoice_line_category_audit" USING btree ("batch_id");

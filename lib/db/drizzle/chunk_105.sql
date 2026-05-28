@@ -1,0 +1,1 @@
+ALTER TABLE "dashboard_1099_email_settings" ADD CONSTRAINT "dashboard_1099_email_settings_partner_id_partners_id_fk" FOREIGN KEY ("partner_id") REFERENCES "public"."partners"("id") ON DELETE cascade ON UPDATE no action;

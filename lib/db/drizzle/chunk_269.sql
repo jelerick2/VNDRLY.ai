@@ -1,0 +1,1 @@
+CREATE INDEX "certification_reminder_log_cert_idx" ON "certification_reminder_log" USING btree ("certification_id");

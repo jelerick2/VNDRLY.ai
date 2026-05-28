@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD CONSTRAINT "users_active_membership_id_user_org_memberships_id_fk" FOREIGN KEY ("active_membership_id") REFERENCES "public"."user_org_memberships"("id") ON DELETE set null ON UPDATE no action;

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "demo_user_label_overrides_username_locale_unique" ON "demo_user_label_overrides" USING btree ("username","locale");

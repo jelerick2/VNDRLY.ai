@@ -1,0 +1,1 @@
+ALTER TABLE "tax_1099_correction_audit_log" ADD CONSTRAINT "tax_1099_correction_audit_log_filing_id_tax_1099_filings_id_fk" FOREIGN KEY ("filing_id") REFERENCES "public"."tax_1099_filings"("id") ON DELETE set null ON UPDATE no action;

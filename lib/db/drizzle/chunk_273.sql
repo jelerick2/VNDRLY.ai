@@ -1,0 +1,1 @@
+CREATE INDEX "dashboard_1099_delivery_jobs_status_idx" ON "dashboard_1099_delivery_jobs" USING btree ("status");

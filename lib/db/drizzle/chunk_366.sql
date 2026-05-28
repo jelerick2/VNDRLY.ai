@@ -1,0 +1,1 @@
+CREATE INDEX "schedule_cert_override_audit_ticket_idx" ON "schedule_cert_override_audit_log" USING btree ("ticket_id","created_at");

@@ -26,7 +26,29 @@
 // test in the package without the per-file mocks having to duplicate
 // the workaround.
 
+import path from "node:path";
+import Module from "node:module";
 import { vi } from "vitest";
+
+const ASSETS_ROOT = path.resolve(__dirname);
+const _Module = Module as unknown as {
+  _resolveFilename: (
+    request: string,
+    parent: NodeModule,
+    ...rest: unknown[]
+  ) => string;
+  _extensions: Record<string, (m: { exports: unknown }, f: string) => void>;
+};
+const origResolve = _Module._resolveFilename.bind(_Module);
+_Module._resolveFilename = (request, parent, ...rest) => {
+  if (request.startsWith("@/assets/") && request.endsWith(".png")) {
+    return path.join(ASSETS_ROOT, request.slice(2));
+  }
+  return origResolve(request, parent, ...rest);
+};
+_Module._extensions[".png"] = (m, filename) => {
+  m.exports = filename;
+};
 
 // ── Fix #1: stub `globalThis.expo.EventEmitter` ──────────────────────
 //
@@ -220,5 +242,20 @@ vi.mock("expo-secure-store", () => {
     }),
     isAvailableAsync: vi.fn(async () => false),
     canUseBiometricAuthentication: vi.fn(() => false),
+  };
+});
+
+// ── Fix #4: stub `react-native-safe-area-context` ───────────────────
+//
+// The published package ships Flow/ESM that Node can't parse at module
+// load (`Unexpected token 'typeof'`). Screens using InPageHeader pull
+// this in transitively; a global pass-through keeps component tests loadable.
+vi.mock("react-native-safe-area-context", async () => {
+  const RN = await import("react-native");
+  return {
+    SafeAreaView: RN.View,
+    SafeAreaProvider: ({ children }: { children: React.ReactNode }) =>
+      children,
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   };
 });

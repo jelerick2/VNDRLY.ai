@@ -1,0 +1,1 @@
+ALTER TABLE "tax_1099_filings" ADD CONSTRAINT "tax_1099_filings_payer_partner_id_partners_id_fk" FOREIGN KEY ("payer_partner_id") REFERENCES "public"."partners"("id") ON DELETE cascade ON UPDATE no action;

@@ -1,0 +1,1 @@
+ALTER TABLE "qb_account_mapping" ADD CONSTRAINT "qb_account_mapping_partner_id_partners_id_fk" FOREIGN KEY ("partner_id") REFERENCES "public"."partners"("id") ON DELETE cascade ON UPDATE no action;

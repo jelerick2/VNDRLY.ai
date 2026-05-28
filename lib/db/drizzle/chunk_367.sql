@@ -1,0 +1,1 @@
+CREATE INDEX "schedule_cert_override_audit_created_idx" ON "schedule_cert_override_audit_log" USING btree ("created_at");

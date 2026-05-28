@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "invoice_ticket_link_unique" ON "invoice_ticket_links" USING btree ("invoice_id","ticket_id");

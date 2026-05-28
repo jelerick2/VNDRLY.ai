@@ -1,0 +1,1 @@
+ALTER TABLE "invoice_reminder_log" ADD CONSTRAINT "invoice_reminder_log_invoice_id_invoices_id_fk" FOREIGN KEY ("invoice_id") REFERENCES "public"."invoices"("id") ON DELETE cascade ON UPDATE no action;

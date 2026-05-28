@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "comment_read_receipts_uniq" ON "comment_read_receipts" USING btree ("source","comment_id","user_id");

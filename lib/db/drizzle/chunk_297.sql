@@ -1,0 +1,1 @@
+CREATE INDEX "partner_vendor_approval_events_vendor_idx" ON "partner_vendor_approval_events" USING btree ("vendor_id");

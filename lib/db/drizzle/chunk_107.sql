@@ -1,0 +1,1 @@
+ALTER TABLE "direct_assignments" ADD CONSTRAINT "direct_assignments_partner_id_partners_id_fk" FOREIGN KEY ("partner_id") REFERENCES "public"."partners"("id") ON DELETE cascade ON UPDATE no action;

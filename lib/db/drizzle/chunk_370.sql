@@ -1,0 +1,1 @@
+CREATE INDEX "qb_account_mapping_audit_line_type_idx" ON "qb_account_mapping_audit_log" USING btree ("line_type","created_at");

@@ -1,0 +1,1 @@
+CREATE INDEX "dashboard_1099_email_settings_enabled_idx" ON "dashboard_1099_email_settings" USING btree ("enabled");

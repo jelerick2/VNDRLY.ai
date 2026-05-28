@@ -1,0 +1,21 @@
+CREATE TABLE "site_locations" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"partner_id" integer NOT NULL,
+	"name" text NOT NULL,
+	"address" text NOT NULL,
+	"latitude" double precision NOT NULL,
+	"longitude" double precision NOT NULL,
+	"state" text,
+	"site_code" text NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"status" text DEFAULT 'active' NOT NULL,
+	"hidden" boolean DEFAULT false NOT NULL,
+	"site_radius_meters" integer,
+	"afe" text,
+	"photo_url" text,
+	"source_type" text DEFAULT 'manual' NOT NULL,
+	"source_ref" text,
+	"superseded_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "site_locations_site_code_unique" UNIQUE("site_code")
+);

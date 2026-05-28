@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_credit_memos_invoice_idx" ON "invoice_credit_memos" USING btree ("invoice_id");

@@ -1,0 +1,1 @@
+CREATE INDEX "platform_settings_audit_field_created_idx" ON "platform_settings_audit_log" USING btree ("field","created_at");

@@ -4,6 +4,7 @@ import React from "react";
 import { useTranslation } from "react-i18next";
 
 import ActiveOrgIndicator from "@/components/ActiveOrgIndicator";
+import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/useColors";
 import { useTabBadges } from "@/lib/tabBadges";
 
@@ -11,6 +12,8 @@ export default function TabLayout() {
   const colors = useColors();
   const { t } = useTranslation();
   const badges = useTabBadges();
+  const { user } = useAuth();
+  const isFieldEmployee = user?.role === "field_employee";
   return (
     <Tabs
       screenOptions={{
@@ -52,6 +55,7 @@ export default function TabLayout() {
         name="schedule"
         options={{
           title: t("tabs.schedule"),
+          href: isFieldEmployee ? null : undefined,
           tabBarIcon: ({ color, size }) => (
             <Feather name="calendar" size={size} color={color} />
           ),

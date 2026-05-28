@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "vendor_work_types_vendor_work_type_unique" ON "vendor_work_types" USING btree ("vendor_id","work_type_id");

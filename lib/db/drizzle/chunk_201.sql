@@ -1,0 +1,1 @@
+ALTER TABLE "site_visits" ADD CONSTRAINT "site_visits_host_partner_id_partners_id_fk" FOREIGN KEY ("host_partner_id") REFERENCES "public"."partners"("id") ON DELETE no action ON UPDATE no action;

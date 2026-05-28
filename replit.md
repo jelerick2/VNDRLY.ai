@@ -150,7 +150,7 @@ Outbound emails, including password resets and invoice deliveries, are handled v
 Vendors connect QuickBooks Online and OpenAccountant from the Reports page. OpenAccountant ships with both an OAuth2 default flow (`GET /api/accounting/oa/connect` + `/callback`) and a long-lived API-key fallback (`POST /api/accounting/oa/connect-api-key`). Admin setup for the OAuth path — required env vars (`OPENACCOUNTANT_CLIENT_ID`, `OPENACCOUNTANT_CLIENT_SECRET`, `OPENACCOUNTANT_REDIRECT_URI`, plus optional `OPENACCOUNTANT_OAUTH_BASE_URL` / `OPENACCOUNTANT_OAUTH_SCOPE`), how to register the OA OAuth client, and the API-key fallback are documented in `docs/accounting-oauth.md`.
 
 ## External Dependencies
-- **PostgreSQL:** Primary relational database.
+- **PostgreSQL (Supabase):** Primary relational database — project `bihjmgbdzbhcnsuhzzwo`, us-west-2. Local `.env.local` and Replit `DATABASE_URL` secret both point at the same Supabase instance. See **`docs/database.md`**.
 - **Drizzle ORM:** TypeScript ORM.
 - **Zod:** Schema validation library.
 - **Orval:** OpenAPI client code generator.

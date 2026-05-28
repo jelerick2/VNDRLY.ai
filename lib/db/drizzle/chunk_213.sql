@@ -1,0 +1,1 @@
+ALTER TABLE "invoice_payment_audit_log" ADD CONSTRAINT "invoice_payment_audit_log_payment_id_invoice_payments_id_fk" FOREIGN KEY ("payment_id") REFERENCES "public"."invoice_payments"("id") ON DELETE cascade ON UPDATE no action;

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "invoice_reminder_log_dedupe_unique" ON "invoice_reminder_log" USING btree ("dedupe_key");

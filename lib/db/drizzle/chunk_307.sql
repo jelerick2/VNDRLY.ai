@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "uniq_ticket_assignment_rate" ON "ticket_assignment_rates" USING btree ("ticket_id","employee_id");

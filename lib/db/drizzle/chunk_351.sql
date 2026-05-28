@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_send_log_invoice_idx" ON "invoice_send_log" USING btree ("invoice_id");

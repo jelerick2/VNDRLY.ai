@@ -1,0 +1,1 @@
+ALTER TABLE "ticket_assignment_rates" ADD CONSTRAINT "ticket_assignment_rates_ticket_id_tickets_id_fk" FOREIGN KEY ("ticket_id") REFERENCES "public"."tickets"("id") ON DELETE no action ON UPDATE no action;

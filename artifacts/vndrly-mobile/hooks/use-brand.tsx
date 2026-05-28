@@ -23,15 +23,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { applyAppIcon } from "@/lib/dynamic-app-icon";
 import { resolveBrandIcon, type BrandIconName } from "@/lib/brand-icon-map";
 
-// Neutral dark fallback used ONLY when no brand color has been
-// configured anywhere in the chain (no partner, no vendor, no
-// platform_settings.brandPrimaryColor). The mobile app must never
-// render amber. Default is a neutral VNDRLY blue so unbranded
-// surfaces (login, splash, pre-auth) have a non-amber identity.
-// Once the admin or a partner/vendor sets their own color it
-// overrides this via brand.primary.
-export const DEFAULT_BRAND_PRIMARY = "#2563eb";
-export const DEFAULT_BRAND_ACCENT = "#1e3a8a";
+// VNDRLY default brand — gold/amber matches the TestFlight field-app
+// chrome (yellow V logo, yellow CTAs, yellow active tab). Partner/vendor
+// org colors still override this when configured.
+export const DEFAULT_BRAND_PRIMARY = "#FFB800";
+export const DEFAULT_BRAND_ACCENT = "#d97706";
 const STORAGE_KEY = "vndrly.lastBrand";
 
 export interface Brand {
@@ -56,17 +52,6 @@ let cachedBrand: Brand = DEFAULT_BRAND;
 let cachedBrandLoaded = false;
 const cacheListeners = new Set<(brand: Brand) => void>();
 
-// Hard purge of any legacy amber/gold values that exist anywhere
-// in the brand chain — persisted localStorage, the platform-brand
-// admin row, etc. Anything matching is dropped so the chain falls
-// back to the new neutral blue default.
-function isLegacyAmber(c?: string | null): boolean {
-  if (!c) return false;
-  return /^#?(e6ac00|f5c542|ffb000|ffa500|d4a017|c89b3c|b8860b|fbbf24|f59e0b|fcd34d|fde68a|facc15|eab308|d97706)$/i.test(
-    c.replace("#", ""),
-  );
-}
-
 function normalizeUrl(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
@@ -87,14 +72,9 @@ async function readStoredBrand(): Promise<Brand> {
     const parsed = JSON.parse(raw) as Partial<Brand>;
     const logoUrl = normalizeUrl(parsed.logoUrl);
     const logoSquareUrl = normalizeUrl(parsed.logoSquareUrl);
-    // Hard purge of any legacy amber that was persisted before the
-    // amber ban. Uses the module-level `isLegacyAmber` so the same
-    // gold/amber list applies here AND to the platform-brand fetch.
-    const safePrimary = isLegacyAmber(parsed.primary) ? null : parsed.primary;
-    const safeAccent = isLegacyAmber(parsed.accent) ? null : parsed.accent;
     return {
-      primary: safePrimary || DEFAULT_BRAND_PRIMARY,
-      accent: safeAccent || safePrimary || DEFAULT_BRAND_ACCENT,
+      primary: parsed.primary || DEFAULT_BRAND_PRIMARY,
+      accent: parsed.accent || parsed.primary || DEFAULT_BRAND_ACCENT,
       logoUrl,
       logoSquareUrl,
       name: parsed.name ?? null,
@@ -344,12 +324,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     if (platformBrand && !partnerId && !vendorId) {
       const logoUrl = normalizeUrl(platformBrand.logoUrl);
       const logoSquareUrl = normalizeUrl(platformBrand.logoSquareUrl);
-      const primaryRaw = isLegacyAmber(platformBrand.brandPrimaryColor)
-        ? null
-        : platformBrand.brandPrimaryColor || null;
-      const accentRaw = isLegacyAmber(platformBrand.brandAccentColor)
-        ? null
-        : platformBrand.brandAccentColor || null;
+      const primaryRaw = platformBrand.brandPrimaryColor || null;
+      const accentRaw = platformBrand.brandAccentColor || null;
       const hasCustomBrand = !!(primaryRaw || logoUrl || logoSquareUrl);
       if (hasCustomBrand) {
         const primary = primaryRaw || DEFAULT_BRAND_PRIMARY;

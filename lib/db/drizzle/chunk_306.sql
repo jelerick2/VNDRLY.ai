@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ticket_sched_notif_ticket_user_kind_idx" ON "ticket_scheduled_notifications" USING btree ("ticket_id","user_id","kind");

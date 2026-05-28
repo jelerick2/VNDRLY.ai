@@ -1,0 +1,1 @@
+ALTER TABLE "partner_vendor_work_type_approvals" ADD CONSTRAINT "partner_vendor_work_type_approvals_approved_by_user_id_users_id_fk" FOREIGN KEY ("approved_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

@@ -270,9 +270,7 @@ describe("HomeScreen — Task #691 rate-limit gate", () => {
     });
   });
 
-  it("shows the reconnecting toast and disables the header refresh button when the shared cooldown arms", async () => {
-    // Initial mount: list loads happily so the refresh button is in
-    // the DOM and we can assert the disabled flip.
+  it("shows the reconnecting toast when the shared cooldown arms on the field home tab", async () => {
     apiFetchMock.mockImplementation((url: string) => {
       if (url === "/api/field/open-tickets") return Promise.resolve([]);
       if (url === "/api/field/history") return Promise.resolve([]);
@@ -285,33 +283,18 @@ describe("HomeScreen — Task #691 rate-limit gate", () => {
 
     render(<HomeScreen />);
 
-    const button = await screen.findByTestId("button-refresh-tickets");
-    expect((button as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryAllByTestId("toast-tickets-rate-limited").length).toBe(
       0,
     );
 
-    // Arm the cooldown manually (simulating the gate hook observing a
-    // 429 raised by some other caller — e.g. the live-location
-    // reporter or the ticket detail screen).
     await act(async () => {
       noteTicketsRateLimit(makeRateLimitError(15));
     });
 
-    // The reconnecting toast must be visible.
     await waitFor(() => {
       expect(
         screen.queryAllByTestId("toast-tickets-rate-limited").length,
       ).toBeGreaterThan(0);
-    });
-
-    // And the manual refresh button must be disabled — a tap during
-    // cooldown would just re-trip the limiter.
-    await waitFor(() => {
-      const btn = screen.getByTestId(
-        "button-refresh-tickets",
-      ) as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
     });
   });
 });

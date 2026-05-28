@@ -7,6 +7,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "https://vndrly.ai"
+      },
       "ios": {
         "simulator": true
       },
@@ -14,6 +17,9 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "https://vndrly.ai"
+      },
       "ios": {
         "simulator": false
       },
@@ -24,6 +30,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "https://vndrly.ai"
+      },
       "ios": {
         "resourceClass": "m-medium"
       },
@@ -37,7 +46,7 @@
     "production": {
       "ios": {
         "appleId": "REPLACE_WITH_APPLE_ID_EMAIL",
-        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "ascAppId": "6771456209",
         "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
       },
       "android": {
@@ -45,14 +54,6 @@
         "track": "internal",
         "releaseStatus": "draft"
       }
-    }
-  },
-  "update": {
-    "production": {
-      "channel": "production"
-    },
-    "preview": {
-      "channel": "preview"
     }
   }
 }

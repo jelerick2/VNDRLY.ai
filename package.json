@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "preinstall": "node -e \"const fs=require('fs'); for (const f of ['package-lock.json','yarn.lock']) fs.rmSync(f,{force:true}); const ua=process.env.npm_config_user_agent||''; const execPath=process.env.npm_execpath||''; if (!/^pnpm\\//.test(ua) && !/pnpm/i.test(execPath)) { console.error('Use pnpm instead'); process.exit(1); }\"",
     "dev:bootstrap": "bash scripts/dev-bootstrap.sh",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
@@ -15,7 +15,7 @@
     "test:api": "pnpm --filter @workspace/api-server run test",
     "test:e2e": "pnpm --filter @workspace/e2e exec playwright test",
     "lint:i18n": "pnpm --filter @workspace/scripts run lint:i18n",
-    "save": "powershell -ExecutionPolicy Bypass -File scripts/save-online.ps1"
+    "publish": "powershell -ExecutionPolicy Bypass -File scripts/publish-online.ps1"
   },
   "private": true,
   "devDependencies": {

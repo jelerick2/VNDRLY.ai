@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "tax_1099_filings_unique" ON "tax_1099_filings" USING btree ("tax_year","form_type","payer_partner_id","recipient_vendor_id");

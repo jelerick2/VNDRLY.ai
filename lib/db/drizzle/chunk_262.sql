@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "accounting_conn_vendor_provider_uniq" ON "accounting_connections" USING btree ("vendor_id","provider");

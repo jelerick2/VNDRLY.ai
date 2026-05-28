@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev:local": "pnpm run build && node ../../scripts/run-api-local.mjs",
     "build": "node ./build.mjs",
-    "start": "node --enable-source-maps ./dist/index.mjs",
+    "start": "node --import ../../scripts/load-env-local.mjs --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "tsx scripts/run-with-test-db.ts -- sh -c 'pnpm --filter @workspace/db run check-schema && vitest run'",
     "test:no-isolated-db": "pnpm --filter @workspace/db run check-schema && vitest run",
@@ -41,6 +42,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5",
     "google-auth-library": "^10.6.2",
+    "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "jszip": "^3.10.1",
     "pdfkit": "^0.18.0",

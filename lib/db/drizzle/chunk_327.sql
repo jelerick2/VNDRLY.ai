@@ -1,0 +1,1 @@
+CREATE INDEX "invoices_open_period_idx" ON "invoices" USING btree ("vendor_id","partner_id","cadence","status","period_start");

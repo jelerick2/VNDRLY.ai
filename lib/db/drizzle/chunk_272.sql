@@ -1,0 +1,1 @@
+CREATE INDEX "dashboard_1099_delivery_jobs_scope_idx" ON "dashboard_1099_delivery_jobs" USING btree ("scope","partner_id","created_at");

@@ -1,0 +1,1 @@
+CREATE INDEX "direct_assignments_site_idx" ON "direct_assignments" USING btree ("site_location_id");

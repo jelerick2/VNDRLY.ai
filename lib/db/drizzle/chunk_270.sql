@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "certification_reminder_log_dedupe_unique" ON "certification_reminder_log" USING btree ("dedupe_key");

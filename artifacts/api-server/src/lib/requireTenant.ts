@@ -12,5 +12,5 @@ export function requireTenant(req: Request, res: Response, next: NextFunction) {
     return res.status(403).json({ message: "No tenant context" });
   }
 
-  next();
+  return next();
 }

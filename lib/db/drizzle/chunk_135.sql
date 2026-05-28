@@ -1,0 +1,1 @@
+ALTER TABLE "vendor_work_types" ADD CONSTRAINT "vendor_work_types_work_type_id_work_types_id_fk" FOREIGN KEY ("work_type_id") REFERENCES "public"."work_types"("id") ON DELETE no action ON UPDATE no action;

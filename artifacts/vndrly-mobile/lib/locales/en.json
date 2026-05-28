@@ -164,7 +164,6 @@
       "foremanSelfSuffix": "(you)"
     },
     "errorLoadOpen": "Couldn't load your open tickets. Pull to refresh.",
-    "errorOpenWeb": "Couldn't open the web portal. Try again from a browser.",
     "errorLoadHistory": "Couldn't load your job history. Pull to refresh.",
     "refreshDetailAccessibility": "Refresh this ticket",
     "refreshDetailAccessibilityHint": "Pulls the latest details, items, notes, and tracking from the server.",

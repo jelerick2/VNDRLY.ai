@@ -1,0 +1,1 @@
+CREATE INDEX "accounting_conn_reminder_log_conn_idx" ON "accounting_connection_reminder_log" USING btree ("connection_id");

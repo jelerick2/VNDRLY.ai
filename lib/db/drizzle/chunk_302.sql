@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "vendor_site_location_afe_unique" ON "vendor_site_location_afes" USING btree ("vendor_id","site_location_id");

@@ -1,0 +1,1 @@
+CREATE INDEX "site_visits_host_partner_idx" ON "site_visits" USING btree ("host_partner_id");

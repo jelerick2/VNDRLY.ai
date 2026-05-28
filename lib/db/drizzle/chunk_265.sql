@@ -1,0 +1,1 @@
+CREATE INDEX "ap_payment_digest_log_partner_idx" ON "ap_payment_digest_log" USING btree ("partner_id");

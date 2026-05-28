@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "vendor_catalog_versions_vendor_version_unique" ON "vendor_catalog_versions" USING btree ("vendor_id","version");

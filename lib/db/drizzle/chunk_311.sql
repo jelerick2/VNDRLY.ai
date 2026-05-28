@@ -1,0 +1,1 @@
+CREATE INDEX "user_org_memberships_org_idx" ON "user_org_memberships" USING btree ("org_type","partner_id","vendor_id");

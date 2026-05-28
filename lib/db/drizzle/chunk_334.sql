@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "invoice_lines_generated_dedupe_null_source_uniq" ON "invoice_lines" USING btree ("invoice_id","ticket_id","source_type") WHERE is_manual_override = false AND ticket_id IS NOT NULL AND source_id IS NULL;

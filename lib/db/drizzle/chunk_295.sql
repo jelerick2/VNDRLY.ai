@@ -1,0 +1,1 @@
+CREATE INDEX "partner_eula_acceptances_pair_idx" ON "partner_eula_acceptances" USING btree ("partner_id","vendor_id","vendor_catalog_version_id");

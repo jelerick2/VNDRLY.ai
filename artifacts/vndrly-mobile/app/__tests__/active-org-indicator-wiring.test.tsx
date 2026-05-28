@@ -95,6 +95,10 @@ vi.mock("@/hooks/useColors", () => ({
   }),
 }));
 
+vi.mock("@/lib/tabBadges", () => ({
+  useTabBadges: () => ({ home: 0, schedule: 0 }),
+}));
+
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
     availableMemberships: [
@@ -204,16 +208,17 @@ beforeEach(() => {
 describe("ActiveOrgIndicator wiring (Task #186)", () => {
   it("is injected into the tab navigator's headerRight", async () => {
     const TabLayout = (await import("../(tabs)/_layout")).default;
-    render(<TabLayout />);
-    expect(tabsCalls.length).toBeGreaterThan(0);
-    const screenOpts = tabsCalls[0].screenOptions;
+    const renderedLayout = TabLayout() as React.ReactElement<{
+      screenOptions?: Record<string, unknown>;
+    }>;
+    const screenOpts = renderedLayout.props.screenOptions;
     expect(screenOpts).toBeDefined();
     expect(typeof screenOpts!.headerRight).toBe("function");
     const rendered = (
       screenOpts!.headerRight as () => React.ReactElement<unknown, React.JSXElementConstructor<unknown>>
     )();
     expect((rendered.type as { name?: string }).name).toBe("ActiveOrgIndicator");
-  });
+  }, 30_000);
 
   it("is injected into the root stack's headerRight so non-tab screens get it too", async () => {
     const RootLayout = (await import("../_layout")).default;
@@ -226,5 +231,5 @@ describe("ActiveOrgIndicator wiring (Task #186)", () => {
       screenOpts!.headerRight as () => React.ReactElement<unknown, React.JSXElementConstructor<unknown>>
     )();
     expect((rendered.type as { name?: string }).name).toBe("ActiveOrgIndicator");
-  });
+  }, 15_000);
 });

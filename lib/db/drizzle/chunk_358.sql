@@ -1,0 +1,1 @@
+CREATE INDEX "report_export_audit_created_idx" ON "report_export_audit_log" USING btree ("created_at");

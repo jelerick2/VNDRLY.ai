@@ -708,7 +708,7 @@ export default function HomeScreen() {
                     >
                       {orgName}
                     </Text>
-                    {orgType ? (
+                    {orgType && !isFieldEmployee ? (
                       <View
                         style={[
                           styles.orgPill,
@@ -740,7 +740,7 @@ export default function HomeScreen() {
                     >
                       {orgName}
                     </Text>
-                    {orgType ? (
+                    {orgType && !isFieldEmployee ? (
                       <View
                         style={[
                           styles.orgPill,
@@ -779,52 +779,23 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Heading row: "Tracking" left, Live/freshness pill right ──
-          Title and the freshness ("Live") indicator share one line so
-          the eye lands on the page identity AND its connection state
-          at the same height. Action buttons (History / New Ticket /
-          Refresh) drop to the row below — that gives them room to
-          sit at full pill size without forcing the heading column to
-          flex-shrink and wrap "Tracking" on narrow devices. */}
-      <View style={styles.headerRow}>
-        <Text style={[styles.heading, { color: colors.foreground }]} numberOfLines={1}>
-          {t("tickets.title")}
-        </Text>
-        <View style={styles.freshnessRow}>
-          <FreshnessPill
-            lastLoadedAt={lastLoadedAt}
-            inFlight={loading || refreshing || headerRefreshing}
-            errored={loadError != null}
-            rateLimited={rateLimited}
-            testID="tickets-freshness-pill"
-          />
-        </View>
-      </View>
-
-      {/* ── Action row: pill buttons, left-aligned under the heading ──
-          History + New Ticket use the same TogglePillButton chrome the
-          login screen uses (Sign In / Continue), so the in-app primary
-          actions read with the same visual weight the user has already
-          learned. Refresh stays as a compact icon button on the right
-          of the row. */}
-      {/* All three actions use the SAME solid brand-colored pill chrome
-          as the "Start New Job" CTA so the row reads as a uniform set
-          of equal-weight buttons rather than mixing visual styles.
-          Refresh shows a spinner in place of its icon while in flight,
-          and disables itself during the rate-limit cooldown. */}
-      <View style={styles.actionsRow}>
-        {isFieldEmployee ? (
-          <>
-            <LayeredPillButton
-              onPress={() => router.push("/history")}
+      {isFieldEmployee ? (
+        /* Field-employee home — matches the TestFlight layout: "Tracking"
+           on the left, grey History + brand "Start New Job" on the right. */
+        <View style={styles.trackingRow}>
+          <Text style={[styles.heading, { color: colors.foreground }]} numberOfLines={1}>
+            {t("tickets.title")}
+          </Text>
+          <View style={styles.trackingActions}>
+            <TogglePillButton
+              inactive
               height={36}
+              onPress={() => router.push("/history")}
               testID="button-tickets-history"
             >
-              <Feather name="clock" size={14} color="#ffffff" style={styles.btnIconShadow} />
-              <Text style={[styles.newBtnText, { color: "#ffffff" }]}>
-                {t("tickets.history")}
-              </Text>
-            </LayeredPillButton>
+              <Feather name="clock" size={14} color="#1a1d23" />
+              <Text style={styles.historyBtnText}>{t("tickets.history")}</Text>
+            </TogglePillButton>
             <LayeredPillButton
               onPress={() => router.push("/new-ticket")}
               height={36}
@@ -835,23 +806,42 @@ export default function HomeScreen() {
                 {t("tickets.newTicket")}
               </Text>
             </LayeredPillButton>
-          </>
-        ) : null}
-        <View style={{ flex: 1 }} />
-        <LayeredPillButton
-          onPress={onHeaderRefresh}
-          disabled={headerRefreshing || refreshing || rateLimited}
-          loading={headerRefreshing}
-          height={36}
-          testID="button-refresh-tickets"
-        >
-          {headerRefreshing ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Feather name="refresh-cw" size={16} color="#ffffff" style={styles.btnIconShadow} />
-          )}
-        </LayeredPillButton>
-      </View>
+          </View>
+        </View>
+      ) : (
+        <>
+          <View style={styles.headerRow}>
+            <Text style={[styles.heading, { color: colors.foreground }]} numberOfLines={1}>
+              {t("tickets.title")}
+            </Text>
+            <View style={styles.freshnessRow}>
+              <FreshnessPill
+                lastLoadedAt={lastLoadedAt}
+                inFlight={loading || refreshing || headerRefreshing}
+                errored={loadError != null}
+                rateLimited={rateLimited}
+                testID="tickets-freshness-pill"
+              />
+            </View>
+          </View>
+          <View style={styles.actionsRow}>
+            <View style={{ flex: 1 }} />
+            <LayeredPillButton
+              onPress={onHeaderRefresh}
+              disabled={headerRefreshing || refreshing || rateLimited}
+              loading={headerRefreshing}
+              height={36}
+              testID="button-refresh-tickets"
+            >
+              {headerRefreshing ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Feather name="refresh-cw" size={16} color="#ffffff" style={styles.btnIconShadow} />
+              )}
+            </LayeredPillButton>
+          </View>
+        </>
+      )}
 
       {/*
         Task #498 — "Initiate adjacent ticket" CTA on the dashboard.
@@ -1149,8 +1139,29 @@ export default function HomeScreen() {
                     ) : null}
                   </View>
                   {(() => {
-                    const pill = ticketStatusPillStyle(item.status, item.updatedAt);
                     const staleDays = ticketStaleDays(item.status, item.updatedAt);
+                    if (isFieldEmployee) {
+                      return (
+                        <View style={styles.statusGroup}>
+                          {staleDays != null ? (
+                            <Text
+                              style={[styles.staleText, { color: colors.mutedForeground }]}
+                              accessibilityLabel={t("tickets.staleSuffixA11y", { days: staleDays })}
+                              testID={`text-ticket-stale-${item.id}`}
+                            >
+                              {t("tickets.staleSuffix", { days: staleDays })}
+                            </Text>
+                          ) : null}
+                          <Text
+                            style={[styles.statusTextOnly, { color: colors.primary }]}
+                            testID={`badge-ticket-status-${item.id}`}
+                          >
+                            {ticketStatusLabel(item.status, t)}
+                          </Text>
+                        </View>
+                      );
+                    }
+                    const pill = ticketStatusPillStyle(item.status, item.updatedAt);
                     return (
                       <View style={styles.statusGroup}>
                         {staleDays != null ? (
@@ -1466,8 +1477,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   brandName: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
     marginTop: 2,
   },
   brandVendor: {
@@ -1543,7 +1554,27 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   freshnessRow: { flexDirection: "row", alignItems: "center" },
-  heading: { fontFamily: "Inter_700Bold", fontSize: 22 },
+  heading: { fontFamily: "Inter_700Bold", fontSize: 22, flexShrink: 1 },
+  trackingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  trackingActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
+  },
+  historyBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#1a1d23",
+  },
   // Action buttons (History / New Ticket / Refresh) drop to their own
   // row below the heading so they have full pill width without
   // squeezing the title. Left-aligned to match the heading's left edge;
@@ -1656,6 +1687,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   statusText: { fontFamily: "Inter_500Medium", fontSize: 11 },
+  statusTextOnly: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
   // Task #890: groups the stale-time suffix with the status pill on
   // the right side of the card header so the two read together as a
   // single status block rather than the suffix floating on its own.

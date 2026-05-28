@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "vendors_canonical_name_unique" ON "vendors" USING btree (lower(btrim("name")));

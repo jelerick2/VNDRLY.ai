@@ -1,0 +1,1 @@
+CREATE INDEX "tax_1099_filings_year_idx" ON "tax_1099_filings" USING btree ("tax_year","form_type");

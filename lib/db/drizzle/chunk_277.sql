@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "dashboard_1099_email_settings_partner_unique" ON "dashboard_1099_email_settings" USING btree ("partner_id") WHERE "dashboard_1099_email_settings"."scope" = 'partner' and "dashboard_1099_email_settings"."partner_id" is not null;

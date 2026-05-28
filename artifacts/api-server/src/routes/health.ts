@@ -8,4 +8,8 @@ router.get("/healthz", (_req, res) => {
   sendResponse(res, HealthCheckResponse, { status: "ok" });
 });
 
+router.get("/health", (_req, res) => {
+  sendResponse(res, HealthCheckResponse, { status: "ok" });
+});
+
 export default router;

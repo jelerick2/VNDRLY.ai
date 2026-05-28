@@ -1,0 +1,1 @@
+ALTER TABLE "ticket_unlocks" ADD CONSTRAINT "ticket_unlocks_unlocked_by_id_users_id_fk" FOREIGN KEY ("unlocked_by_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

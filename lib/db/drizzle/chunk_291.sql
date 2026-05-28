@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "work_types_canonical_name_unique" ON "work_types" USING btree (lower(btrim("name")));

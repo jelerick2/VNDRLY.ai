@@ -1,0 +1,1 @@
+CREATE INDEX "reconciliation_weekly_recap_log_vendor_idx" ON "reconciliation_weekly_recap_log" USING btree ("vendor_id");

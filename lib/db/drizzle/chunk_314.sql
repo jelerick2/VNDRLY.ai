@@ -1,0 +1,1 @@
+CREATE INDEX "notifications_unemailed_idx" ON "notifications" USING btree ("user_id","created_at") WHERE "notifications"."emailed_at" is null;

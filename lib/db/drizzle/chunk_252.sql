@@ -1,0 +1,1 @@
+ALTER TABLE "qb_account_mapping_bulk_actions" ADD CONSTRAINT "qb_account_mapping_bulk_actions_undone_by_user_id_users_id_fk" FOREIGN KEY ("undone_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

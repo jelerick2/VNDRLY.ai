@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "invoices_unique_supplemental_draft_per_period" ON "invoices" USING btree ("vendor_id","partner_id","cadence","period_start","supplemental_of_invoice_id") WHERE status = 'draft' AND supplemental_of_invoice_id IS NOT NULL AND cadence <> 'per_ticket';

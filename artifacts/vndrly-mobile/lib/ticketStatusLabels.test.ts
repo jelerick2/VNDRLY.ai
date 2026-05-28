@@ -35,29 +35,29 @@ describe("ticketStatusPillStyle", () => {
     // artifacts/vndrly/src/components/ticket-status-badge.tsx
     expect(TICKET_STATUS_COLORS.in_progress).toBe("blue");
     expect(TICKET_STATUS_COLORS.submitted).toBe("amber");
-    expect(TICKET_STATUS_COLORS.awaiting_payment).toBe("amber");
-    expect(TICKET_STATUS_COLORS.approved).toBe("green");
-    expect(TICKET_STATUS_COLORS.completed).toBe("green");
-    expect(TICKET_STATUS_COLORS.funds_dispersed).toBe("green");
+    expect(TICKET_STATUS_COLORS.awaiting_payment).toBe("orange");
+    expect(TICKET_STATUS_COLORS.approved).toBe("lime");
+    expect(TICKET_STATUS_COLORS.completed).toBe("teal");
+    expect(TICKET_STATUS_COLORS.funds_dispersed).toBe("darkGreen");
     expect(TICKET_STATUS_COLORS.kicked_back).toBe("red");
-    expect(TICKET_STATUS_COLORS.cancelled).toBe("grey");
-    expect(TICKET_STATUS_COLORS.pending_review).toBe("grey");
+    expect(TICKET_STATUS_COLORS.cancelled).toBe("darkRed");
+    expect(TICKET_STATUS_COLORS.pending_review).toBe("purple");
   });
 
-  it("renders submitted and awaiting_payment with the same amber pill", () => {
-    // Task #598: after Task #594 added the awaiting_payment label, the
-    // two statuses should be visually identical because both signal
-    // "blocked on the back office".
+  it("renders submitted and awaiting_payment as distinct office-owned states", () => {
     const submitted = ticketStatusPillStyle("submitted");
     const awaitingPayment = ticketStatusPillStyle("awaiting_payment");
-    expect(submitted).toEqual(awaitingPayment);
+    expect(submitted).not.toEqual(awaitingPayment);
     expect(submitted.foreground).toBe("#ffffff");
+    expect(awaitingPayment.foreground).toBe("#ffffff");
   });
 
-  it("renders approved and funds_dispersed as the green success pill", () => {
+  it("renders approved and funds_dispersed as distinct success states", () => {
     const approved = ticketStatusPillStyle("approved");
     const dispersed = ticketStatusPillStyle("funds_dispersed");
-    expect(approved).toEqual(dispersed);
+    expect(approved).not.toEqual(dispersed);
+    expect(approved.foreground).toBe("#ffffff");
+    expect(dispersed.foreground).toBe("#ffffff");
   });
 
   it("falls back to the neutral grey pill for unmapped statuses", () => {
@@ -261,29 +261,22 @@ describe("ticketStaleDays", () => {
       NOW.getTime() - (TICKET_INACTIVE_DAYS + 5) * dayMs,
     ).toISOString();
     const fresh = new Date(NOW.getTime() - 1 * dayMs).toISOString();
-    const amberBg = ticketStatusPillStyle("submitted").background;
-    const cases: Array<[string, string]> = [
-      ["draft", stale],
-      ["pending_review", stale],
-      ["in_progress", stale],
-      ["kicked_back", stale],
-      ["draft", fresh],
-      ["in_progress", fresh],
-      ["submitted", stale],
-      ["awaiting_payment", stale],
-      ["approved", stale],
-      ["completed", stale],
-      ["cancelled", stale],
+    const cases: Array<[string, string, boolean]> = [
+      ["draft", stale, true],
+      ["pending_review", stale, true],
+      ["in_progress", stale, true],
+      ["kicked_back", stale, false],
+      ["draft", fresh, false],
+      ["in_progress", fresh, false],
+      ["submitted", stale, false],
+      ["awaiting_payment", stale, false],
+      ["approved", stale, false],
+      ["completed", stale, false],
+      ["cancelled", stale, false],
     ];
-    for (const [status, updatedAt] of cases) {
-      const pillIsAmber =
-        ticketStatusPillStyle(status, updatedAt).background === amberBg &&
-        // exclude statuses that are *natively* amber (submitted /
-        // awaiting_payment) — they wouldn't be visually flagged as
-        // stale, and the helper should return null for them.
-        ticketStatusPillStyle(status).background !== amberBg;
+    for (const [status, updatedAt, shouldShowStaleDays] of cases) {
       const days = ticketStaleDays(status, updatedAt);
-      expect(days != null).toBe(pillIsAmber);
+      expect(days != null).toBe(shouldShowStaleDays);
     }
   });
 });

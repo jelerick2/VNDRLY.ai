@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "partner_vendor_relationship_unique" ON "partner_vendor_relationships" USING btree ("partner_id","vendor_id");

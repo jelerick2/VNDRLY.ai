@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_rate_card_snapshot_invoice_idx" ON "invoice_rate_card_snapshots" USING btree ("invoice_id","captured_at");

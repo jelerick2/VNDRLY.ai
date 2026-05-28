@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "dashboard_1099_email_log_dedupe_unique" ON "dashboard_1099_email_log" USING btree ("dedupe_key");

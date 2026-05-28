@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "location_consents_user_device_uniq" ON "location_consents" USING btree ("user_id","device_id");

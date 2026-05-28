@@ -1,0 +1,1 @@
+CREATE INDEX "site_visits_active_idx" ON "site_visits" USING btree ("site_location_id","check_out_time");

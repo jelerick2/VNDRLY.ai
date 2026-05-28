@@ -1,0 +1,1 @@
+ALTER TABLE "qb_account_mapping_audit_log" ADD CONSTRAINT "qb_account_mapping_audit_log_vendor_id_vendors_id_fk" FOREIGN KEY ("vendor_id") REFERENCES "public"."vendors"("id") ON DELETE set null ON UPDATE no action;

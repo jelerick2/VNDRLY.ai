@@ -1,0 +1,1 @@
+CREATE INDEX "report_export_audit_retried_from_idx" ON "report_export_audit_log" USING btree ((("scope"->>'retriedFromAuditId')::int)) WHERE "report_export_audit_log"."scope"->>'retriedFromAuditId' ~ '^[0-9]+$';

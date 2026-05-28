@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "onboarding_progress_vendor_people_uniq" ON "onboarding_progress" USING btree ("vendor_people_id");

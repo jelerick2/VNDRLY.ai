@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "accounting_conn_reminder_log_dedupe_unique" ON "accounting_connection_reminder_log" USING btree ("dedupe_key");

@@ -1,0 +1,1 @@
+ALTER TABLE "invoice_line_category_backfill_audit_log" ADD CONSTRAINT "invoice_line_category_backfill_audit_log_partner_id_partners_id_fk" FOREIGN KEY ("partner_id") REFERENCES "public"."partners"("id") ON DELETE set null ON UPDATE no action;

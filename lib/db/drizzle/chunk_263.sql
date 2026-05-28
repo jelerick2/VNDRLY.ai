@@ -1,0 +1,1 @@
+CREATE INDEX "accounting_conn_status_idx" ON "accounting_connections" USING btree ("status");

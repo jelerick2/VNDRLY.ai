@@ -1,0 +1,1 @@
+CREATE INDEX "qb_account_mapping_audit_created_idx" ON "qb_account_mapping_audit_log" USING btree ("created_at");

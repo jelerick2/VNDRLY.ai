@@ -1,0 +1,1 @@
+CREATE INDEX "site_location_admin_audit_created_idx" ON "site_location_admin_audit_log" USING btree ("created_at");

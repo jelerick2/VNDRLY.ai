@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_lines_source_idx" ON "invoice_lines" USING btree ("source_type","source_id");

@@ -1,0 +1,1 @@
+ALTER TABLE "tickets" ADD CONSTRAINT "tickets_site_location_id_site_locations_id_fk" FOREIGN KEY ("site_location_id") REFERENCES "public"."site_locations"("id") ON DELETE no action ON UPDATE no action;

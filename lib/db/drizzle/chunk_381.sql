@@ -1,0 +1,1 @@
+CREATE INDEX "tax_1099_correction_audit_created_idx" ON "tax_1099_correction_audit_log" USING btree ("created_at");

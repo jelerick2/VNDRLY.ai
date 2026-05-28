@@ -1,0 +1,1 @@
+ALTER TABLE "vendor_merge_audit_log" ADD CONSTRAINT "vendor_merge_audit_log_survivor_vendor_id_vendors_id_fk" FOREIGN KEY ("survivor_vendor_id") REFERENCES "public"."vendors"("id") ON DELETE set null ON UPDATE no action;

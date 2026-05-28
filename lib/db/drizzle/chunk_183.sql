@@ -1,0 +1,1 @@
+ALTER TABLE "ticket_status_history" ADD CONSTRAINT "ticket_status_history_actor_user_id_users_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

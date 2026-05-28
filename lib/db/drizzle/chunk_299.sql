@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "partner_work_type_afe_unique" ON "partner_work_type_afes" USING btree ("partner_id","work_type_id");

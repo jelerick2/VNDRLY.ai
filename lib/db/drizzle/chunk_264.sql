@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "accounting_pushed_invoices_uniq" ON "accounting_pushed_invoices" USING btree ("vendor_id","provider","invoice_number");

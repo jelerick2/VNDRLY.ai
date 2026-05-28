@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "vp_billing_settings_unique" ON "vendor_partner_billing_settings" USING btree ("vendor_id","partner_id");

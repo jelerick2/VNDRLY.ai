@@ -1,0 +1,1 @@
+ALTER TABLE "vendor_ratings" ADD CONSTRAINT "vendor_ratings_partner_id_partners_id_fk" FOREIGN KEY ("partner_id") REFERENCES "public"."partners"("id") ON DELETE cascade ON UPDATE no action;

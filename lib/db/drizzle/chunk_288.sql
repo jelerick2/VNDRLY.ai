@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "partners_canonical_name_unique" ON "partners" USING btree (lower(btrim("name")));

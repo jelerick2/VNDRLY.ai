@@ -1,0 +1,23 @@
+CREATE TABLE "invoice_lines" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"invoice_id" integer NOT NULL,
+	"ticket_id" integer,
+	"source_type" text NOT NULL,
+	"source_id" integer,
+	"afe" text,
+	"line_type" text NOT NULL,
+	"description" text NOT NULL,
+	"quantity" numeric(12, 4) NOT NULL,
+	"unit" text,
+	"unit_price" numeric(14, 4) NOT NULL,
+	"amount" numeric(14, 2) NOT NULL,
+	"taxable" boolean DEFAULT true NOT NULL,
+	"tax_state" text,
+	"tax_rate" numeric(6, 4),
+	"tax_amount" numeric(14, 2) DEFAULT '0' NOT NULL,
+	"is_manual_override" boolean DEFAULT false NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"income_category" text DEFAULT 'nec' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);

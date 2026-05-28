@@ -1,0 +1,1 @@
+ALTER TABLE "partner_eula_acceptances" ADD CONSTRAINT "partner_eula_acceptances_accepted_by_user_id_users_id_fk" FOREIGN KEY ("accepted_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

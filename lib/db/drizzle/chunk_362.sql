@@ -1,0 +1,1 @@
+CREATE INDEX "vendor_merge_audit_survivor_idx" ON "vendor_merge_audit_log" USING btree ("survivor_vendor_id","created_at");

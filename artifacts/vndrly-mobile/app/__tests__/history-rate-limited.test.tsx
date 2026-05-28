@@ -1,5 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { isElementDisabled } from "../../lib/testDomHelpers";
 
 // Task #762 — verifies the History tab behaves correctly when the
 // per-session rate limiter (Task #675) trips on the field endpoints.
@@ -210,7 +211,7 @@ describe("HistoryScreen — Task #762 rate-limit gate", () => {
     render(<HistoryScreen />);
 
     const button = await screen.findByTestId("button-refresh-history");
-    expect((button as HTMLButtonElement).disabled).toBe(false);
+    expect(isElementDisabled(button)).toBe(false);
     expect(screen.queryAllByTestId("toast-tickets-rate-limited").length).toBe(
       0,
     );
@@ -232,10 +233,8 @@ describe("HistoryScreen — Task #762 rate-limit gate", () => {
     // And the manual refresh button must be disabled — a tap during
     // cooldown would just re-trip the limiter.
     await waitFor(() => {
-      const btn = screen.getByTestId(
-        "button-refresh-history",
-      ) as HTMLButtonElement;
-      expect(btn.disabled).toBe(true);
+      const btn = screen.getByTestId("button-refresh-history");
+      expect(isElementDisabled(btn)).toBe(true);
     });
   });
 });

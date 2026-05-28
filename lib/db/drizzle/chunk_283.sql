@@ -1,0 +1,1 @@
+CREATE INDEX "field_push_tokens_user_idx" ON "field_push_tokens" USING btree ("user_id");

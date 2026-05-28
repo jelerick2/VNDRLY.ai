@@ -1,0 +1,1 @@
+CREATE INDEX "report_export_audit_user_idx" ON "report_export_audit_log" USING btree ("downloaded_by_user_id","created_at");

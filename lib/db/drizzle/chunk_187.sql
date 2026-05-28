@@ -1,0 +1,1 @@
+ALTER TABLE "user_org_memberships" ADD CONSTRAINT "user_org_memberships_partner_id_partners_id_fk" FOREIGN KEY ("partner_id") REFERENCES "public"."partners"("id") ON DELETE cascade ON UPDATE no action;

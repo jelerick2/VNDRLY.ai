@@ -1,0 +1,1 @@
+CREATE INDEX "qb_account_mapping_bulk_actions_created_idx" ON "qb_account_mapping_bulk_actions" USING btree ("created_at");

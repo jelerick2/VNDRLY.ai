@@ -1,0 +1,1 @@
+CREATE INDEX "invoice_lines_ticket_idx" ON "invoice_lines" USING btree ("ticket_id");

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "acct_conn_items_conn_line_uniq" ON "accounting_connection_items" USING btree ("connection_id","line_type");

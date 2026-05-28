@@ -111,7 +111,7 @@ export default function LayeredPillButton({
   inactive,
 }: LayeredPillButtonProps) {
   const brand = useBrand();
-  const targetHex = color ?? brand.primary;
+  const targetHex = color ?? brand.primary ?? "#1f9a3d";
   const mid = useMemo(() => pickPillForBrand(targetHex), [targetHex]);
   const isInactive = inactive || disabled || loading;
   // Hard cap: every action pill on mobile is 40px tall, full stop.

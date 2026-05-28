@@ -1,0 +1,22 @@
+CREATE TABLE "partners" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"contact_name" text NOT NULL,
+	"contact_email" text NOT NULL,
+	"contact_phone" text,
+	"physical_address" text,
+	"billing_address" text,
+	"business_phone" text,
+	"hours_of_operation" text,
+	"state_tax_id" text,
+	"federal_tax_id" text,
+	"blurb" text,
+	"operating_radius_miles" integer,
+	"logo_url" text,
+	"logo_square_url" text,
+	"brand_primary_color" text,
+	"brand_accent_color" text,
+	"email_1099_subject" text,
+	"email_1099_body" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);

@@ -1,0 +1,1 @@
+ALTER TABLE "schedule_cert_override_audit_log" ADD CONSTRAINT "schedule_cert_override_audit_log_actor_user_id_users_id_fk" FOREIGN KEY ("actor_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

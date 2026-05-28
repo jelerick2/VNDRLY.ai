@@ -1,0 +1,1 @@
+ALTER TABLE "report_export_audit_log" ADD CONSTRAINT "report_export_audit_log_downloaded_by_user_id_users_id_fk" FOREIGN KEY ("downloaded_by_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;

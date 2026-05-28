@@ -1,0 +1,1 @@
+ALTER TABLE "ticket_scheduled_notifications" ADD CONSTRAINT "ticket_scheduled_notifications_ticket_id_tickets_id_fk" FOREIGN KEY ("ticket_id") REFERENCES "public"."tickets"("id") ON DELETE cascade ON UPDATE no action;

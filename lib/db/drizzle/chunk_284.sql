@@ -1,0 +1,1 @@
+CREATE INDEX "fire_transmitter_settings_audit_created_idx" ON "fire_transmitter_settings_audit_log" USING btree ("created_at");

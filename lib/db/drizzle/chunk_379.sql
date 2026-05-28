@@ -1,0 +1,1 @@
+CREATE INDEX "tax_1099_filings_sendgrid_msg_idx" ON "tax_1099_filings" USING btree ("sendgrid_message_id");

@@ -164,7 +164,6 @@
       "foremanSelfSuffix": "(tú)"
     },
     "errorLoadOpen": "No se pudieron cargar tus tickets abiertos. Desliza para refrescar.",
-    "errorOpenWeb": "No se pudo abrir el portal web. Intenta desde un navegador.",
     "errorLoadHistory": "No se pudo cargar tu historial. Desliza para refrescar.",
     "refreshDetailAccessibility": "Actualizar este ticket",
     "refreshDetailAccessibilityHint": "Obtiene los detalles, ítems, notas y seguimiento más recientes del servidor.",

@@ -1,0 +1,1 @@
+CREATE INDEX "payment_audit_ticket_idx" ON "payment_audit" USING btree ("ticket_id","created_at");

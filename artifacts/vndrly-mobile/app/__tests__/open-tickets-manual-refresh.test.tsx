@@ -102,7 +102,7 @@ vi.mock("@/lib/push", () => ({
 
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
-    user: { id: 99, role: "field_employee", displayName: "Field Tester" },
+    user: { id: 99, role: "vendor", displayName: "Vendor Admin" },
     activeMembership: { orgName: "Acme Vendor", orgType: "vendor" },
   }),
 }));
