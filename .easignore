@@ -1,0 +1,25 @@
+# Keep pnpm-lock.yaml + pnpm-workspace.yaml — EAS needs them for install.
+# Mobile build needs artifacts/vndrly-mobile + lib/* workspace packages.
+
+.pnpm-store
+.local
+.cache
+.codex
+.cursor
+.tmp_*
+.tmp_combined*
+**/*.err.log
+eval-summary.json
+tsconfig.zip
+lib/db/drizzle/batches
+
+artifacts/vndrly
+artifacts/api-server
+
+lib/e2e
+
+.env
+.env.local
+.env.*.local
+
+node_modules

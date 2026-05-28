@@ -1,7 +1,8 @@
 {
   "cli": {
     "version": ">= 12.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "remote",
+    "promptToConfigurePushNotifications": false
   },
   "build": {
     "development": {
@@ -30,6 +31,8 @@
     },
     "production": {
       "autoIncrement": true,
+      "corepack": true,
+      "node": "22.14.0",
       "env": {
         "EXPO_PUBLIC_DOMAIN": "https://vndrly.ai"
       },

@@ -2,6 +2,7 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@11.1.2",
   "scripts": {
     "preinstall": "node -e \"const fs=require('fs'); for (const f of ['package-lock.json','yarn.lock']) fs.rmSync(f,{force:true}); const ua=process.env.npm_config_user_agent||''; const execPath=process.env.npm_execpath||''; if (!/^pnpm\\//.test(ua) && !/pnpm/i.test(execPath)) { console.error('Use pnpm instead'); process.exit(1); }\"",
     "dev:bootstrap": "bash scripts/dev-bootstrap.sh",
@@ -15,7 +16,8 @@
     "test:api": "pnpm --filter @workspace/api-server run test",
     "test:e2e": "pnpm --filter @workspace/e2e exec playwright test",
     "lint:i18n": "pnpm --filter @workspace/scripts run lint:i18n",
-    "publish": "powershell -ExecutionPolicy Bypass -File scripts/publish-online.ps1"
+    "publish:online": "powershell -ExecutionPolicy Bypass -File scripts/publish-online.ps1",
+    "save": "powershell -ExecutionPolicy Bypass -File scripts/publish-online.ps1"
   },
   "private": true,
   "devDependencies": {

@@ -9041,3 +9041,648 @@ Error: socket hang up
 [2m3:24:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Can't resolve 'tailwindcss' in 'C:\Users\JohnElerick\Desktop\vndrly\artifacts\vndrly\src'
   Plugin: [35m@tailwindcss/vite:generate:serve[39m
   File: [36mC:/Users/JohnElerick/Desktop/vndrly/artifacts/vndrly/src/index.css[39m
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/gps-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/partners/1[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/note-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/unlocks[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/transitions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/line-items[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/site-locations/4[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/vendors/3/ratings[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/labor-summary[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-roster[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tax-rates/by-state/OK[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees?vendorId=3[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments-participants[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/gps-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/note-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/unlocks[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/transitions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/line-items[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/partners/1[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/site-locations/4[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/labor-summary[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/vendors/3/ratings[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-roster[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tax-rates/by-state/OK[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:51 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:51 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees?vendorId=3[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/gps-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/note-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/unlocks[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/transitions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/line-items[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/partners/1[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/site-locations/4[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/labor-summary[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/vendors/3/ratings[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-roster[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tax-rates/by-state/OK[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:31:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees?vendorId=3[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/gps-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/note-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/unlocks[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/transitions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/line-items[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/partners/1[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/site-locations/4[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/labor-summary[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/vendors/3/ratings[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-roster[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tax-rates/by-state/OK[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments-participants[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:44 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:46 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:32:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:13 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:15 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:19 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:20 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:21 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:23 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:27 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:33:58 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:13 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:17 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:19 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:20 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:22 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:38 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:34:59 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:00 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:02 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:06 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:36 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:37 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:38 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:39 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:39 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:35:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:36:18 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:36:19 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:36:21 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:36:25 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:36:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:36:53 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:07 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:07 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:08 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:10 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:14 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:44 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:46 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:37:59 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:03 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:23 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:24 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:26 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:30 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:33 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:35 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:37 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:38:41 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:12 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:14 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:18 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:30 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:45 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:39:56 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:40:32 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:40:33 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:40:36 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:40:40 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:40:49 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:40:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:40:52 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:08 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:10 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:13 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:17 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:47 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:50 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:41:54 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:15 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:16 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:18 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:23 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:24 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:25 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:39 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:42:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:14 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:15 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:17 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:33 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:33 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:34 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:36 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:43:40 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:03 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:04 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:07 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:11 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:40 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:41 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:41 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:42 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:44 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:59 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:44:59 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:45:29 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:45:30 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:45:32 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:45:46 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:45:59 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:00 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:09 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:13 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:16 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:17 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:19 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:23 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:54 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:46:55 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:03 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/notifications/unread-count[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/partners/1[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/gps-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-sessions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/note-logs[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/unlocks[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/transitions[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/line-items[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/site-locations/4[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/vendors/3/ratings[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/field-employees?vendorId=3[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/labor-summary[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/crew-roster[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tax-rates/by-state/OK[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:47:05 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments-participants[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:51:38 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments-participants[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:53:59 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments-participants[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)
+[2m9:54:30 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/tickets/236/comments-participants[39m
+Error: getaddrinfo ENOTFOUND vndrly.ai
+    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)

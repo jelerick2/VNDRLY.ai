@@ -18,7 +18,8 @@
     "eas:submit:ios": "eas submit --platform ios --latest",
     "eas:submit:android": "eas submit --platform android --latest",
     "eas:update": "eas update --branch production --profile production",
-    "eas:update:preview": "eas update --branch preview --profile preview"
+    "eas:update:preview": "eas update --branch preview --profile preview",
+    "eas-build-pre-install": "corepack enable"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -10,6 +10,13 @@ out-tsc
 
 # dependencies
 node_modules
+.pnpm-store
+
+# migration / scratch uploads (never commit)
+.tmp_*
+.tmp_combined*
+tsconfig.zip
+lib/db/drizzle/batches/*.json
 .pnpm-store/
 
 # IDEs and editors
