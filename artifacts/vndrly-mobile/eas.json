@@ -53,7 +53,7 @@
       "ios": {
         "appleId": "REPLACE_WITH_APPLE_ID_EMAIL",
         "ascAppId": "6771456209",
-        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
+        "appleTeamId": "CM253WWQW2"
       },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
