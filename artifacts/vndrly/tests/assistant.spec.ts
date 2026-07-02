@@ -1568,6 +1568,7 @@ describe("knowledge corpus references the live app", () => {
     // Concept docs introduced when askV got read-only DB tools — they
     // describe a capability set, not a single page.
     "data-tools-overview": null,
+    "data-tools-field": null,
     "metrics-collected": null,
     "onboarding-partner": "Partner",
     "onboarding-vendor": "Vendor",

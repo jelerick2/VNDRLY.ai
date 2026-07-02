@@ -4,9 +4,9 @@ import express, { type Express } from "express";
 import cookieParser from "cookie-parser";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import pg from "pg";
 import { sql } from "drizzle-orm";
 import { buildTestCookie } from "../test-utils/session";
+import { hasListenNotifySupport } from "../test-utils/listen-notify";
 
 // ---------------------------------------------------------------------------
 // Task #685: end-to-end coverage for the
@@ -41,28 +41,7 @@ import { buildTestCookie } from "../test-utils/session";
 //     seq triggers a `hotlist.comment.hello` carrying `gap: true`.
 // ---------------------------------------------------------------------------
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const haveRealDb = await checkDatabase();
-
-async function checkDatabase(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  // The unit-test setup writes a placeholder URL when no real DB exists.
-  if (DATABASE_URL.includes("test:test@localhost")) return false;
-  const client = new pg.Client({ connectionString: DATABASE_URL });
-  try {
-    await client.connect();
-    await client.query("SELECT 1");
-    await client.end();
-    return true;
-  } catch {
-    try {
-      await client.end();
-    } catch {
-      /* ignore */
-    }
-    return false;
-  }
-}
+const haveRealDb = await hasListenNotifySupport();
 
 // All seeded rows carry this marker so cleanup can target only what the
 // suite created without touching pre-existing dev-DB data.

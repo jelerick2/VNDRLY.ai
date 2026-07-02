@@ -190,7 +190,6 @@
     "staleSuffixA11y": "Sin avance hace {{days}} días",
     "rateLimitedToast": "Reconectando… reintentando en {{seconds}} s",
     "partsAndLabor": "Partes y Mano de Obra",
-    "routeSection": "Ruta",
     "historySection": "Historial",
     "reopenedFrom": "Reabierto desde",
     "unlockNumber": "Desbloqueo #{{num}} · {{name}}",
@@ -220,7 +219,6 @@
     "reopenedBy": "Reabierto por {{name}}",
     "reopenedByCount": "Reabierto por {{name}} · {{count}}×",
     "viewOnMap": "Ver en el mapa",
-    "taxLabel": "Impuesto ({{state}} · {{pct}}%)",
     "taxLabelMerchandise": "Impuesto — bienes ({{label}} · {{pct}}%)",
     "taxLabelLabor": "Impuesto — mano de obra ({{label}} · {{pct}}%)",
     "taxLabelLaborExempt": "Mano de obra (exenta — servicios de campo {{state}})",
@@ -297,8 +295,6 @@
     "qtyPlaceholder": "Cant.",
     "unitPricePlaceholder": "Precio unitario",
     "siteLocationFallback": "Ubicación del Sitio",
-    "initiateAdjacent": "Iniciar ticket adyacente",
-    "adjacentSiteHint": "· {{site}}",
     "unreadCommentsA11y": "{{count}} comentarios sin leer",
     "siteFallbackPlaceholder": "—",
     "workTypeFallbackPlaceholder": "—",
@@ -464,6 +460,8 @@
       "invalid_body": "Parte de la información enviada no es válida. Revise e inténtelo de nuevo.",
       "invalid_input": "Parte de la entrada no es válida. Revise e inténtelo de nuevo.",
       "invalid_query": "Algunos parámetros de la consulta no son válidos.",
+      "required": "Este campo es obligatorio.",
+      "invalid_days_ahead": "Los días de anticipación deben ser un número válido.",
       "failed": "Falta información o no es válida. Revisa el formulario e inténtalo de nuevo.",
       "issues": {
         "default": "Este valor no es válido.",
@@ -511,6 +509,8 @@
       "invalid_duration": "La duración debe ser de al menos 15 minutos.",
       "invalid_crew": "El tamaño de la cuadrilla debe ser un número entero positivo.",
       "invalid_foreman": "Ese capataz no es válido para este ticket.",
+      "invalid_acting_foreman": "Ese capataz interino no es válido para esta agenda.",
+      "crew_required": "Selecciona al menos un miembro de la cuadrilla.",
       "invalid_ack_status": "Ese estado de confirmación no es válido.",
       "not_on_crew": "No estás en la cuadrilla de este ticket.",
       "not_assigned": "No estás asignado a este ticket.",
@@ -530,6 +530,22 @@
       "not_found": "No se encontró ese empleado.",
       "vendor_mismatch": "Ese empleado no pertenece al proveedor de este ticket."
     },
+    "foreman": {
+      "required": "Se requiere un capataz."
+    },
+    "crew_preset": {
+      "not_found": "No se encontró esa cuadrilla guardada."
+    },
+    "majik": {
+      "not_member": "Ese usuario no está en el equipo Majik.",
+      "invalid_user_id": "Ese ID de usuario no es válido.",
+      "team_full": "El equipo Majik está lleno.",
+      "user_not_found": "No se encontró ese usuario.",
+      "already_member": "Ese usuario ya está en el equipo Majik."
+    },
+    "safety": {
+      "site_inactive": "Este sitio está inactivo por una orden de alto al trabajo de seguridad."
+    },
     "certification": {
       "cert_number_required": "Se requiere el número de certificado.",
       "verify_forbidden": "Solo el administrador del proveedor puede verificar certificaciones."
@@ -541,6 +557,7 @@
       "reason_required": "Se requiere un motivo.",
       "already_on_roster": "Ese empleado ya está en la lista de cuadrilla de este ticket.",
       "not_on_roster": "Ese miembro no está en la lista de cuadrilla.",
+      "invalid_members": "Uno o más miembros de la cuadrilla no son válidos.",
       "assignment_rate_role": "Solo tu proveedor o un administrador puede establecer las tarifas de asignación.",
       "invalid_hourly_rate": "La tarifa por hora debe ser cero o mayor (o vacía para borrarla).",
       "employee_inactive": "La oficina acaba de desactivar a ese miembro de la cuadrilla. Actualiza y elige a otra persona."
@@ -588,9 +605,13 @@
     "field": {
       "account_inactive": "Tu cuenta de campo no está activa. Contacta a tu oficina.",
       "login_required": "Inicia sesión como empleado de campo para continuar.",
+      "mobile_viewer_login_required": "Inicia sesión con una cuenta móvil de campo para continuar.",
+      "forbidden": "No tienes permiso para acceder a ese recurso de campo.",
       "vendor_not_found": "No encontramos a ese proveedor.",
+      "partner_not_found": "No se encontró ese socio.",
       "field_or_vendor_login_required": "Inicia sesión como empleado de campo o proveedor para continuar.",
       "first_name_required": "El nombre es obligatorio.",
+      "email_required": "El correo es obligatorio.",
       "invalid_pec_date": "La fecha de vencimiento PEC debe tener el formato AAAA-MM-DD.",
       "password_required": "La contraseña actual y la nueva son obligatorias.",
       "password_too_short": "La contraseña debe tener al menos 8 caracteres.",
@@ -624,6 +645,8 @@
     "ticket": {
       "not_found": "No se encontró el ticket.",
       "no_access": "No tienes acceso a este ticket.",
+      "not_submittable": "Este ticket aún no está listo para enviar.",
+      "not_kickbackable": "Solo los tickets enviados o aprobados pueden devolverse.",
       "not_editable": "Este ticket ya no se puede editar.",
       "en_route_invalid_state": "No puedes marcar este ticket en ruta en su estado actual.",
       "not_approved": "Solo se pueden dispersar fondos en un ticket aprobado.",
@@ -754,6 +777,15 @@
     "site_not_found": "No encontramos ese sitio. Elige otro.",
     "site_vendor_mismatch": "Tu proveedor no está asignado a trabajar en este sitio. Elige otro.",
     "work_type_not_allowed": "Tu proveedor no está aprobado para este tipo de trabajo en este sitio. Elige otro.",
+    "site_inactive": "Este sitio está inactivo por una orden de alto al trabajo de seguridad.",
+    "not_scheduled": "Este ticket aún no está programado.",
+    "crew_required": "Selecciona al menos un miembro de la cuadrilla.",
+    "no_partner": "Este sitio de visitante no está vinculado a un socio.",
+    "foreman_required": "Se requiere un capataz.",
+    "field_partner_not_found": "No se encontró ese socio.",
+    "field_mobile_viewer_login_required": "Inicia sesión con una cuenta móvil de campo para continuar.",
+    "field_email_required": "El correo es obligatorio.",
+    "internal_error": "Algo salió mal de nuestro lado. Inténtalo de nuevo.",
     "foreman_vendor_mismatch": "Ese capataz no pertenece a este proveedor. Elige otro empleado de campo.",
     "foreman_field_employee_mismatch": "El capataz debe coincidir con el empleado de campo asignado.",
     "not_authenticated": "Inicia sesión para continuar.",
@@ -815,13 +847,26 @@
       "eula_not_accepted": "El proveedor debe aceptar el EULA antes de aprobarlo."
     },
     "assistant": {
+      "audio_too_large": "Ese clip de audio es demasiado grande. Graba uno más corto.",
+      "feedback_assistant_only": "Solo se pueden calificar respuestas de AskV.",
+      "invalid_audio": "Ese archivo de audio no es válido. Graba de nuevo.",
+      "invalid_feedback_rating": "Esa calificación no es válida.",
       "invalid_persona": "Ese perfil de asistente no es válido.",
       "message_too_long": "Su mensaje es demasiado largo. Por favor acórtelo.",
-      "missing_message": "Escriba un mensaje antes de enviar."
+      "missing_audio": "Graba audio antes de enviarlo.",
+      "missing_message": "Escriba un mensaje antes de enviar.",
+      "missing_text": "Escribe texto antes de pedir voz.",
+      "no_speech": "No se detectó voz. Inténtalo de nuevo.",
+      "transcribe_failed": "No se pudo transcribir el audio. Inténtalo de nuevo.",
+      "transcribe_unavailable": "La transcripción de voz no está disponible ahora.",
+      "tts_failed": "No se pudo reproducir la respuesta de voz. Inténtalo de nuevo.",
+      "tts_unavailable": "La respuesta de voz no está disponible ahora."
     },
     "certification": {
+      "cert_number_required": "Se requiere el número de certificado.",
       "invalid_document_url": "Esa URL del documento de certificación no es válida.",
-      "not_found": "Esa certificación no se encontró."
+      "not_found": "Esa certificación no se encontró.",
+      "verify_forbidden": "Solo el administrador del proveedor puede verificar certificaciones."
     },
     "common": {
       "not_found": "No pudimos encontrar ese registro."
@@ -972,6 +1017,7 @@
       "site_not_found": "No encontramos ese sitio.",
       "site_vendor_mismatch": "Tu proveedor no está asignado para trabajar en este sitio.",
       "work_type_not_allowed": "Tu proveedor no está aprobado para este tipo de trabajo en este sitio.",
+      "create_failed": "No se pudo crear el ticket de campo. Inténtalo de nuevo.",
       "starting_mileage_invalid": "Ingrese un kilometraje inicial válido para continuar."
     },
     "visitor": {
@@ -982,6 +1028,7 @@
       "not_ticket_owner": "No estás asignado a ese ticket.",
       "ticket_not_on_shift": "Este ticket no está en turno ahora mismo.",
       "invalid_site_location_id": "Ese ID de ubicación de sitio no es válido.",
+      "no_partner": "Este sitio de visitante no está vinculado a un socio.",
       "no_vendor": "Tu cuenta no está vinculada a un proveedor.",
       "wrong_vendor": "Eso no pertenece a tu proveedor.",
       "forbidden": "No tienes permiso para ver ubicaciones en vivo.",
@@ -1233,7 +1280,6 @@
       "comments": "Comentarios y menciones",
       "commentsDesc": "@menciones y respuestas en tickets y hilos de Hotlist en los que participas.",
       "safety": "Incidentes de seguridad",
-      "safetyDesc": "Paros de trabajo, incidentes y actualizaciones de HSE.",
       "commentMentionEmail": "Enviarme correo cuando me @mencionen",
       "commentMentionEmailDesc": "Envía un correo de inmediato cuando alguien te @mencione en un comentario de un ticket o de Hotlist.",
       "commentReplyEmail": "Resumen de respuestas por correo",
@@ -1258,15 +1304,7 @@
     "title": "Tarjeta de Cumplimiento",
     "brand": "CUMPLIMIENTO VNDRLY",
     "id": "ID #{{id}}",
-    "certifications": "CERTIFICACIONES",
-    "noCerts": "No hay certificaciones registradas.",
-    "qrCaption": "Muestra esto a los inspectores para verificar tu estado.",
-    "active": "Vigente",
-    "expiringSoon": "Por vencer",
-    "expired": "Vencida",
-    "noExpiration": "Sin vencimiento",
-    "unknownIssuer": "—",
-    "expirationSuffix": " · vence {{date}}"
+    "qrCaption": "Muestra esto a los inspectores para verificar tu estado."
   },
   "editProfile": {
     "tapToChange": "Toca la foto para cambiarla",
@@ -1327,7 +1365,6 @@
     "complianceCard": "Tarjeta de Cumplimiento",
     "manageEmployees": "Administrar empleados",
     "companyServices": "Servicios de la empresa",
-    "crewChanges": "Mis cambios de cuadrilla",
     "couldNotUpdate": "No se pudo actualizar",
     "languageSavedToast": "Guardado — {{language}}",
     "languageSaveFailedToast": "No se pudo guardar tu preferencia de idioma. Inténtalo de nuevo."
@@ -1360,7 +1397,6 @@
   "foremanSchedule": {
     "scheduleTicket": "Programar ticket",
     "scheduleNow": "Programar ahora",
-    "addToCalendar": "Agregar al calendario",
     "pickTicketTitle": "Tickets abiertos",
     "noOpenTickets": "No hay tickets abiertos para su proveedor.",
     "emptyForeman": "Nada programado aún. Toque Programar ticket para asignar una cuadrilla a un trabajo abierto."
@@ -1380,8 +1416,7 @@
     "nobodyNearby": "Ninguna cuadrilla comparte ubicación cerca de sus sitios ahora."
   },
   "partnerSchedule": {
-    "empty": "No hay trabajo programado próximo de proveedores en sus sitios.",
-    "vendor": "Proveedor: {{name}}"
+    "empty": "No hay trabajo programado próximo de proveedores en sus sitios."
   },
   "crew": {
     "title": "Cuadrilla y Tiempo",
@@ -1471,25 +1506,17 @@
     "greetingAdmin": "¡Hola, {{name}}! Pregunta sobre configuración de plataforma, tickets, 1099 y flujos de administrador.",
     "quickActionsLabel": "Acciones rápidas",
     "inputPlaceholder": "Pregunta lo que quieras sobre VNDRLY…",
-    "send": "Enviar",
     "thinking": "Pensando…",
     "usingTool": "Consultando {{tool}}…",
     "clearTitle": "¿Borrar conversación?",
     "clearBody": "Esto elimina el historial del chat de esta sesión.",
     "clearConfirm": "Borrar",
     "errorGeneric": "El asistente tiene problemas ahora. Inténtalo de nuevo.",
-    "newChat": "Nuevo chat",
     "downloadTranscript": "Descargar transcripción",
-    "deleteConversation": "Eliminar esta conversación",
-    "close": "Cerrar",
-    "feedbackHelpful": "Útil",
-    "feedbackUnhelpful": "No útil",
     "sharedAnswerFallback": "Respuesta compartida de AskV",
-    "disclaimer": "Las respuestas son generadas por IA. Verifique los detalles importantes antes de actuar. Ayúdenos a mejorar AskV con sus comentarios.",
     "transcriptErrorTitle": "No se pudo exportar la transcripción",
     "transcriptShareUnavailable": "Compartir no está disponible en este dispositivo.",
     "transcribeFailed": "No pude entender eso. Inténtalo de nuevo o escribe tu pregunta.",
-    "holdToTalkHint": "Mantén el micrófono, habla y suelta para enviar.",
     "quickActions": {
       "fieldStatus": "Actualizar estado del ticket",
       "fieldPhoto": "Foto de perfil y certificados",
@@ -1524,7 +1551,6 @@
     "quickActions": "Acciones rápidas",
     "startJob": "Iniciar trabajo",
     "schedule": "Agenda",
-    "crewComms": "Comunicación",
     "alerts": "Alertas",
     "activeJobs": "Trabajos activos",
     "crewCommsTitle": "Comunicación de cuadrilla",
@@ -1596,11 +1622,7 @@
   "stack": {
     "newTicket": "Iniciar Nuevo Trabajo",
     "tracking": "Seguimiento",
-    "history": "Historial de Seguimiento",
-    "editProfile": "Editar Perfil",
-    "crewTracker": "Rastreo de cuadrilla",
-    "invoice": "Factura",
-    "back": "Atrás"
+    "editProfile": "Editar Perfil"
   },
   "invoices": {
     "loadFailed": "No se pudo cargar esta factura. Desliza para actualizar.",
@@ -1706,13 +1728,11 @@
   },
   "scheduleTicket": {
     "button": "Programar trabajo",
-    "title": "Programar trabajo",
     "scheduleNowTitle": "Programar ahora",
     "loading": "Cargando programación…",
     "whenLabel": "Fecha y hora de inicio",
     "durationLabel": "Duración estimada (horas)",
     "durationPlaceholder": "ej. 4",
-    "crewLabel": "Seleccionar cuadrilla",
     "crewPresetLabel": "Cuadrillas guardadas",
     "individualCrewLabel": "O elija miembros individualmente",
     "presetAppliedTitle": "Cuadrilla aplicada",
@@ -1728,13 +1748,8 @@
     "warningsHint": "Alertas push a 24 h, 12 h y 1 h antes del inicio. Toque la notificación para abrir el ticket en VNDRLY.",
     "warning1d": "24 horas antes",
     "warning12h": "12 horas antes",
-    "warning2d": "2 días antes",
-    "warning3d": "3 días antes",
-    "warning4h": "4 horas antes",
     "warning1h": "1 hora antes",
-    "warningStart": "Al iniciar",
     "cancel": "Cancelar",
-    "save": "Guardar programación",
     "notifyCrew": "Notificar cuadrilla",
     "saving": "Guardando…",
     "savedTitle": "Cuadrilla notificada",

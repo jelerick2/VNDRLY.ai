@@ -457,7 +457,9 @@ describe("POST /api/field/tickets — response contract", () => {
           siteRadiusMeters: 500,
         },
       ],
-      // 3) site_work_assignments by (vendor, site, work_type) — happy path
+      // 3) active-site safety gate
+      () => [{ isActive: true, status: "active", name: "Pad A" }],
+      // 4) site_work_assignments by (vendor, site, work_type) — happy path
       () => [{ id: 99 }],
     ];
     const now = new Date("2026-04-30T15:00:00.000Z");
@@ -532,6 +534,7 @@ describe("POST /api/field/tickets — response contract", () => {
           siteRadiusMeters: 50,
         },
       ],
+      () => [{ isActive: true, status: "active", name: "Pad A" }],
       () => [{ id: 99 }],
     ];
     const now = new Date("2026-04-30T15:00:00.000Z");

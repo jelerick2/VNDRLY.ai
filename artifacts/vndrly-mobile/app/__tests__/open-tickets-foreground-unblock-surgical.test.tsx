@@ -150,9 +150,11 @@ import {
 } from "@testing-library/react";
 
 import HomeScreen from "../(tabs)/index";
+import { __resetTicketsRateLimitForTests } from "@/lib/ticketsRateLimitGate";
 
 afterEach(() => {
   cleanup();
+  __resetTicketsRateLimitForTests();
 });
 
 // Helper — drive the captured foreground push listener with a
@@ -216,6 +218,7 @@ const initialList: OpenTicket[] = [
 ];
 
 beforeEach(() => {
+  __resetTicketsRateLimitForTests();
   apiFetchMock.mockReset();
   routerPushMock.mockReset();
   pushListeners.length = 0;

@@ -186,9 +186,32 @@ function redactPassword(url: string): string {
   }
 }
 
+function resolveListenNotifyTestUrl(resolved: ResolvedUrls): string | undefined {
+  const raw = process.env.LISTEN_NOTIFY_DATABASE_URL?.trim();
+  if (!raw) return undefined;
+  const url = new URL(raw);
+  url.pathname = `/${resolved.testDbName}`;
+  return url.toString();
+}
+
 function parseChildArgs(argv: string[]): string[] {
   const sep = argv.indexOf("--");
   return sep >= 0 ? argv.slice(sep + 1) : argv;
+}
+
+function schemaDriftSkipReason(resolved: ResolvedUrls): string | null {
+  if (process.env.SKIP_SCHEMA_DRIFT_CHECK === "1") {
+    return "SKIP_SCHEMA_DRIFT_CHECK=1";
+  }
+  try {
+    const url = new URL(resolved.testUrl);
+    if (url.hostname.endsWith(".pooler.supabase.com")) {
+      return "Supabase pooler introspection workaround";
+    }
+  } catch {
+    // If the URL was good enough to connect above, this should not run.
+  }
+  return null;
 }
 
 async function main(): Promise<void> {
@@ -215,20 +238,34 @@ async function main(): Promise<void> {
     DATABASE_URL: resolved.testUrl,
     TEST_DATABASE_URL: resolved.testUrl,
   };
+  const listenNotifyTestUrl = resolveListenNotifyTestUrl(resolved);
+  if (listenNotifyTestUrl) {
+    env.LISTEN_NOTIFY_DATABASE_URL = listenNotifyTestUrl;
+    process.stdout.write(
+      `[test-db] LISTEN/NOTIFY URL scoped to test database: ${redactPassword(listenNotifyTestUrl)}\n`,
+    );
+  }
 
-  const skipDriftCheck = process.env.SKIP_SCHEMA_DRIFT_CHECK === "1";
-  if (!skipDriftCheck) {
+  const skipDriftReason = schemaDriftSkipReason(resolved);
+  if (!skipDriftReason) {
+    const schemaCheckEnv: NodeJS.ProcessEnv = listenNotifyTestUrl
+      ? {
+          ...env,
+          DATABASE_URL: listenNotifyTestUrl,
+          TEST_DATABASE_URL: listenNotifyTestUrl,
+        }
+      : env;
     const checkCode = await spawnChild(
-      "pnpm",
-      ["--filter", "@workspace/db", "run", "check-schema"],
-      env,
+      "corepack",
+      ["pnpm", "--filter", "@workspace/db", "run", "check-schema"],
+      schemaCheckEnv,
     );
     if (checkCode !== 0) {
       process.exit(checkCode);
     }
   } else {
     process.stdout.write(
-      "[test-db] SKIP_SCHEMA_DRIFT_CHECK=1 — skipping check-schema (pooler introspection workaround).\n",
+      `[test-db] ${skipDriftReason} — skipping check-schema.\n`,
     );
   }
 

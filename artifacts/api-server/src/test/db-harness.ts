@@ -105,6 +105,7 @@ export async function hasReachableDatabase(
 ): Promise<boolean> {
   if (!url) return false;
   if (url.includes("test:test@localhost")) return false;
+  if (!(await hasPgDump())) return false;
   const client = new pg.Client({ connectionString: url });
   try {
     await client.connect();
@@ -119,6 +120,12 @@ export async function hasReachableDatabase(
     }
     return false;
   }
+}
+
+function hasPgDump(): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile("pg_dump", ["--version"], (err) => resolve(!err));
+  });
 }
 
 /**

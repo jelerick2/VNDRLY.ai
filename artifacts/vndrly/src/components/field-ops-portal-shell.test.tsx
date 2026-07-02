@@ -131,11 +131,11 @@ afterEach(() => {
 });
 
 describe("FieldOpsPortalShell", () => {
-  it("mirrors vendor portal chrome: AskV pane, nav sign-out, star rating", () => {
+  it("mirrors vendor portal chrome: AskV pane, nav sign-out, star rating", async () => {
     renderShell();
 
     expect(screen.getByTestId("askv-pane")).toBeTruthy();
-    expect(screen.getByTestId("assistant-launcher").getAttribute("data-placement")).toBe(
+    expect((await screen.findByTestId("assistant-launcher")).getAttribute("data-placement")).toBe(
       "askv-pane",
     );
     expect(screen.getByTestId("button-askv-pane-refer-to-vndrly")).toBeTruthy();

@@ -162,10 +162,12 @@ const ASSIGNMENT_ID = 700;
 // `routes/siteLocations.ts` POST `/site-locations/:siteId/assignments`:
 //   (1) verifySitePartnerAccess → siteLocations row (admin skips this)
 //   (2) Task #727 vendor catalog check → vendor_work_types row
-//   (3) post-insert select with joined work_type/vendor → assignment row
-//   (4) notifyWorkersOfUnblockedTickets → tickets joined with site_locations
-//   (5) (only when 4 returned rows) ticket_crew rows for those tickets
-//   (6) (only when 4 returned rows) vendorPeople rows for the union of
+//   (3) duplicate site_work_assignments check → null on success path
+//   (4) site AFE lookup → { afe: null } in these tests
+//   (5) post-insert select with joined work_type/vendor → assignment row
+//   (6) notifyWorkersOfUnblockedTickets → tickets joined with site_locations
+//   (7) (only when 6 returned rows) ticket_crew rows for those tickets
+//   (8) (only when 6 returned rows) vendorPeople rows for the union of
 //       lead `fieldEmployeeId` and crew `employeeId`
 const catalogRow = { id: 9001 };
 const insertedAssignmentRow = {
@@ -211,6 +213,8 @@ describe("POST /site-locations/:siteId/assignments — Task #592 unblock notific
   it("notifies the field worker on an open ticket affected by the new assignment", async () => {
     selectQueue = [
       catalogRow,
+      null,
+      { afe: null },
       enrichedAssignmentRow,
       // affected tickets join (one in_progress ticket assigned to FE 555).
       // `sitePartnerId` is included for the Task #622 SSE side-channel —
@@ -272,6 +276,8 @@ describe("POST /site-locations/:siteId/assignments — Task #592 unblock notific
   it("does not notify when no open tickets match (vendor, site, work_type)", async () => {
     selectQueue = [
       catalogRow,
+      null,
+      { afe: null },
       enrichedAssignmentRow,
       // no affected tickets → fan-out short-circuits
       [],
@@ -290,6 +296,8 @@ describe("POST /site-locations/:siteId/assignments — Task #592 unblock notific
   it("skips tickets whose field employee has no linked user account", async () => {
     selectQueue = [
       catalogRow,
+      null,
+      { afe: null },
       enrichedAssignmentRow,
       [
         {
@@ -344,6 +352,8 @@ describe("POST /site-locations/:siteId/assignments — Task #592 unblock notific
   it("notifies multiple workers when several tickets are unblocked at once", async () => {
     selectQueue = [
       catalogRow,
+      null,
+      { afe: null },
       enrichedAssignmentRow,
       [
         { ticketId: 1001, fieldEmployeeId: 11, siteName: "Pad A" },
@@ -386,6 +396,8 @@ describe("POST /site-locations/:siteId/assignments — Task #592 unblock notific
   it("notifies crew members in addition to the lead, without double-firing for overlap", async () => {
     selectQueue = [
       catalogRow,
+      null,
+      { afe: null },
       enrichedAssignmentRow,
       // One open ticket with lead = vendor_people 11.
       [{ ticketId: 5000, fieldEmployeeId: 11, siteName: "Pad B" }],
@@ -436,6 +448,8 @@ describe("POST /site-locations/:siteId/assignments — Task #592 unblock notific
   it("notifies crew on an open ticket that has no lead assigned", async () => {
     selectQueue = [
       catalogRow,
+      null,
+      { afe: null },
       enrichedAssignmentRow,
       [{ ticketId: 6000, fieldEmployeeId: null, siteName: "Pad C" }],
       [

@@ -65,6 +65,10 @@ vi.mock("@/hooks/use-brand", () => ({
 
 vi.mock("@expo/vector-icons", () => ({ Feather: () => null }));
 
+vi.mock("@/components/SafetyDashboardCard", () => ({
+  default: () => null,
+}));
+
 const { routerPushMock } = vi.hoisted(() => ({ routerPushMock: vi.fn() }));
 vi.mock("expo-router", () => {
   const useFocusEffect = (cb: () => void | (() => void)) => {

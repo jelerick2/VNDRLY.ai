@@ -21,14 +21,14 @@ function makeChain(rows: any[]) {
     from: () => chain,
     leftJoin: () => chain,
     innerJoin: () => chain,
-    orderBy: () => Promise.resolve(rows),
+    orderBy: () => chain,
     limit: () => Promise.resolve(rows),
   };
   chain.where = (...args: any[]) => {
     lastWhereArgs = args;
     const next: any = {
       then: (resolve: any) => Promise.resolve(rows).then(resolve),
-      orderBy: () => Promise.resolve(rows),
+      orderBy: () => next,
       limit: () => Promise.resolve(rows),
       leftJoin: () => next,
       innerJoin: () => next,

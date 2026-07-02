@@ -1020,18 +1020,14 @@ router.get("/tickets", async (req, res): Promise<void> => {
 
   // Task #51 — pass the viewer so each row carries an accurate
   // `unreadCommentCount` for the badge on the tickets-list page.
-  const items = limit > 0
-    ? whereClause
-      ? await ticketQuery(session.userId)
-        .where(whereClause)
-        .orderBy(desc(ticketsTable.createdAt))
-        .limit(limit)
-        .offset(offset)
-      : await ticketQuery(session.userId)
-        .orderBy(desc(ticketsTable.createdAt))
-        .limit(limit)
-        .offset(offset)
-    : [];
+  let items: any[] = [];
+  if (limit > 0) {
+    let itemsQuery: any = whereClause
+      ? ticketQuery(session.userId).where(whereClause)
+      : ticketQuery(session.userId);
+    itemsQuery = itemsQuery.orderBy(desc(ticketsTable.createdAt)).limit(limit);
+    items = offset > 0 ? await itemsQuery.offset(offset) : await itemsQuery;
+  }
   const total = Number(countRow?.value ?? 0);
   sendResponse(res, ListTicketsResponse, { items, total });
 });

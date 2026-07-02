@@ -31,6 +31,18 @@ vi.mock("@expo/vector-icons", () => ({ Feather: () => null }));
 vi.mock("expo-router", () => ({
   router: { push: vi.fn(), replace: vi.fn(), back: vi.fn() },
   Stack: { Screen: () => null },
+  useLocalSearchParams: () => ({}),
+  useFocusEffect: (cb: () => void | (() => void)) => {
+    const ReactLib = require("react");
+    ReactLib.useEffect(() => {
+      const cleanupFn = cb();
+      return typeof cleanupFn === "function" ? cleanupFn : undefined;
+    }, []);
+  },
+}));
+
+vi.mock("expo-notifications", () => ({
+  addNotificationReceivedListener: () => ({ remove: vi.fn() }),
 }));
 
 import enLocale from "../../lib/locales/en.json";

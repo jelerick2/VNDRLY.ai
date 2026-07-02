@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { useTranslation } from "react-i18next";
 import { ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,11 @@ const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function SafetyEventDetailPage() {
   const { t } = useTranslation();
-  const [, params] = useRoute("/safety/:id");
+  const [location] = useLocation();
+  const safetyBase = location.startsWith("/foreman/") ? "/foreman/safety" : "/safety";
+  const [, adminParams] = useRoute("/safety/:id");
+  const [, foremanParams] = useRoute("/foreman/safety/:id");
+  const params = foremanParams ?? adminParams;
   const id = Number(params?.id);
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -77,7 +81,7 @@ export default function SafetyEventDetailPage() {
 
   return (
     <div className="space-y-4 p-4 md:p-6 max-w-3xl mx-auto">
-      <Link href="/safety" className="text-sm text-primary">
+      <Link href={safetyBase} className="text-sm text-primary">
         ← {t("safety.backToInbox")}
       </Link>
       <h1 className="text-2xl font-bold flex items-center gap-2">

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import pg from "pg";
+import { hasListenNotifySupport } from "../test-utils/listen-notify";
 
 // ---------------------------------------------------------------------------
 // Cross-instance live Crew Map updates regression test.
@@ -21,28 +21,7 @@ import pg from "pg";
 
 type VisitEventsModule = typeof import("./visit-events");
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const haveRealDb = await checkDatabase();
-
-async function checkDatabase(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  // Ignore the placeholder URL the test setup writes when no DB is available.
-  if (DATABASE_URL.includes("test:test@localhost")) return false;
-  const client = new pg.Client({ connectionString: DATABASE_URL });
-  try {
-    await client.connect();
-    await client.query("SELECT 1");
-    await client.end();
-    return true;
-  } catch {
-    try {
-      await client.end();
-    } catch {
-      /* ignore */
-    }
-    return false;
-  }
-}
+const haveRealDb = await hasListenNotifySupport();
 
 async function loadFreshModule(): Promise<VisitEventsModule> {
   vi.resetModules();

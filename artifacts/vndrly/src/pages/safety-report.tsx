@@ -33,7 +33,8 @@ function readSearchParams(): { siteLocationId?: string; ticketId?: string } {
 export default function SafetyReportPage() {
   const { t } = useTranslation();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+  const safetyBase = location.startsWith("/foreman/") ? "/foreman/safety" : "/safety";
   const initial = readSearchParams();
   const [eventType, setEventType] = useState<(typeof EVENT_TYPES)[number]>("near_miss");
   const [title, setTitle] = useState("");
@@ -69,7 +70,7 @@ export default function SafetyReportPage() {
         throw new Error(body?.message ?? t("safety.reportErrorTitle"));
       }
       toast({ title: t("safety.reportSuccessTitle"), description: t("safety.reportSuccessBody") });
-      navigate("/safety");
+      navigate(safetyBase);
     } catch (err) {
       toast({
         title: t("safety.reportErrorTitle"),
@@ -84,7 +85,7 @@ export default function SafetyReportPage() {
   return (
     <div className="space-y-6 max-w-xl" data-testid="safety-report-page">
       <div className="flex items-center gap-4">
-        <Link href="/safety" className="group inline-flex items-center" aria-label="Back">
+        <Link href={safetyBase} className="group inline-flex items-center" aria-label="Back">
           <SphereBackButton size={40} />
         </Link>
         <div>

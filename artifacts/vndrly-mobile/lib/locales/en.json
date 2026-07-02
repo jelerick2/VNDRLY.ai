@@ -190,7 +190,6 @@
     "staleSuffixA11y": "Stalled for {{days}} days",
     "rateLimitedToast": "Reconnecting… retrying in {{seconds}}s",
     "partsAndLabor": "Parts & Labor",
-    "routeSection": "Route",
     "historySection": "History",
     "reopenedFrom": "Reopened from",
     "unlockNumber": "Unlock #{{num}} · {{name}}",
@@ -220,7 +219,6 @@
     "reopenedBy": "Reopened by {{name}}",
     "reopenedByCount": "Reopened by {{name}} · {{count}}×",
     "viewOnMap": "View on map",
-    "taxLabel": "Tax ({{state}} · {{pct}}%)",
     "taxLabelMerchandise": "Tax — goods ({{label}} · {{pct}}%)",
     "taxLabelLabor": "Tax — labor ({{label}} · {{pct}}%)",
     "taxLabelLaborExempt": "Labor (exempt — {{state}} field services)",
@@ -297,8 +295,6 @@
     "qtyPlaceholder": "Qty",
     "unitPricePlaceholder": "Unit price",
     "siteLocationFallback": "Site Location",
-    "initiateAdjacent": "Initiate adjacent ticket",
-    "adjacentSiteHint": "· {{site}}",
     "unreadCommentsA11y": "{{count}} unread comments",
     "siteFallbackPlaceholder": "—",
     "workTypeFallbackPlaceholder": "—",
@@ -464,6 +460,8 @@
       "invalid_body": "Some of the submitted information is invalid. Please review and try again.",
       "invalid_input": "Some of the input is invalid. Please review and try again.",
       "invalid_query": "Some of the query parameters are invalid.",
+      "required": "This field is required.",
+      "invalid_days_ahead": "Days ahead must be a valid number.",
       "failed": "Some information is missing or invalid. Please check the form and try again.",
       "issues": {
         "default": "This value isn't valid.",
@@ -511,6 +509,8 @@
       "invalid_duration": "The duration must be at least 15 minutes.",
       "invalid_crew": "Crew size must be a positive whole number.",
       "invalid_foreman": "That foreman isn't valid for this ticket.",
+      "invalid_acting_foreman": "That acting foreman isn't valid for this schedule.",
+      "crew_required": "Select at least one crew member.",
       "invalid_ack_status": "That acknowledgement status isn't valid.",
       "not_on_crew": "You're not on the crew for this ticket.",
       "not_assigned": "You're not assigned to this ticket.",
@@ -530,6 +530,22 @@
       "not_found": "That employee wasn't found.",
       "vendor_mismatch": "That employee isn't part of this ticket's vendor."
     },
+    "foreman": {
+      "required": "A foreman is required."
+    },
+    "crew_preset": {
+      "not_found": "That saved crew wasn't found."
+    },
+    "majik": {
+      "not_member": "That user is not on the Majik team.",
+      "invalid_user_id": "That user ID isn't valid.",
+      "team_full": "The Majik team is full.",
+      "user_not_found": "That user wasn't found.",
+      "already_member": "That user is already on the Majik team."
+    },
+    "safety": {
+      "site_inactive": "This site is inactive due to a safety stop-work event."
+    },
     "certification": {
       "cert_number_required": "Certificate number is required.",
       "verify_forbidden": "Only vendor admin can verify certifications."
@@ -541,6 +557,7 @@
       "reason_required": "A reason is required.",
       "already_on_roster": "That employee is already on the crew roster for this ticket.",
       "not_on_roster": "That crew member isn't on the roster.",
+      "invalid_members": "One or more crew members aren't valid.",
       "assignment_rate_role": "Only your vendor or admin can set assignment rates.",
       "invalid_hourly_rate": "Hourly rate must be zero or higher (or empty to clear).",
       "employee_inactive": "That crew member was just deactivated by the office. Refresh and pick someone else."
@@ -588,9 +605,13 @@
     "field": {
       "account_inactive": "Your field account is not active. Contact your office staff.",
       "login_required": "Sign in as a field employee to continue.",
+      "mobile_viewer_login_required": "Sign in with a mobile field account to continue.",
+      "forbidden": "You don't have permission to access that field resource.",
       "vendor_not_found": "That vendor wasn't found.",
+      "partner_not_found": "That partner wasn't found.",
       "field_or_vendor_login_required": "Sign in as a field employee or vendor to continue.",
       "first_name_required": "First name is required.",
+      "email_required": "Email is required.",
       "invalid_pec_date": "PEC expiration date must be in YYYY-MM-DD format.",
       "password_required": "Current and new password are required.",
       "password_too_short": "Password must be at least 8 characters.",
@@ -624,6 +645,8 @@
     "ticket": {
       "not_found": "Ticket not found.",
       "no_access": "You don't have access to this ticket.",
+      "not_submittable": "This ticket isn't ready to submit yet.",
+      "not_kickbackable": "Only submitted or approved tickets can be kicked back.",
       "not_editable": "This ticket can no longer be edited.",
       "en_route_invalid_state": "You can't mark this ticket en route in its current state.",
       "not_approved": "Funds can only be dispersed on an approved ticket.",
@@ -754,6 +777,15 @@
     "site_not_found": "We couldn't find that site. Pick a different one.",
     "site_vendor_mismatch": "Your vendor isn't assigned to work at this site. Pick a different one.",
     "work_type_not_allowed": "Your vendor isn't approved for this work type at this site. Pick a different one.",
+    "site_inactive": "This site is inactive due to a safety stop-work event.",
+    "not_scheduled": "This ticket isn't scheduled yet.",
+    "crew_required": "Select at least one crew member.",
+    "no_partner": "This visitor site is not linked to a partner.",
+    "foreman_required": "A foreman is required.",
+    "field_partner_not_found": "That partner wasn't found.",
+    "field_mobile_viewer_login_required": "Sign in with a mobile field account to continue.",
+    "field_email_required": "Email is required.",
+    "internal_error": "Something went wrong on our end. Please try again.",
     "foreman_vendor_mismatch": "That foreman isn't on this vendor. Pick a different field employee.",
     "foreman_field_employee_mismatch": "The foreman must match the assigned field employee.",
     "not_authenticated": "Please sign in to continue.",
@@ -815,13 +847,26 @@
       "eula_not_accepted": "Vendor must accept the EULA before you can approve them."
     },
     "assistant": {
+      "audio_too_large": "That audio clip is too large. Try a shorter recording.",
+      "feedback_assistant_only": "Only AskV answers can be rated.",
+      "invalid_audio": "That audio file isn't valid. Try recording again.",
+      "invalid_feedback_rating": "That feedback rating isn't valid.",
       "invalid_persona": "That assistant persona isn't valid.",
       "message_too_long": "Your message is too long. Please shorten it.",
-      "missing_message": "Please type a message before sending."
+      "missing_audio": "Record audio before sending.",
+      "missing_message": "Please type a message before sending.",
+      "missing_text": "Enter text before requesting speech.",
+      "no_speech": "No speech was detected. Try again.",
+      "transcribe_failed": "Couldn't transcribe the audio. Try again.",
+      "transcribe_unavailable": "Speech transcription isn't available right now.",
+      "tts_failed": "Couldn't play the voice response. Try again.",
+      "tts_unavailable": "Voice response isn't available right now."
     },
     "certification": {
+      "cert_number_required": "Certificate number is required.",
       "invalid_document_url": "That certification document URL isn't valid.",
-      "not_found": "That certification wasn't found."
+      "not_found": "That certification wasn't found.",
+      "verify_forbidden": "Only vendor admin can verify certifications."
     },
     "common": {
       "not_found": "We couldn't find that record."
@@ -972,6 +1017,7 @@
       "site_not_found": "We couldn't find that site.",
       "site_vendor_mismatch": "Your vendor isn't assigned to work at this site.",
       "work_type_not_allowed": "Your vendor isn't approved for this work type at this site.",
+      "create_failed": "Couldn't create the field ticket. Please try again.",
       "starting_mileage_invalid": "Enter a valid starting mileage to continue."
     },
     "visitor": {
@@ -982,6 +1028,7 @@
       "not_ticket_owner": "You're not assigned to that ticket.",
       "ticket_not_on_shift": "This ticket isn't on shift right now.",
       "invalid_site_location_id": "That site location ID isn't valid.",
+      "no_partner": "This visitor site is not linked to a partner.",
       "no_vendor": "Your account isn't linked to a vendor.",
       "wrong_vendor": "That doesn't belong to your vendor.",
       "forbidden": "You don't have permission to view live locations.",
@@ -1233,7 +1280,6 @@
       "comments": "Comments & mentions",
       "commentsDesc": "@mentions and replies on tickets and hotlist threads you're on.",
       "safety": "Safety Incidents",
-      "safetyDesc": "Stop-work orders, incidents, and HSE updates.",
       "commentMentionEmail": "Email me when @mentioned",
       "commentMentionEmailDesc": "Send an email immediately when someone @mentions you in a ticket or hotlist comment.",
       "commentReplyEmail": "Email reply digest",
@@ -1258,15 +1304,7 @@
     "title": "Compliance Card",
     "brand": "VNDRLY COMPLIANCE",
     "id": "ID #{{id}}",
-    "certifications": "CERTIFICATIONS",
-    "noCerts": "No certifications recorded.",
-    "qrCaption": "Show this to inspectors to verify your status.",
-    "active": "Active",
-    "expiringSoon": "Expiring",
-    "expired": "Expired",
-    "noExpiration": "No expiration",
-    "unknownIssuer": "—",
-    "expirationSuffix": " · exp {{date}}"
+    "qrCaption": "Show this to inspectors to verify your status."
   },
   "editProfile": {
     "tapToChange": "Tap photo to change",
@@ -1327,7 +1365,6 @@
     "complianceCard": "Compliance Card",
     "manageEmployees": "Manage employees",
     "companyServices": "Company services",
-    "crewChanges": "My Crew Changes",
     "couldNotUpdate": "Could not update",
     "languageSavedToast": "Saved — {{language}}",
     "languageSaveFailedToast": "Couldn't save your language preference. Please try again."
@@ -1360,7 +1397,6 @@
   "foremanSchedule": {
     "scheduleTicket": "Schedule Ticket",
     "scheduleNow": "Schedule Now",
-    "addToCalendar": "Add to Calendar",
     "pickTicketTitle": "Open tickets",
     "noOpenTickets": "No open tickets for your vendor.",
     "emptyForeman": "Nothing scheduled yet. Tap Schedule Ticket to assign a crew to an open job."
@@ -1380,8 +1416,7 @@
     "nobodyNearby": "No crews are sharing location near your sites right now."
   },
   "partnerSchedule": {
-    "empty": "No upcoming scheduled vendor work at your sites.",
-    "vendor": "Vendor: {{name}}"
+    "empty": "No upcoming scheduled vendor work at your sites."
   },
   "crew": {
     "title": "Crew & Time",
@@ -1471,25 +1506,17 @@
     "greetingAdmin": "Hi {{name}}! Ask about platform setup, tickets, 1099, and admin workflows.",
     "quickActionsLabel": "Quick actions",
     "inputPlaceholder": "Ask anything about VNDRLY…",
-    "send": "Send",
     "thinking": "Thinking…",
     "usingTool": "Looking up {{tool}}…",
     "clearTitle": "Clear conversation?",
     "clearBody": "This deletes the chat history for this session.",
     "clearConfirm": "Clear",
     "errorGeneric": "The assistant is having trouble right now. Please try again.",
-    "newChat": "New chat",
     "downloadTranscript": "Download transcript",
-    "deleteConversation": "Delete this conversation",
-    "close": "Close",
-    "feedbackHelpful": "Helpful",
-    "feedbackUnhelpful": "Unhelpful",
     "sharedAnswerFallback": "Shared AskV answer",
-    "disclaimer": "Replies are AI-generated. Verify important details before acting on them. Help us improve AskV with feedback.",
     "transcriptErrorTitle": "Could not export transcript",
     "transcriptShareUnavailable": "Sharing is not available on this device.",
     "transcribeFailed": "Couldn't understand that. Try again or type your question.",
-    "holdToTalkHint": "Hold the mic, speak, then release to send.",
     "quickActions": {
       "fieldStatus": "Update ticket status",
       "fieldPhoto": "Profile photo & certs",
@@ -1524,7 +1551,6 @@
     "quickActions": "Quick actions",
     "startJob": "Start job",
     "schedule": "Schedule",
-    "crewComms": "Crew comms",
     "alerts": "Alerts",
     "activeJobs": "Active jobs",
     "crewCommsTitle": "Crew comms",
@@ -1596,11 +1622,7 @@
   "stack": {
     "newTicket": "Start New Job",
     "tracking": "Tracking",
-    "history": "Tracking History",
-    "editProfile": "Edit Profile",
-    "crewTracker": "Crew Tracker",
-    "invoice": "Invoice",
-    "back": "Back"
+    "editProfile": "Edit Profile"
   },
   "invoices": {
     "loadFailed": "Couldn't load this invoice. Pull to refresh.",
@@ -1706,13 +1728,11 @@
   },
   "scheduleTicket": {
     "button": "Schedule job",
-    "title": "Schedule job",
     "scheduleNowTitle": "Schedule Now",
     "loading": "Loading current schedule…",
     "whenLabel": "Date & start time",
     "durationLabel": "Estimated duration (hours)",
     "durationPlaceholder": "e.g. 4",
-    "crewLabel": "Select crew",
     "crewPresetLabel": "Saved crews",
     "individualCrewLabel": "Or pick crew members individually",
     "presetAppliedTitle": "Crew applied",
@@ -1728,13 +1748,8 @@
     "warningsHint": "Push alerts at 24h, 12h, and 1h before start. Tap a notification to open the ticket in VNDRLY.",
     "warning1d": "24 hours before",
     "warning12h": "12 hours before",
-    "warning2d": "2 days before",
-    "warning3d": "3 days before",
-    "warning4h": "4 hours before",
     "warning1h": "1 hour before",
-    "warningStart": "At start time",
     "cancel": "Cancel",
-    "save": "Save schedule",
     "notifyCrew": "Notify Crew",
     "saving": "Saving…",
     "savedTitle": "Crew notified",

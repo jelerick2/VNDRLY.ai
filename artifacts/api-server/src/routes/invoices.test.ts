@@ -270,7 +270,7 @@ describe.runIf(haveRealDb)("invoices REST — create / regenerate / concurrency"
     );
   });
 
-  // Helper: create a fresh ticket on partnerA in `submitted` state with one
+  // Helper: create a fresh ticket on partnerA in `pending_review` state with one
   // 8h labor check-in and one equipment line item, ready for an approve
   // call. The approvedAt is left null — the approve handler stamps it on
   // transition.
@@ -285,7 +285,7 @@ describe.runIf(haveRealDb)("invoices REST — create / regenerate / concurrency"
         siteLocationId: opts.siteLocationId ?? siteAId,
         vendorId,
         workTypeId,
-        status: "submitted",
+        status: "pending_review",
         checkInTime: opts.checkInAt,
         checkOutTime: opts.checkOutAt,
       })

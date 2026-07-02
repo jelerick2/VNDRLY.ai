@@ -81,6 +81,7 @@ const tables = {
     "email",
     "isActive",
     "deletedAt",
+    "vendorRole",
   ]),
 };
 
@@ -599,6 +600,7 @@ function seedFieldEmployeeWithLogin(opts: {
     email: opts.email,
     isActive: true,
     deletedAt: null,
+    vendorRole: "field",
   };
   fixtures.vendorPeople.push(employee);
   const membership: Row = {

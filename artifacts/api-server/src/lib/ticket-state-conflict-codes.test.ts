@@ -4,13 +4,14 @@ import {
   TICKET_NOT_ACCEPTED,
   TICKET_NOT_AWAITING_ACCEPTANCE,
   TICKET_NOT_CHECKINABLE,
+  TICKET_ON_LOCATION_INVALID_STATE,
   TICKET_STATE_CHANGED,
   TICKET_STATE_CONFLICT_CODES,
   isTicketStateConflictCode,
 } from "@workspace/ticket-state-conflict-codes";
 
 describe("ticket-state-conflict-codes", () => {
-  it("exposes the canonical set of five state-conflict codes", () => {
+  it("exposes the canonical set of six state-conflict codes", () => {
     // Pin the exact membership of the named set. Adding or removing a
     // code is a contract change that must be coordinated with the web
     // and mobile mirrors (see the file header for paths), so this test
@@ -21,6 +22,7 @@ describe("ticket-state-conflict-codes", () => {
       "ticket_not_accepted",
       "ticket_not_awaiting_acceptance",
       "ticket_not_checkinable",
+      "ticket_on_location_invalid_state",
       "ticket_state_changed",
     ]);
   });
@@ -38,6 +40,7 @@ describe("ticket-state-conflict-codes", () => {
     expect(set.has(TICKET_STATE_CHANGED)).toBe(true);
     expect(set.has(TICKET_NOT_CHECKINABLE)).toBe(true);
     expect(set.has(TICKET_EN_ROUTE_INVALID_STATE)).toBe(true);
+    expect(set.has(TICKET_ON_LOCATION_INVALID_STATE)).toBe(true);
   });
 
   it("isTicketStateConflictCode recognizes every canonical code", () => {

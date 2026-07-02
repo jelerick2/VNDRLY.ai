@@ -72,6 +72,30 @@ const SITE_RADIUS_OPTIONS: Array<{ value: string; miles: number | null }> = [
 type SortKey = "ticket" | "site" | "vendor" | "fieldEmployee" | "status" | "created" | "daysWaiting";
 type SortDir = "asc" | "desc";
 
+type TicketsListCacheShape = { items?: unknown } | Ticket[] | null | undefined;
+
+function ticketItemsFromCache(cache: TicketsListCacheShape): Ticket[] {
+  if (Array.isArray(cache)) return cache;
+  const items = cache && typeof cache === "object" ? cache.items : undefined;
+  return Array.isArray(items) ? (items as Ticket[]) : [];
+}
+
+function patchTicketInListCache<T>(cache: T, ticketId: number, fresh: Ticket): T {
+  if (Array.isArray(cache)) {
+    return cache.map((t) => (t.id === ticketId ? fresh : t)) as T;
+  }
+  const page = cache as unknown as { items?: unknown };
+  if (cache && typeof cache === "object" && Array.isArray(page.items)) {
+    return {
+      ...cache,
+      items: page.items.map((t) =>
+        t.id === ticketId ? fresh : t,
+      ),
+    } as T;
+  }
+  return cache;
+}
+
 type TicketLike = {
   id: number;
   siteName?: string | null;
@@ -454,7 +478,7 @@ export default function Tickets() {
     },
   );
   const { data: ticketsPage, isLoading, error: ticketsListError } = ticketsListQuery;
-  const tickets = ticketsPage?.items ?? [];
+  const tickets = ticketItemsFromCache(ticketsPage as TicketsListCacheShape);
   type TicketsPageData = NonNullable<typeof ticketsPage>;
   const { rateLimited: listRateLimited } = useTicketsRateLimitGate(ticketsListError);
   useEffect(() => {
@@ -575,7 +599,7 @@ export default function Tickets() {
               Object.keys(lp).length > 0 ? lp : undefined,
             );
             const cachedList = queryClient.getQueryData<TicketsPageData>(listKey);
-            if (cachedList && cachedList.items.some((t) => t.id === tid)) {
+            if (ticketItemsFromCache(cachedList as TicketsListCacheShape).some((t) => t.id === tid)) {
               queryClient
                 .fetchQuery({
                   queryKey: getGetTicketQueryKey(tid),
@@ -583,9 +607,7 @@ export default function Tickets() {
                 })
                 .then((fresh) => {
                   queryClient.setQueryData<TicketsPageData>(listKey, (old) =>
-                    old
-                      ? { ...old, items: old.items.map((t) => (t.id === tid ? fresh : t)) }
-                      : old,
+                    patchTicketInListCache(old, tid, fresh),
                   );
                 })
                 .catch(() => {
@@ -860,7 +882,7 @@ export default function Tickets() {
           Object.keys(lp).length > 0 ? lp : undefined,
         );
         const cachedList = queryClient.getQueryData<TicketsPageData>(listKey);
-        if (!cachedList || !cachedList.items.some((t) => t.id === ticketId)) {
+        if (!ticketItemsFromCache(cachedList as TicketsListCacheShape).some((t) => t.id === ticketId)) {
           // Row isn't in the current view — nothing to patch and no
           // toast to fire either. Acknowledging restores for tickets
           // outside the dispatcher's filtered view would just be noise.
@@ -887,9 +909,7 @@ export default function Tickets() {
           })
           .then((fresh) => {
             queryClient.setQueryData<TicketsPageData>(listKey, (old) =>
-              old
-                ? { ...old, items: old.items.map((t) => (t.id === ticketId ? fresh : t)) }
-                : old,
+              patchTicketInListCache(old, ticketId, fresh),
             );
           })
           .catch(() => {

@@ -176,9 +176,11 @@ vi.mock("@workspace/db", () => {
     ticketCheckInsTable: tableTag("ticketCheckIns"),
     ticketStatusHistoryTable: tableTag("ticketStatusHistory"),
     siteWorkAssignmentsTable: tableTag("siteWorkAssignments"),
+    partnerVendorWorkTypeApprovalsTable: tableTag("partnerVendorWorkTypeApprovals"),
     partnerVendorRelationshipsTable: tableTag("partnerVendorRelationships"),
     vendorWorkTypesTable: tableTag("vendorWorkTypes"),
     hotlistJobsTable: tableTag("hotlistJobs"),
+    resolveEffectiveTaxTreatment: vi.fn(() => "exempt_labor"),
     // Task #51 — referenced by unread-comments.ts subqueries.
     commentReadReceiptsTable: tableTag("commentReadReceipts"),
     hotlistCommentsTable: tableTag("hotlistComments"),

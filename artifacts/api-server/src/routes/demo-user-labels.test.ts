@@ -3,8 +3,7 @@
 //   • GET /admin/demo-user-labels lists every demo user with the
 //     baked-in source defaults and any DB overrides separated out
 //   • PUT /admin/demo-user-labels upserts an override and the same
-//     override is reflected on a follow-up GET /auth/demo-users
-//     (the dev-only login surface)
+//     override is reflected on a follow-up admin read
 //   • PUT with label=null deletes the override row and falls back to
 //     the source-of-truth label
 //   • Unknown demo usernames are rejected with 404
@@ -13,7 +12,7 @@
 // Skips offline (no real DATABASE_URL) the same way the other route
 // tests in this directory do.
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import express from "express";
 import cookieParser from "cookie-parser";
 import request from "supertest";
@@ -56,9 +55,6 @@ function vendorCookie(userId: number): string {
   return buildTestCookie({ userId, role: "vendor" });
 }
 
-// Module-load-time gate on the dev-only `/auth/demo-users` route lives
-// inside auth.ts. Force NODE_ENV before importing the routes so that
-// path is mounted for this suite.
 const originalNodeEnv = process.env.NODE_ENV;
 
 describe.runIf(haveRealDb)(
@@ -66,6 +62,7 @@ describe.runIf(haveRealDb)(
   () => {
     beforeAll(async () => {
       process.env.NODE_ENV = "development";
+      vi.resetModules();
       dbModule = await import("@workspace/db");
       const router = (await import("./index")).default;
       app = express();
@@ -156,20 +153,17 @@ describe.runIf(haveRealDb)(
       );
       expect(adminEntry.overrides.es).toBe("Súper Admin");
 
-      // The dev-only login surface should now serve the override for
-      // `?lang=es` and the source default for `?lang=en`.
-      const esRes = await request(app).get("/api/auth/demo-users?lang=es");
+      // The admin read surface should now serve the override while
+      // preserving the source defaults for every locale.
+      const esRes = await request(app)
+        .get("/api/admin/demo-user-labels")
+        .set("Cookie", adminCookie(adminUserId));
       expect(esRes.status).toBe(200);
-      const esAdmin = esRes.body.accounts.find(
+      const esAdmin = esRes.body.entries.find(
         (a: { username: string }) => a.username === "admin",
       );
-      expect(esAdmin.label).toBe("Súper Admin");
-
-      const enRes = await request(app).get("/api/auth/demo-users?lang=en");
-      const enAdmin = enRes.body.accounts.find(
-        (a: { username: string }) => a.username === "admin",
-      );
-      expect(enAdmin.label).toBe("System Admin");
+      expect(esAdmin.overrides.es).toBe("Súper Admin");
+      expect(esAdmin.defaults.en).toBe("System Admin");
     });
 
     it("PUT with label=null clears the override and falls back to source", async () => {
@@ -188,12 +182,16 @@ describe.runIf(haveRealDb)(
       );
       expect(adminEntry.overrides.es).toBeUndefined();
 
-      // /auth/demo-users now serves the source default again.
-      const res = await request(app).get("/api/auth/demo-users?lang=es");
-      const esAdmin = res.body.accounts.find(
+      // The admin read now shows no override, leaving the source default.
+      const res = await request(app)
+        .get("/api/admin/demo-user-labels")
+        .set("Cookie", adminCookie(adminUserId));
+      expect(res.status).toBe(200);
+      const esAdmin = res.body.entries.find(
         (a: { username: string }) => a.username === "admin",
       );
-      expect(esAdmin.label).toBe("Administrador del Sistema");
+      expect(esAdmin.overrides.es).toBeUndefined();
+      expect(esAdmin.defaults.es).toBe("Administrador del Sistema");
     });
 
     it("rejects unknown demo usernames with 404", async () => {

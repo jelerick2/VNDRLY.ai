@@ -674,6 +674,29 @@ export type SeedCounts = {
   unchanged: number;
 };
 
+function isUniqueViolation(err: unknown): boolean {
+  const anyErr = err as { code?: unknown; cause?: { code?: unknown } };
+  return anyErr.code === "23505" || anyErr.cause?.code === "23505";
+}
+
+async function loadPartnerByCanonicalName(name: string) {
+  const [existing] = await db
+    .select()
+    .from(partnersTable)
+    .where(sql`lower(btrim(${partnersTable.name})) = lower(btrim(${name}))`)
+    .limit(1);
+  return existing ?? null;
+}
+
+async function loadVendorByCanonicalName(name: string) {
+  const [existing] = await db
+    .select()
+    .from(vendorsTable)
+    .where(sql`lower(btrim(${vendorsTable.name})) = lower(btrim(${name}))`)
+    .limit(1);
+  return existing ?? null;
+}
+
 export async function seedPartners(): Promise<SeedCounts> {
   let inserted = 0;
   let enriched = 0;
@@ -685,25 +708,28 @@ export async function seedPartners(): Promise<SeedCounts> {
     // partners_canonical_name_unique DB index — without it, a re-seed
     // against a hand-edited row would now hit a unique-violation
     // instead of silently inserting a duplicate.
-    const [existing] = await db
-      .select()
-      .from(partnersTable)
-      .where(sql`lower(btrim(${partnersTable.name})) = lower(btrim(${seed.name}))`)
-      .limit(1);
+    let existing = await loadPartnerByCanonicalName(seed.name);
     if (!existing) {
-      await db.insert(partnersTable).values(seed);
-      inserted++;
-      console.log(`  + inserted partner: ${seed.name}`);
-    } else {
-      const patch = mergeBlanks(existing, seed);
-      if (Object.keys(patch).length > 0) {
-        await db.update(partnersTable).set(patch).where(eq(partnersTable.id, existing.id));
-        enriched++;
-        console.log(`  ~ enriched partner #${existing.id}: ${seed.name}  (${Object.keys(patch).join(", ")})`);
-      } else {
-        unchanged++;
-        console.log(`  · unchanged partner #${existing.id}: ${seed.name}`);
+      try {
+        await db.insert(partnersTable).values(seed);
+        inserted++;
+        console.log(`  + inserted partner: ${seed.name}`);
+        continue;
+      } catch (err) {
+        if (!isUniqueViolation(err)) throw err;
+        existing = await loadPartnerByCanonicalName(seed.name);
+        if (!existing) throw err;
       }
+    }
+
+    const patch = mergeBlanks(existing, seed);
+    if (Object.keys(patch).length > 0) {
+      await db.update(partnersTable).set(patch).where(eq(partnersTable.id, existing.id));
+      enriched++;
+      console.log(`  ~ enriched partner #${existing.id}: ${seed.name}  (${Object.keys(patch).join(", ")})`);
+    } else {
+      unchanged++;
+      console.log(`  · unchanged partner #${existing.id}: ${seed.name}`);
     }
   }
   console.log(`Partners: +${inserted} inserted, ~${enriched} enriched, ${unchanged} unchanged.`);
@@ -721,25 +747,28 @@ export async function seedVendors(): Promise<SeedCounts> {
     // vendors_canonical_name_unique DB index — without it, a re-seed
     // against a hand-edited row would now hit a unique-violation
     // instead of silently inserting a duplicate.
-    const [existing] = await db
-      .select()
-      .from(vendorsTable)
-      .where(sql`lower(btrim(${vendorsTable.name})) = lower(btrim(${seed.name}))`)
-      .limit(1);
+    let existing = await loadVendorByCanonicalName(seed.name);
     if (!existing) {
-      await db.insert(vendorsTable).values(seed);
-      inserted++;
-      console.log(`  + inserted vendor: ${seed.name}`);
-    } else {
-      const patch = mergeBlanks(existing, seed);
-      if (Object.keys(patch).length > 0) {
-        await db.update(vendorsTable).set(patch).where(eq(vendorsTable.id, existing.id));
-        enriched++;
-        console.log(`  ~ enriched vendor #${existing.id}: ${seed.name}  (${Object.keys(patch).join(", ")})`);
-      } else {
-        unchanged++;
-        console.log(`  · unchanged vendor #${existing.id}: ${seed.name}`);
+      try {
+        await db.insert(vendorsTable).values(seed);
+        inserted++;
+        console.log(`  + inserted vendor: ${seed.name}`);
+        continue;
+      } catch (err) {
+        if (!isUniqueViolation(err)) throw err;
+        existing = await loadVendorByCanonicalName(seed.name);
+        if (!existing) throw err;
       }
+    }
+
+    const patch = mergeBlanks(existing, seed);
+    if (Object.keys(patch).length > 0) {
+      await db.update(vendorsTable).set(patch).where(eq(vendorsTable.id, existing.id));
+      enriched++;
+      console.log(`  ~ enriched vendor #${existing.id}: ${seed.name}  (${Object.keys(patch).join(", ")})`);
+    } else {
+      unchanged++;
+      console.log(`  · unchanged vendor #${existing.id}: ${seed.name}`);
     }
   }
   console.log(`Vendors:  +${inserted} inserted, ~${enriched} enriched, ${unchanged} unchanged.`);

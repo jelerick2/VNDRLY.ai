@@ -1,4 +1,4 @@
-import { Bell, Calendar, PlusCircle, Radio } from "lucide-react";
+import { Bell, Calendar, PlusCircle, ShieldAlert } from "lucide-react";
 
 import { useTranslation } from "react-i18next";
 
@@ -99,15 +99,15 @@ export default function ForemanQuickActions({
 
     {
 
-      key: "comms",
+      key: "safety",
 
-      icon: Radio,
+      icon: ShieldAlert,
 
-      label: t("foremanHome.crewComms"),
+      label: t("foremanHome.safetyReports"),
 
-      onClick: () => navigate(`${portalBase}/crews`),
+      onClick: () => navigate(`${portalBase}/safety`),
 
-      testId: "foreman-action-comms",
+      testId: "foreman-action-safety-reports",
 
     },
 

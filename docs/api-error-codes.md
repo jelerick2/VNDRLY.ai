@@ -50,6 +50,7 @@ the snake_case `error` field.
 | `payment_reference_required` | 400 | `POST /api/tickets/:id/disperse-funds` | A payment reference (check #) is required. | Se requiere una referencia de pago (# de cheque). |
 | `reverse_funds_reason_required` | 400 | `POST /api/tickets/:id/reverse-funds-dispersal` | A reason is required to reverse the payment. | Se requiere un motivo para revertir el pago. |
 | `phone_intake_role_required` | 403 | `POST /api/tickets` | Phone intake requires admin or vendor office access. | La toma por teléfono requiere acceso de administrador u oficina del proveedor. |
+| `site_inactive` | 409 | `POST /api/tickets`, `POST /api/field/tickets` | This site is inactive due to a safety stop-work event. | Este sitio está inactivo por una orden de alto al trabajo de seguridad. |
 | `site_not_found` | 400 | `POST /api/tickets` | We couldn't find that site. Pick a different one. | No encontramos ese sitio. Elige otro. |
 | `site_not_geocoded` | 400 | `POST /api/tickets/direct-award` | Site is not geocoded — vendor radius can't be verified. | El sitio no está geolocalizado — no se puede verificar el radio del proveedor. |
 | `site_vendor_mismatch` | 400 | `POST /api/tickets`, `POST /api/tickets/:id/check-in`, `POST /api/tickets/:id/check-out`, `POST /api/tickets/:id/en-route`, `POST /api/tickets/:id/submit` | Your vendor isn't assigned to work at this site. Pick a different one. | Tu proveedor no está asignado a trabajar en este sitio. Elige otro. |
@@ -82,9 +83,11 @@ table above (`not_authenticated`, `ticket_not_found`, `invalid_ticket_id`,
 
 | Code | HTTP | Route(s) | EN message | ES message |
 | --- | --- | --- | --- | --- |
+| `crew_required` | 400 | `POST /api/tickets/:id/schedule/notify` | Select at least one crew member. | Selecciona al menos un miembro de la cuadrilla. |
 | `forbidden_not_scheduler` | 403 | `POST /api/tickets/:id/schedule`, `GET /api/tickets/:id/schedule`, `GET /api/tickets/:id/crew-tracker`, `GET /api/tickets/:id/schedule.ics` | You don't have permission to schedule this ticket. | No tienes permiso para programar este ticket. |
 | `foreman_not_in_crew` | 400 | `POST /api/tickets/:id/schedule` | The foreman must be one of the assigned crew members. | El capataz debe ser uno de los miembros del equipo asignados. |
 | `invalid_scheduled_duration_minutes` | 400 | `POST /api/tickets/:id/schedule` | Duration must be a positive number of minutes. | La duración debe ser un número positivo de minutos. |
+| `not_scheduled` | 409 | `GET /api/tickets/:id/crew-tracker`, `POST /api/tickets/:id/schedule/notify`, `GET /api/tickets/:id/schedule.ics` | This ticket isn't scheduled yet. | Este ticket aún no está programado. |
 | `scheduled_start_at_required` | 400 | `POST /api/tickets/:id/schedule` | Please pick a start time. | Selecciona una hora de inicio. |
 
 ## Codes emitted by `artifacts/api-server/src/routes/locations.ts`
@@ -99,6 +102,7 @@ the `tickets.ts` table above.
 | `invalid_id` | 400 | `GET /api/field-employees/:id/day-track` | That id isn't valid. | Ese ID no es válido. |
 | `no_active_consent` | 403 | `POST /api/location-pings` | Location sharing is off for this device. Turn it on to share your location. | El uso compartido de ubicación está desactivado en este dispositivo. Actívalo para compartir tu ubicación. |
 | `no_employee_profile` | 403 | `POST /api/location-pings` | We couldn't find your field employee profile. | No encontramos tu perfil de empleado de campo. |
+| `no_partner` | 403 | `GET /api/site-map/:siteLocationId/nearby` | This visitor site is not linked to a partner. | Este sitio de visitante no está vinculado a un socio. |
 | `no_vendor` | 403 | `GET /api/live-locations`, `GET /api/live-locations/events` | Your account isn't linked to a vendor. | Tu cuenta no está vinculada a un proveedor. |
 | `not_found` | 404 | `GET /api/field-employees/:id/day-track` | We couldn't find that record. | No encontramos ese registro. |
 | `not_ticket_owner` | 403 | `POST /api/location-pings` | You're not assigned to that ticket. | No estás asignado a ese ticket. |
@@ -121,6 +125,11 @@ flow is documented in one place.
 
 | Code | HTTP | Route(s) | EN message | ES message |
 | --- | --- | --- | --- | --- |
+| `field_email_required` | 400 | `POST /api/field-employees/:id/login` | Email is required. | El correo es obligatorio. |
+| `field_mobile_viewer_login_required` | 401 | `GET /api/field/open-tickets`, `GET /api/field/me` | Sign in with a mobile field account to continue. | Inicia sesión con una cuenta móvil de campo para continuar. |
+| `field_partner_not_found` | 403 | `GET /api/field/open-tickets`, `GET /api/field/me` | That partner wasn't found. | No se encontró ese socio. |
+| `foreman_required` | 403 | Foreman-only field endpoints | A foreman is required. | Se requiere un capataz. |
+| `internal_error` | 500 | `POST /api/field/tickets` | Something went wrong on our end. Please try again. | Algo salió mal de nuestro lado. Inténtalo de nuevo. |
 | `site_not_found` | 400 | `POST /api/field/tickets` | We couldn't find that site. Pick a different one. | No encontramos ese sitio. Elige otro. |
 | `site_vendor_mismatch` | 400 | `POST /api/field/tickets` | Your vendor isn't assigned to work at this site. Pick a different one. | Tu proveedor no está asignado a trabajar en este sitio. Elige otro. |
 | `work_type_not_allowed` | 400 | `POST /api/field/tickets` | Your vendor isn't approved for this work type at this site. Pick a different one. | Tu proveedor no está aprobado para este tipo de trabajo en este sitio. Elige otro. |

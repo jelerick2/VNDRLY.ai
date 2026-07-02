@@ -20,8 +20,9 @@ const cookieFor = (s: object) => buildTestCookie(s);
 // The field route does (in order, on the happy path):
 //   1. requireFieldUser → SELECT vendor_people LEFT JOIN vendors WHERE userId
 //   2. SELECT site_locations WHERE id (site_not_found guard + geofence)
-//   3. SELECT site_work_assignments WHERE (vendor, site, work_type)
-// Only on miss in step 3 is a 4th narrowing query issued for
+//   3. SELECT site_locations active-state row (safety stop-work gate)
+//   4. SELECT site_work_assignments WHERE (vendor, site, work_type)
+// Only on miss in step 4 is a 5th narrowing query issued for
 // (vendor, site) to disambiguate site_vendor_mismatch vs.
 // work_type_not_allowed. Tasks #498 and #528 — see field.ts for the
 // structured-code rationale.
@@ -150,9 +151,11 @@ beforeEach(async () => {
       longitude: -90,
       siteRadiusMeters: 500,
     },
-    // 3) site_work_assignments by (vendor, site, work_type) — happy-path
+    // 3) active-site safety gate
+    { isActive: true, status: "active", name: "Pad A" },
+    // 4) site_work_assignments by (vendor, site, work_type) — happy-path
     //    combined check. Field route only issues the narrower (vendor,
-    //    site) query when this misses, so 3 reads is enough for the
+    //    site) query when this misses, so 4 reads is enough for the
     //    create-success scenarios this file covers.
     { id: 99 },
   ];
@@ -193,7 +196,7 @@ describe("POST /api/field/tickets — adjacent ticket foreman attribution", () =
   });
 
   it("silently falls back to self when body-supplied foremanUserId is not a valid foreman on this vendor", async () => {
-    // The override-validation lookup runs after the 3 happy-path reads
+    // The override-validation lookup runs after the 4 happy-path reads
     // — push a no-row result onto the queue so the lookup misses (e.g.
     // the userId belongs to another vendor, isn't foreman-eligible, or
     // doesn't exist). The route MUST NOT 4xx — the spec wants a silent
@@ -209,7 +212,7 @@ describe("POST /api/field/tickets — adjacent ticket foreman attribution", () =
   });
 
   it("honors a body-supplied foremanUserId when it points to a foreman-eligible person on the same vendor", async () => {
-    // The override-validation lookup runs after the 3 happy-path reads.
+    // The override-validation lookup runs after the 4 happy-path reads.
     // Push a row that simulates a real foreman-eligible vendor_people
     // record on this vendor so the route uses the override.
     selectQueue.push({ userId: 5555 });

@@ -4,9 +4,9 @@ import express, { type Express } from "express";
 import cookieParser from "cookie-parser";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import pg from "pg";
 import { sql } from "drizzle-orm";
 import { buildTestCookie } from "../test-utils/session";
+import { hasListenNotifySupport } from "../test-utils/listen-notify";
 
 // ---------------------------------------------------------------------------
 // Task #644: end-to-end coverage for the /api/tickets/events SSE channel
@@ -34,28 +34,7 @@ import { buildTestCookie } from "../test-utils/session";
 //     its own vendor; an unrelated vendor does not see the event.
 // ---------------------------------------------------------------------------
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const haveRealDb = await checkDatabase();
-
-async function checkDatabase(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  // The unit-test setup writes a placeholder URL when no real DB exists.
-  if (DATABASE_URL.includes("test:test@localhost")) return false;
-  const client = new pg.Client({ connectionString: DATABASE_URL });
-  try {
-    await client.connect();
-    await client.query("SELECT 1");
-    await client.end();
-    return true;
-  } catch {
-    try {
-      await client.end();
-    } catch {
-      /* ignore */
-    }
-    return false;
-  }
-}
+const haveRealDb = await hasListenNotifySupport();
 
 // All seeded rows carry this marker so cleanup can target only what the
 // suite created without touching pre-existing dev-DB data.
@@ -159,16 +138,6 @@ async function seed(): Promise<SeedIds> {
       siteCode: `${MARKER.slice(0, 24)}-SC`.slice(0, 40),
     })
     .returning({ id: siteLocationsTable.id });
-
-  // Task #727: vendor catalog is the source of truth for site assignments.
-  // The POST /site-locations/:siteId/assignments handler now rejects with
-  // `work_type_not_in_vendor_catalog` (HTTP 400) if the (vendor, work_type)
-  // pair is not in `vendor_work_types`. Seed the catalog row for vendor one
-  // so the unblock fan-out is exercised end-to-end as before.
-  await db.insert(vendorWorkTypesTable).values({
-    vendorId: vendorOne.id,
-    workTypeId: workType.id,
-  });
 
   // Field employee (a.k.a. vendor_people row) to satisfy the unblock fan-out
   // requirement that at least one ticket has a lead — otherwise the helper's

@@ -142,6 +142,12 @@ const siteRow = {
   siteRadiusMeters: 500,
 };
 
+const activeSiteRow = {
+  isActive: true,
+  status: "active",
+  name: "Site A",
+};
+
 beforeEach(async () => {
   insertedTicket = { id: 7777 };
   insertValuesSpy = vi.fn();
@@ -180,11 +186,11 @@ describe("POST /api/field/tickets — structured validation codes", () => {
   });
 
   it("rejects with site_vendor_mismatch when vendor has no assignment at the site", async () => {
-    // Reads: vendor_people, site (exists), combined (vendor, site,
-    // work_type) → null, then narrowing (vendor, site) → null. The
-    // route disambiguates via the second read and emits the
-    // site-picker code.
-    selectQueue = [fieldEmployeeRow, siteRow, null, null];
+    // Reads: vendor_people, site (exists), active-site safety gate,
+    // combined (vendor, site, work_type) → null, then narrowing
+    // (vendor, site) → null. The route disambiguates via the second
+    // assignment read and emits the site-picker code.
+    selectQueue = [fieldEmployeeRow, siteRow, activeSiteRow, null, null];
     const r = await request(app)
       .post("/api/field/tickets")
       .set("Cookie", fieldCookie)
@@ -197,11 +203,11 @@ describe("POST /api/field/tickets — structured validation codes", () => {
   });
 
   it("rejects with work_type_not_allowed when site+vendor exists but no row for the work type", async () => {
-    // Reads: vendor_people, site (exists), combined (vendor, site,
-    // work_type) → null, then narrowing (vendor, site) → row. This is
-    // the case the legacy 403 covered; it now lands as a 400 with the
-    // same code the office endpoint emits.
-    selectQueue = [fieldEmployeeRow, siteRow, null, { id: 88 }];
+    // Reads: vendor_people, site (exists), active-site safety gate,
+    // combined (vendor, site, work_type) → null, then narrowing
+    // (vendor, site) → row. This is the case the legacy 403 covered;
+    // it now lands as a 400 with the same code the office endpoint emits.
+    selectQueue = [fieldEmployeeRow, siteRow, activeSiteRow, null, { id: 88 }];
     const r = await request(app)
       .post("/api/field/tickets")
       .set("Cookie", fieldCookie)
@@ -216,13 +222,14 @@ describe("POST /api/field/tickets — structured validation codes", () => {
   it("creates the ticket when the combined site+vendor+work-type assignment exists", async () => {
     // Happy-path sanity check. The route only does the narrower
     // (vendor, site) query when the combined check misses, so 3 reads
-    // are enough here (vendor_people, site, combined assignment).
-    selectQueue = [fieldEmployeeRow, siteRow, { id: 99 }];
+    // are enough after the safety gate (vendor_people, site,
+    // active-site safety gate, combined assignment).
+    selectQueue = [fieldEmployeeRow, siteRow, activeSiteRow, { id: 99 }];
     const r = await request(app)
       .post("/api/field/tickets")
       .set("Cookie", fieldCookie)
       .send(baseBody);
     expectStatus(r, 201);
-    expect(insertValuesSpy).toHaveBeenCalledTimes(2); // ticket insert + gps log
+    expect(insertValuesSpy).toHaveBeenCalledTimes(3); // ticket insert + status history + gps log
   });
 });

@@ -66,6 +66,10 @@ let reconnectDelayMs = 1000;
 let stopping = false;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
+function listenNotifyDatabaseUrl(): string | undefined {
+  return process.env.LISTEN_NOTIFY_DATABASE_URL || process.env.DATABASE_URL;
+}
+
 function quoteLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
@@ -73,14 +77,15 @@ function quoteLiteral(value: string): string {
 async function startListenerClient(): Promise<void> {
   if (stopping) return;
   if (listenerClient || listenerStarting) return;
-  if (!process.env.DATABASE_URL) {
+  const databaseUrl = listenNotifyDatabaseUrl();
+  if (!databaseUrl) {
     logger.warn(
       "DATABASE_URL not set; hotlist_comment_events pub/sub will not be cross-instance",
     );
     return;
   }
   listenerStarting = true;
-  const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+  const client = new pg.Client({ connectionString: databaseUrl });
 
   client.on("notification", (msg) => {
     if (msg.channel !== CHANNEL || !msg.payload) return;

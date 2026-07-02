@@ -146,7 +146,9 @@ vi.mock("../lib/session", async () => {
       const [body] = raw.split(".");
       const s = JSON.parse(Buffer.from(body, "base64").toString("utf-8"));
       if (s.role !== "admin") {
-        res.status(403).json({ error: "Forbidden" });
+        res
+          .status(403)
+          .json({ error: "Admin access required", code: "auth.admin_required" });
         return;
       }
       next();

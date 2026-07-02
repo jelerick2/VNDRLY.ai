@@ -1032,14 +1032,19 @@ describe("GET /api/field-employees/:id/day-track", () => {
 
   it("forbids non-vendor / non-admin roles even when the employee exists", async () => {
     fixtures.employees = [emp()];
-    for (const role of ["field_employee", "partner"]) {
-      const res = await request(app)
-        .get("/api/field-employees/50/day-track?date=2026-04-20")
-        .set("Cookie", authCookie({ role, vendorId: null }));
-      expect(res.status).toBe(403);
-      expect(res.body.code).toBe("visitor.forbidden");
-      expect(res.body.error).toBe("forbidden");
-    }
+    const fieldRes = await request(app)
+      .get("/api/field-employees/50/day-track?date=2026-04-20")
+      .set("Cookie", authCookie({ role: "field_employee", vendorId: null }));
+    expect(fieldRes.status).toBe(403);
+    expect(fieldRes.body.code).toBe("visitor.forbidden");
+    expect(fieldRes.body.error).toBe("forbidden");
+
+    const partnerRes = await request(app)
+      .get("/api/field-employees/50/day-track?date=2026-04-20")
+      .set("Cookie", authCookie({ role: "partner", vendorId: null }));
+    expect(partnerRes.status).toBe(403);
+    expect(partnerRes.body.code).toBe("visitor.no_partner");
+    expect(partnerRes.body.error).toBe("no_partner");
   });
 
   it("vendors cannot view another vendor's employee timeline", async () => {

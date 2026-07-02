@@ -129,6 +129,7 @@ vi.mock("@workspace/db", () => {
 
 vi.mock("./notifications", () => ({
   notifyUsers: vi.fn(async () => undefined),
+  notifyFieldEmployee: vi.fn(async () => undefined),
   findVendorUserIds: vi.fn(async () => [] as number[]),
   findPartnerUserIds: vi.fn(async () => [] as number[]),
 }));
@@ -188,20 +189,27 @@ const baseSiteRow = () => ({
   siteRadiusMeters: 200,
 });
 
+const activeSiteRow = () => ({
+  isActive: true,
+  status: "active",
+  name: "Test Site",
+});
+
 function seedPartnerReads() {
-  // partner role: only the site lookup happens before the transaction.
-  selectQueue = [baseSiteRow()];
+  // partner role: site lookup, then active-site safety gate.
+  selectQueue = [baseSiteRow(), activeSiteRow()];
 }
 
 function seedVendorReads() {
-  // vendor role: site lookup, then Task #517 split site-assignment guards
-  // (1: any site+vendor row, 2: site+vendor+work_type row).
-  selectQueue = [baseSiteRow(), { id: 1 }, { id: 1 }];
+  // vendor role: site lookup, active-site safety gate, then Task #517
+  // split site-assignment guards (1: any site+vendor row,
+  // 2: site+vendor+work_type row).
+  selectQueue = [baseSiteRow(), activeSiteRow(), { id: 1 }, { id: 1 }];
 }
 
 function seedAdminReads() {
-  // admin role: only the site lookup (no tenancy guard).
-  selectQueue = [baseSiteRow()];
+  // admin role: site lookup and active-site safety gate (no tenancy guard).
+  selectQueue = [baseSiteRow(), activeSiteRow()];
 }
 
 beforeEach(async () => {
@@ -505,7 +513,7 @@ describe("POST /tickets — phone intake + intake_channel resolution", () => {
     // site exists, but the site-vendor assignment lookup returns no row
     // → hard 400 with a structured code so the front end can flag the
     // site picker inline.
-    selectQueue = [baseSiteRow(), null];
+    selectQueue = [baseSiteRow(), activeSiteRow(), null];
     const r = await request(app)
       .post("/api/tickets")
       .set("Cookie", vendorCookie)
@@ -524,7 +532,7 @@ describe("POST /tickets — phone intake + intake_channel resolution", () => {
     // site exists, site+vendor assignment exists, but no row for the
     // requested work type at this site+vendor combo → hard 400 so the
     // front end can flag the work-type picker inline.
-    selectQueue = [baseSiteRow(), { id: 1 }, null];
+    selectQueue = [baseSiteRow(), activeSiteRow(), { id: 1 }, null];
     const r = await request(app)
       .post("/api/tickets")
       .set("Cookie", vendorCookie)

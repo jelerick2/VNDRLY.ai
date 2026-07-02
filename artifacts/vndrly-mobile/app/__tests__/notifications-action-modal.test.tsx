@@ -28,6 +28,7 @@ const routerPushMock = vi.fn();
 vi.mock("expo-router", () => ({
   router: { push: (...a: unknown[]) => routerPushMock(...a), back: vi.fn() },
   Stack: { Screen: () => null },
+  useLocalSearchParams: () => ({}),
   useFocusEffect: (cb: () => void | (() => void)) => {
     const ReactLib = require("react");
     ReactLib.useEffect(() => {

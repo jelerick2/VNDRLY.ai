@@ -175,6 +175,17 @@ function fullSiteRow(overrides: Record<string, unknown> = {}) {
     siteRadiusMeters: 150,
     afe: "AFE-001",
     photoUrl: null,
+    taxJurisdictionPostalCode: null,
+    taxJurisdictionCounty: null,
+    taxJurisdictionCity: null,
+    taxJurisdictionLabel: null,
+    stateTaxRate: null,
+    localTaxRate: null,
+    combinedTaxRate: null,
+    merchandiseTaxRate: null,
+    laborTaxRate: null,
+    taxJurisdictionResolvedAt: null,
+    taxProvider: null,
     partnerName: "ACME Energy",
     // Task #158: portal route projects partner brand fields so the
     // QR-code page can paint partner colors. Mirror those columns in

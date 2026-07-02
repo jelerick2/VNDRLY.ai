@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import pg from "pg";
+import { execFile } from "node:child_process";
 import {
   ISOLATED_SCHEMA_PREFIX,
   createIsolatedSchema,
@@ -16,8 +17,15 @@ import {
 //   - the stale-sweep targets only old `vitest_*` schemas, never anything else
 
 const HAVE_DB = await hasReachableDatabase();
+const HAVE_PG_DUMP = await hasPgDump();
 
-describe.runIf(HAVE_DB)("db-harness", () => {
+function hasPgDump(): Promise<boolean> {
+  return new Promise((resolve) => {
+    execFile("pg_dump", ["--version"], (err) => resolve(!err));
+  });
+}
+
+describe.runIf(HAVE_DB && HAVE_PG_DUMP)("db-harness", () => {
   it("creates an isolated schema with the public schema's tables and confines writes to it", async () => {
     const handle = await createIsolatedSchema("harness-self-test");
     try {
@@ -118,8 +126,8 @@ describe.runIf(HAVE_DB)("db-harness", () => {
   }, 60_000);
 });
 
-describe.skipIf(HAVE_DB)("db-harness", () => {
-  it.skip("requires a real Postgres DATABASE_URL", () => {
+describe.skipIf(HAVE_DB && HAVE_PG_DUMP)("db-harness", () => {
+  it.skip("requires a real Postgres DATABASE_URL and pg_dump on PATH", () => {
     // Skipped offline; the harness exists exclusively for tests that
     // need a real server to clone the public schema from.
   });

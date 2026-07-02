@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { ShieldAlert } from "lucide-react";
 import {
@@ -30,6 +30,8 @@ type SafetyEventRow = {
 export default function SafetyInboxPage() {
   const { t } = useTranslation();
   const brand = useBrand();
+  const [location] = useLocation();
+  const safetyBase = location.startsWith("/foreman/") ? "/foreman/safety" : "/safety";
   const iconStyle = { color: brand.isOrgBranded ? brand.primary : "#dc2626" };
 
   const { data, isLoading } = useQuery({
@@ -73,7 +75,7 @@ export default function SafetyInboxPage() {
             events.map((event) => (
               <Link
                 key={event.id}
-                href={`/safety/${event.id}`}
+                href={`${safetyBase}/${event.id}`}
                 className={cn(CARD_INNER_TILE_CLICKABLE_CLASS, "block text-sm")}
               >
                 <div className="flex items-center justify-between gap-2">

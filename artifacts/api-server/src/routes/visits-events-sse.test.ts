@@ -3,8 +3,8 @@ import express from "express";
 import { attachTestErrorMiddleware, expectStatus } from "../test-utils/route-app";
 import cookieParser from "cookie-parser";
 import http from "node:http";
-import pg from "pg";
 import { buildTestCookie } from "../test-utils/session";
+import { hasListenNotifySupport } from "../test-utils/listen-notify";
 
 // ---------------------------------------------------------------------------
 // Task #664: end-to-end coverage for the disconnect → missed event →
@@ -37,28 +37,7 @@ import { buildTestCookie } from "../test-utils/session";
 // implementations.
 // ---------------------------------------------------------------------------
 
-const DATABASE_URL = process.env.DATABASE_URL;
-const haveRealDb = await checkDatabase();
-
-async function checkDatabase(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  // The unit-test setup writes a placeholder URL when no real DB exists.
-  if (DATABASE_URL.includes("test:test@localhost")) return false;
-  const client = new pg.Client({ connectionString: DATABASE_URL });
-  try {
-    await client.connect();
-    await client.query("SELECT 1");
-    await client.end();
-    return true;
-  } catch {
-    try {
-      await client.end();
-    } catch {
-      /* ignore */
-    }
-    return false;
-  }
-}
+const haveRealDb = await hasListenNotifySupport();
 
 function staffCookie(): string {
   // Admin sees all visit events regardless of host scoping (visible() in

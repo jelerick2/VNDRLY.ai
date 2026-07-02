@@ -646,8 +646,9 @@ describe.runIf(haveRealDb)("year-end 1099 dashboard + FIRE + filing status", () 
       expect(cols[1]).toBe(String(seeded!.partnerId));
       expect(cols[3]).toBe(String(seeded!.vendorCId));
       // Vendor A/B should not appear: only K rows are exported.
-      expect(res.text).not.toMatch(new RegExp(`,${seeded!.vendorAId},`));
-      expect(res.text).not.toMatch(new RegExp(`,${seeded!.vendorBId},`));
+      const recipientVendorIds = lines.slice(1).map((line) => line.split(",")[3]);
+      expect(recipientVendorIds).not.toContain(String(seeded!.vendorAId));
+      expect(recipientVendorIds).not.toContain(String(seeded!.vendorBId));
     });
 
     it("partner CSV is forbidden for a different partner's user", async () => {
