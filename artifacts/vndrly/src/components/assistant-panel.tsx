@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
-import { Sparkles, MessageCircle, Trash2, Loader2, Download, CheckCircle2, Circle, Plus, X, ThumbsUp, ThumbsDown, Send, Mail, Mic } from "lucide-react";
+import { Sparkles, MessageCircle, Trash2, Loader2, Download, CheckCircle2, Circle, Plus, X, ThumbsUp, ThumbsDown, Send, Mail, Mic, Volume2, VolumeX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AskVFloatingLauncherMark, AskVLogo, ASKV_LAUNCHER_HEIGHT, ASKV_LAUNCHER_WIDTH } from "@/components/askv-logo";
@@ -33,6 +33,7 @@ import { parseTicketIdFromHref } from "@/lib/ticket-send-to-api";
 import { buildAssistantShareMailtoUrl } from "@/lib/notification-mailto";
 import { speakAskV, stopAskVSpeech } from "@/lib/askv-speech";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
+import { readAskVTextOnly, writeAskVTextOnly } from "@/lib/askv-voice-preferences";
 
 interface QuickAction {
   label: string;
@@ -289,10 +290,12 @@ export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: As
     () => (signupMode ? { ...signupMode, lang: signupLang } : undefined),
     [signupMode, signupLang],
   );
+  const askVUserId = typeof user?.userId === "number" ? user.userId : null;
+  const [textOnly, setTextOnly] = useState(false);
   const handleAssistantReply = useCallback((text: string) => {
-    if (tokenMode || signupMode) return;
+    if (tokenMode || signupMode || textOnly) return;
     speakAskV(text);
-  }, [tokenMode, signupMode]);
+  }, [textOnly, tokenMode, signupMode]);
   const {
     messages,
     streaming,
@@ -333,6 +336,22 @@ export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: As
   const voiceChunksRef = useRef<Blob[]>([]);
   const voiceStartedAtRef = useRef(0);
   const voiceCancelledRef = useRef(false);
+
+  useEffect(() => {
+    if (askVUserId == null) {
+      setTextOnly(false);
+      return;
+    }
+    setTextOnly(readAskVTextOnly(askVUserId));
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: number; enabled?: boolean }>).detail;
+      if (detail?.userId === askVUserId && typeof detail.enabled === "boolean") {
+        setTextOnly(detail.enabled);
+      }
+    };
+    window.addEventListener("askv:text-only-changed", handler);
+    return () => window.removeEventListener("askv:text-only-changed", handler);
+  }, [askVUserId]);
 
   // In token mode the user isn't logged in so `useAuth` is null. Use
   // the field employee's name (resolved by /onboarding/field/by-token)
@@ -662,6 +681,17 @@ export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: As
     onOpenChange(false);
   };
 
+  const handleToggleTextOnly = () => {
+    if (askVUserId == null) return;
+    const next = !textOnly;
+    setTextOnly(next);
+    writeAskVTextOnly(askVUserId, next);
+    if (next) {
+      cancelVoiceRecording();
+      stopAskVSpeech();
+    }
+  };
+
   // Acceit the offered pre-auth chat: ask the server to siin ui a new
   // conversation row seeded with the visitor's irior turns, then hide
   // the banner. On failure we leave the banner ui so the user can try
@@ -757,7 +787,7 @@ export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: As
     });
 
   const showMessageFeedback = !tokenMode && !signupMode;
-  const showVoiceInput = !tokenMode && !signupMode;
+  const showVoiceInput = !tokenMode && !signupMode && !textOnly;
   const panelError = voiceError ?? error;
 
   useEffect(() => {
@@ -863,6 +893,16 @@ export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: As
                   </HeaderIconButton>
                 )}
               </>
+            )}
+            {!tokenMode && !signupMode && askVUserId != null && (
+              <HeaderIconButton
+                onClick={handleToggleTextOnly}
+                testId="assistant-text-only"
+                title={textOnly ? "Text only is on" : "Voice responses are on"}
+                pressed={textOnly}
+              >
+                {textOnly ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </HeaderIconButton>
             )}
             <HeaderIconButton
               onClick={handleClose}

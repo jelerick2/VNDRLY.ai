@@ -36,6 +36,7 @@ import accountingConnectionsRouter from "./accountingConnections";
 import accountManagementRouter from "./accountManagement";
 import onboardingRouter from "./onboarding";
 import assistantRouter from "./assistant";
+import assistantRealtimeRouter from "./assistantRealtime";
 import demoProdSeedRouter from "./demoProdSeed";
 import adminRecoveryRouter from "./adminRecovery";
 import platformSettingsRouter from "./platformSettings";
@@ -106,6 +107,7 @@ router.use(platformSettingsRouter);
 router.use(fireTransmitterSettingsRouter);
 router.use(onboardingRouter);
 router.use(assistantRouter);
+router.use(assistantRealtimeRouter);
 router.use(safetyRouter);
 router.use(majikRouter);
 

@@ -34,6 +34,7 @@ import { useColors } from "@/hooks/useColors";
 import { quickActionsForUser } from "@/lib/assistant-quick-actions";
 import { isAskVSpeaking, speakAskV, stopAskVSpeech } from "@/lib/askv-speech";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
+import { readAskVTextOnly, writeAskVTextOnly } from "@/lib/askvVoicePreferences";
 import { shareAssistantTranscript } from "@/lib/assistant-transcript";
 import {
   createPttRecorder,
@@ -97,6 +98,7 @@ export default function AskVScreen() {
   const [transcribing, setTranscribing] = useState(false);
   const [feedbackPendingId, setFeedbackPendingId] = useState<number | null>(null);
   const [assistantShare, setAssistantShare] = useState<AssistantShareContext | null>(null);
+  const askVUserId = typeof user?.id === "number" ? user.id : null;
 
   const {
     messages,
@@ -123,6 +125,20 @@ export default function AskVScreen() {
       voiceRecorderRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (askVUserId == null) {
+      setReadAloud(true);
+      return;
+    }
+    void readAskVTextOnly(askVUserId).then((textOnly) => {
+      if (!cancelled) setReadAloud(!textOnly);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [askVUserId]);
 
   useEffect(() => {
     if (!speakingMessageId) return;
@@ -162,8 +178,10 @@ export default function AskVScreen() {
 
   const toggleReadAloud = () => {
     setReadAloud((prev) => {
-      if (prev) stopAskVSpeech();
-      return !prev;
+      const next = !prev;
+      if (!next) stopAskVSpeech();
+      if (askVUserId != null) void writeAskVTextOnly(askVUserId, !next);
+      return next;
     });
     setSpeakingMessageId(null);
   };
@@ -533,7 +551,7 @@ export default function AskVScreen() {
           <Pressable
             onPressIn={onVoicePressIn}
             onPressOut={onVoicePressOut}
-            disabled={streaming || transcribing}
+            disabled={streaming || transcribing || !readAloud}
             style={[
               styles.micBtn,
               {

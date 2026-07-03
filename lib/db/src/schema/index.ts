@@ -85,6 +85,7 @@ export * from "./fireTransmitterSettings";
 export * from "./fireTransmitterSettingsAuditLog";
 export * from "./assistantConversations";
 export * from "./assistantMessages";
+export * from "./assistantActionAudit";
 export * from "./eventSequences";
 export * from "./signupAssistantCounters";
 export * from "./demoUserLabels";

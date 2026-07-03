@@ -55,6 +55,7 @@ const AssistantLauncher = React.lazy(() =>
     default: mod.AssistantLauncher,
   })),
 );
+const AskVVoiceController = React.lazy(() => import("@/components/askv-voice-controller"));
 
 function useNavItems(user: { role: string; vendorId: number | null; partnerId: number | null } | null) {
   const { t } = useTranslation();
@@ -187,6 +188,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       className={cn("flex", FIXED_APP_CHROME ? "h-screen overflow-hidden" : "min-h-screen")}
       style={brandStyleVars(brand)}
     >
+      {user && (
+        <Suspense fallback={null}>
+          <AskVVoiceController />
+        </Suspense>
+      )}
       <aside
         style={navPaneStyle}
         className={cn(

@@ -686,7 +686,7 @@ const FIELD_TOKEN_ALLOWED_TOOLS = new Set([
   "deep_link_to",
 ]);
 
-async function runTool(
+export async function runTool(
   name: string,
   input: unknown,
   session: SessionPayload,

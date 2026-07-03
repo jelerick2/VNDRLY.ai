@@ -38,6 +38,7 @@ const AssistantLauncher = lazy(() =>
     default: mod.AssistantLauncher,
   })),
 );
+const AskVVoiceController = lazy(() => import("@/components/askv-voice-controller"));
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -167,6 +168,11 @@ export function FieldOpsPortalShell({
       className={cn("flex", FIXED_APP_CHROME ? "h-screen overflow-hidden" : "min-h-screen")}
       style={brandStyleVars(brand)}
     >
+      {user && (
+        <Suspense fallback={null}>
+          <AskVVoiceController />
+        </Suspense>
+      )}
       <aside
         style={navPaneStyle}
         className={cn(
