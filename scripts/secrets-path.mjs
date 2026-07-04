@@ -31,3 +31,7 @@ export function githubPatPath() {
     path.join(SECRETS_DIR, "VNDRLY-GitHub-PAT.env")
   );
 }
+
+export function mapboxEnvPath() {
+  return process.env.MAPBOX_ENV || path.join(SECRETS_DIR, "MAPBOX Account.env");
+}

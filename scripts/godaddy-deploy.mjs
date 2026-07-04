@@ -5,7 +5,7 @@
 import { Client } from "ssh2";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { ROOT, godaddyEnvPath, supabaseEnvPath } from "./secrets-path.mjs";
+import { ROOT, godaddyEnvPath, mapboxEnvPath, supabaseEnvPath } from "./secrets-path.mjs";
 const LOCAL_CFG = path.join(ROOT, ".local", "godaddy-vps.json");
 const BOOTSTRAP = path.join(ROOT, "scripts/server/bootstrap-vps.sh");
 const NGINX_SITE = path.join(ROOT, "scripts/server/vndrly.ai.nginx.conf");
@@ -145,9 +145,13 @@ async function main() {
   const finnhubKey = localEnv.match(/^FINNHUB_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
   const alphaVantageKey =
     localEnv.match(/^ALPHA_VANTAGE_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
+  const mapboxEnv = parseEnvFile(mapboxEnvPath());
   const mapboxAccessToken =
     localEnv.match(/^MAPBOX_ACCESS_TOKEN=(.+)$/m)?.[1]?.trim() ??
     localEnv.match(/^MAPBOX_API_KEY=(.+)$/m)?.[1]?.trim() ??
+    mapboxEnv.mapbox_access_token ??
+    mapboxEnv.mapbox_api_key ??
+    mapboxEnv.api ??
     "";
 
   const supabaseUrl =
