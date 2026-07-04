@@ -7,7 +7,7 @@ export type AssistantPageContext = {
     longitude: number;
     accuracyMeters?: number | null;
     capturedAt?: string | null;
-    source: "mobile_device";
+    source: "mobile_device" | "web_browser";
   };
 };
 
@@ -29,6 +29,8 @@ function parseCurrentLocation(raw: unknown): AssistantPageContext["currentLocati
   }
   const accuracyRaw = (raw as { accuracyMeters?: unknown }).accuracyMeters;
   const capturedAtRaw = (raw as { capturedAt?: unknown }).capturedAt;
+  const sourceRaw = (raw as { source?: unknown }).source;
+  const source = sourceRaw === "web_browser" ? "web_browser" : "mobile_device";
   return {
     latitude,
     longitude,
@@ -37,7 +39,7 @@ function parseCurrentLocation(raw: unknown): AssistantPageContext["currentLocati
         ? accuracyRaw
         : null,
     capturedAt: typeof capturedAtRaw === "string" ? capturedAtRaw : null,
-    source: "mobile_device",
+    source,
   };
 }
 

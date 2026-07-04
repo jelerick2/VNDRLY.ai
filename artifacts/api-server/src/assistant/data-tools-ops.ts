@@ -50,6 +50,7 @@ export const OPS_DATA_TOOL_NAMES = [
   "lookup_crew_member_status",
   "query_crew_eta",
   "query_crew_route_summary",
+  "query_ticket_logged_miles",
   "estimate_driving_route",
   "query_hotlist_jobs",
   "query_hotlist_bids",
@@ -583,6 +584,122 @@ function parseCoordinate(raw: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseMileage(raw: unknown): number | null {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+async function queryTicketLoggedMiles(args: Record<string, unknown>, session: SessionPayload) {
+  const ticketId = Number(args.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) return err("ticketId is required.");
+  const scope = ticketScopeFilters(session);
+  if (scope === null) return err("No org scope on this session.");
+
+  const [ticket] = await db
+    .select({
+      ticketId: ticketsTable.id,
+      status: ticketsTable.status,
+      lifecycleState: ticketsTable.lifecycleState,
+      siteId: siteLocationsTable.id,
+      siteName: siteLocationsTable.name,
+      siteLatitude: siteLocationsTable.latitude,
+      siteLongitude: siteLocationsTable.longitude,
+      enRouteAt: ticketsTable.enRouteAt,
+      onLocationAt: ticketsTable.onLocationAt,
+      checkInTime: ticketsTable.checkInTime,
+      checkOutTime: ticketsTable.checkOutTime,
+      startingMileage: ticketsTable.startingMileage,
+      endingMileage: ticketsTable.endingMileage,
+    })
+    .from(ticketsTable)
+    .innerJoin(siteLocationsTable, eq(ticketsTable.siteLocationId, siteLocationsTable.id))
+    .where(and(eq(ticketsTable.id, Math.floor(ticketId)), ...(scope as Parameters<typeof and>)))
+    .limit(1);
+  if (!ticket) return err(`Ticket ${Math.floor(ticketId)} not visible to your account.`);
+
+  const points = await db
+    .select({
+      latitude: gpsLogsTable.latitude,
+      longitude: gpsLogsTable.longitude,
+      eventType: gpsLogsTable.eventType,
+      speedMps: gpsLogsTable.speedMps,
+      batteryLevel: gpsLogsTable.batteryLevel,
+      recordedAt: gpsLogsTable.recordedAt,
+    })
+    .from(gpsLogsTable)
+    .where(eq(gpsLogsTable.ticketId, Math.floor(ticketId)))
+    .orderBy(asc(gpsLogsTable.recordedAt))
+    .limit(500);
+
+  let gpsMiles = 0;
+  for (let i = 1; i < points.length; i += 1) {
+    gpsMiles += milesBetween(points[i - 1], points[i]);
+  }
+  const startingMileage = parseMileage(ticket.startingMileage);
+  const endingMileage = parseMileage(ticket.endingMileage);
+  const odometerMiles =
+    startingMileage != null && endingMileage != null && endingMileage >= startingMileage
+      ? Math.round((endingMileage - startingMileage) * 10) / 10
+      : null;
+  const first = points[0] ?? null;
+  const last = points[points.length - 1] ?? null;
+  const gpsDurationMinutes =
+    first && last
+      ? Math.round((new Date(last.recordedAt).getTime() - new Date(first.recordedAt).getTime()) / 60_000)
+      : null;
+
+  return JSON.stringify({
+    ticket,
+    loggedMiles: {
+      odometerMiles,
+      startingMileage,
+      endingMileage,
+      gpsRouteMilesApprox: Math.round(gpsMiles * 10) / 10,
+      basis: odometerMiles != null ? "odometer" : points.length > 1 ? "gps_trail" : "not_available",
+    },
+    gpsTrail: {
+      points: points.length,
+      first,
+      last,
+      durationMinutes: gpsDurationMinutes,
+    },
+    locationSource: "ticket_gps_trail",
+  });
+}
+
+async function loadShopOrigin(session: SessionPayload) {
+  if ((session.role === "vendor" || session.role === "field_employee") && session.vendorId) {
+    const [vendor] = await db
+      .select({
+        id: vendorsTable.id,
+        name: vendorsTable.name,
+        latitude: vendorsTable.latitude,
+        longitude: vendorsTable.longitude,
+        physicalAddress: vendorsTable.physicalAddress,
+      })
+      .from(vendorsTable)
+      .where(eq(vendorsTable.id, session.vendorId))
+      .limit(1);
+    if (!vendor) return { error: "Vendor shop not found for this session." } as const;
+    const latitude = parseCoordinate(vendor.latitude);
+    const longitude = parseCoordinate(vendor.longitude);
+    if (latitude == null || longitude == null) {
+      return { error: "Vendor shop coordinates are not configured yet." } as const;
+    }
+    return {
+      origin: {
+        latitude,
+        longitude,
+        source: "vendor_shop" as const,
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        address: vendor.physicalAddress,
+      },
+    } as const;
+  }
+  return { error: "Shop-origin routing is currently available for vendor and field employee sessions with configured vendor coordinates." } as const;
+}
+
 async function loadRouteDestination(args: Record<string, unknown>, session: SessionPayload) {
   const scope = ticketScopeFilters(session);
   if (scope === null) return { error: "No org scope on this session." } as const;
@@ -674,16 +791,31 @@ async function loadRouteDestination(args: Record<string, unknown>, session: Sess
 }
 
 async function estimateDrivingRoute(args: Record<string, unknown>, session: SessionPayload) {
-  const currentLatitude = parseCoordinate(args.currentLatitude);
-  const currentLongitude = parseCoordinate(args.currentLongitude);
-  if (currentLatitude == null || currentLongitude == null) {
-    return err("currentLatitude and currentLongitude are required.");
+  const originKind = args.origin === "shop" ? "shop" : "current_location";
+  let origin:
+    | { latitude: number; longitude: number; source: "current_location" }
+    | { latitude: number; longitude: number; source: "vendor_shop"; vendorId: number; vendorName: string; address: string | null };
+  if (originKind === "shop") {
+    const loadedOrigin = await loadShopOrigin(session);
+    if ("error" in loadedOrigin) return JSON.stringify(loadedOrigin);
+    origin = loadedOrigin.origin;
+  } else {
+    const currentLatitude = parseCoordinate(args.currentLatitude);
+    const currentLongitude = parseCoordinate(args.currentLongitude);
+    if (currentLatitude == null || currentLongitude == null) {
+      return err("currentLatitude and currentLongitude are required for current-location routing.");
+    }
+    origin = {
+      latitude: currentLatitude,
+      longitude: currentLongitude,
+      source: "current_location",
+    };
   }
   const loaded = await loadRouteDestination(args, session);
   if ("error" in loaded) return JSON.stringify(loaded);
 
   const route = await estimateMapboxDrivingRoute({
-    origin: { latitude: currentLatitude, longitude: currentLongitude },
+    origin,
     destination: {
       latitude: loaded.destination.siteLatitude,
       longitude: loaded.destination.siteLongitude,
@@ -702,11 +834,7 @@ async function estimateDrivingRoute(args: Record<string, unknown>, session: Sess
   return JSON.stringify({
     ok: true,
     basis: loaded.basis,
-    origin: {
-      latitude: currentLatitude,
-      longitude: currentLongitude,
-      source: "mobile_device",
-    },
+    origin,
     destination: loaded.destination,
     route,
   });
@@ -1019,6 +1147,8 @@ export async function runOpsDataTool(
       return queryCrewEta(args, session);
     case "query_crew_route_summary":
       return queryCrewRouteSummary(args, session);
+    case "query_ticket_logged_miles":
+      return queryTicketLoggedMiles(args, session);
     case "estimate_driving_route":
       return estimateDrivingRoute(args, session);
     case "query_hotlist_jobs":

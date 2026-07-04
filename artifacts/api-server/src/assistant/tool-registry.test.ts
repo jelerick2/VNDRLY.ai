@@ -42,7 +42,9 @@ describe("AskV tool registry", () => {
   it("role-filters office-only tools before a Realtime session is minted", () => {
     const fieldTools = toolsForRole("field_employee").map((tool) => tool.name);
     expect(fieldTools).toContain("query_ticket_detail");
+    expect(fieldTools).toContain("query_ticket_logged_miles");
     expect(fieldTools).toContain("post_ticket_comment");
     expect(fieldTools).not.toContain("query_invoice_summary");
+    expect(fieldTools).not.toContain("query_crew_route_summary");
   });
 });

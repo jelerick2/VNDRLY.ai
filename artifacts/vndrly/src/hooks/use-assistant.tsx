@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type AskVLocationContext,
+  readAskVCurrentLocationForMessage,
+} from "@/lib/assistant-location-context";
 
 export type SignupAssistantLang = "en" | "es";
 
@@ -112,7 +116,11 @@ export interface AssistantOptions {
    * Current browser path (from wouter) so the server can inject page
    * context into the system prompt. Ignored in token/signup modes.
    */
-  pageContext?: { path: string; entityId?: number | null };
+  pageContext?: {
+    path: string;
+    entityId?: number | null;
+    currentLocation?: AskVLocationContext;
+  };
   /**
    * When set, the hook talks to the unauthenticated field-employee
    * invite-token endpoint instead of the session-authenticated
@@ -345,6 +353,10 @@ export function useAssistant(opts: AssistantOptions = {}) {
         // a mid-conversation EN/ES flip takes effect on the very next
         // turn. tokenMode never sends `lang` because it has its own
         // server-side source (vendor_people.preferred_language).
+        const currentLocation = stateless
+          ? null
+          : await readAskVCurrentLocationForMessage(trimmed);
+        const pageContext = pageContextRef.current;
         const body = signupMode
           ? {
               message: trimmed,
@@ -355,7 +367,14 @@ export function useAssistant(opts: AssistantOptions = {}) {
             ? { message: trimmed, history: priorHistory }
             : {
                 message: trimmed,
-                ...(pageContextRef.current ? { pageContext: pageContextRef.current } : {}),
+                ...(pageContext || currentLocation
+                  ? {
+                      pageContext: {
+                        ...(pageContext ?? { path: "/web/askv" }),
+                        ...(currentLocation ? { currentLocation } : {}),
+                      },
+                    }
+                  : {}),
               };
         const res = await fetch(url, {
           method: "POST",

@@ -36,6 +36,30 @@ describe("parsePageContext", () => {
       entityId: 42,
     });
   });
+
+  it("parses request-scoped web and mobile location context", () => {
+    expect(
+      parsePageContext({
+        path: "/crew-map",
+        currentLocation: {
+          latitude: 32.004,
+          longitude: -102.077,
+          accuracyMeters: 20.4,
+          capturedAt: "2026-07-04T18:00:00.000Z",
+          source: "web_browser",
+        },
+      }),
+    ).toEqual({
+      path: "/crew-map",
+      currentLocation: {
+        latitude: 32.004,
+        longitude: -102.077,
+        accuracyMeters: 20.4,
+        capturedAt: "2026-07-04T18:00:00.000Z",
+        source: "web_browser",
+      },
+    });
+  });
 });
 
 describe("buildDeepLink — reports card deep links", () => {

@@ -514,18 +514,35 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "estimate_driving_route",
+    name: "query_ticket_logged_miles",
     description:
-      "Estimate driving miles and ETA from the mobile user's current location to a visible ticket or site location using Mapbox. Use for mobile ticket/map questions like 'how many miles to my next ticket', 'how long to ticket #10959', or 'am I close enough to check in'. Requires currentLatitude/currentLongitude from the mobile location context plus ticketId or siteId; if ticketId/siteId is omitted, field employees get their next assigned scheduled/open ticket when one is visible.",
+      "Return mileage logged for a visible ticket: starting/ending odometer difference when captured, approximate GPS trail miles, first/last GPS point, duration, site, and lifecycle timing. Use for field questions like 'how many miles did I log for ticket #10959' or office questions about ticket mileage. Scoped server-side, including field employees' own assigned/crew tickets.",
     input_schema: {
       type: "object",
       properties: {
-        currentLatitude: { type: "number", description: "Current mobile device latitude from CURRENT MOBILE LOCATION." },
-        currentLongitude: { type: "number", description: "Current mobile device longitude from CURRENT MOBILE LOCATION." },
+        ticketId: { type: "number", description: "Ticket number/id, e.g. 10959." },
+      },
+      required: ["ticketId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "estimate_driving_route",
+    description:
+      "Estimate driving miles and ETA to a visible ticket or site location using Mapbox. Use for ticket/map questions like 'how many miles to my next ticket', 'how long to ticket #10959', 'route from the shop to this site', or 'am I close enough to check in'. Use origin=current_location with currentLatitude/currentLongitude from CURRENT DEVICE LOCATION, or origin=shop to route from the caller's vendor shop coordinates when configured. If ticketId/siteId is omitted, field employees get their next assigned scheduled/open ticket when one is visible.",
+    input_schema: {
+      type: "object",
+      properties: {
+        origin: {
+          type: "string",
+          enum: ["current_location", "shop"],
+          description: "Defaults to current_location. Use shop for vendor/shop-origin questions.",
+        },
+        currentLatitude: { type: "number", description: "Current device latitude from CURRENT DEVICE LOCATION." },
+        currentLongitude: { type: "number", description: "Current device longitude from CURRENT DEVICE LOCATION." },
         ticketId: { type: "number", description: "Ticket number/id, e.g. 10959. Optional when asking for next assigned ticket." },
         siteId: { type: "number", description: "Site location id when routing directly to a site." },
       },
-      required: ["currentLatitude", "currentLongitude"],
       additionalProperties: false,
     },
   },
