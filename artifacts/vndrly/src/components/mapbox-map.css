@@ -1,0 +1,53 @@
+.vndrly-mapbox .mapboxgl-canvas {
+  outline: none;
+}
+
+.vndrly-mapbox-marker {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  border: 2px solid #ffffff;
+  border-radius: 50% 50% 50% 0;
+  background: var(--pin-color, #2563eb);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 11px/1 Inter, system-ui, sans-serif;
+  transform: rotate(-45deg);
+  cursor: pointer;
+}
+
+.vndrly-mapbox-marker span {
+  display: block;
+  transform: rotate(45deg);
+}
+
+.vndrly-mapbox-marker-flash {
+  position: absolute;
+  inset: -9px;
+  border: 3px solid rgba(245, 158, 11, 0.75);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: vndrly-mapbox-marker-flash 1s ease-out infinite;
+}
+
+@keyframes vndrly-mapbox-marker-flash {
+  from {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.55);
+  }
+}
+
+.vndrly-mapbox-marker.is-selected {
+  width: 38px;
+  height: 38px;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.35), 0 2px 10px rgba(0, 0, 0, 0.45);
+  z-index: 3;
+}

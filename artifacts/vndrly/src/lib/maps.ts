@@ -8,15 +8,6 @@ export type TileCoords = {
   offsetY: number;
 };
 
-export type LeafletTileLayerConfig = {
-  provider: "mapbox" | "fallback";
-  url: string;
-  attribution: string;
-  maxZoom: number;
-  tileSize?: number;
-  zoomOffset?: number;
-};
-
 const MAPBOX_STYLES: Record<MapboxMapStyle, string> = {
   satellite: "satellite-streets-v12",
   street: "streets-v12",
@@ -25,7 +16,7 @@ const MAPBOX_STYLES: Record<MapboxMapStyle, string> = {
 export const MAPBOX_ATTRIBUTION =
   '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
-function readMapboxAccessToken(): string {
+export function readMapboxAccessToken(): string {
   const env = import.meta.env as Record<string, string | undefined>;
   return (
     env.VITE_MAPBOX_ACCESS_TOKEN ||
@@ -33,6 +24,10 @@ function readMapboxAccessToken(): string {
     (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.MAPBOX_ACCESS_TOKEN ||
     ""
   ).trim();
+}
+
+export function getMapboxStyleUrl(style: MapboxMapStyle = "satellite"): string {
+  return `mapbox://styles/mapbox/${MAPBOX_STYLES[style]}`;
 }
 
 function tilePosition(latitude: number, longitude: number, zoom: number) {
@@ -54,36 +49,6 @@ function tilePosition(latitude: number, longitude: number, zoom: number) {
 export function getMapboxStyleTileUrl(style: MapboxMapStyle = "satellite"): string {
   const token = readMapboxAccessToken();
   return `https://api.mapbox.com/styles/v1/mapbox/${MAPBOX_STYLES[style]}/tiles/256/{z}/{x}/{y}@2x?access_token=${encodeURIComponent(token)}`;
-}
-
-export function getLeafletTileLayerConfig(
-  style: MapboxMapStyle = "satellite",
-): LeafletTileLayerConfig {
-  const token = readMapboxAccessToken();
-  if (token) {
-    return {
-      provider: "mapbox",
-      url: getMapboxStyleTileUrl(style),
-      attribution: MAPBOX_ATTRIBUTION,
-      maxZoom: 22,
-      tileSize: 256,
-    };
-  }
-  return style === "satellite"
-    ? {
-        provider: "fallback",
-        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attribution:
-          "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-        maxZoom: 19,
-      }
-    : {
-        provider: "fallback",
-        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      };
 }
 
 export function getMapboxStaticTile(

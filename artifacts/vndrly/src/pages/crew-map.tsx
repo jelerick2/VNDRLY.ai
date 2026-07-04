@@ -1,8 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import L from "leaflet";
-import { MapContainer, Marker, Polyline, Popup, TileLayer } from "react-leaflet";
-import { BrandZoomControlInMap } from "@/components/brand-zoom-control";
-import "leaflet/dist/leaflet.css";
 import { Link } from "wouter";
 import SphereBackButton from "@/components/sphere-back-button";
 import { useTranslation } from "react-i18next";
@@ -18,14 +14,13 @@ import { useListSiteLocations, getListSiteLocationsQueryKey } from "@workspace/a
 import LiveConnectionPill, { type LiveConnectionStatus } from "@/components/live-connection-pill";
 import { PngPillButton } from "@/components/png-pill-rollover";
 import { useRateLimitGate } from "@/hooks/use-rate-limit-gate";
-import { GeofenceCirclesLayer, type GeofenceSite } from "@/components/map/geofence-circles-layer";
 import {
   isProblemCrewMember,
 } from "@workspace/map-utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RecentTripsCard } from "@/components/map/recent-trips-card";
 import { MapComplianceIssuesCard } from "@/components/map/map-compliance-issues-card";
-import { getLeafletTileLayerConfig } from "@/lib/maps";
+import { MapboxMap, type MapboxCircle, type MapboxLine, type MapboxPoint } from "@/components/mapbox-map";
 
 const LOW_BATTERY_THRESHOLD = 0.2;
 
@@ -67,6 +62,14 @@ type LiveLocation = {
   // Ground speed in meters/second from the device GPS, or null when unknown.
   speedMps: number | null;
   recordedAt: string;
+};
+
+type GeofenceSite = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  siteRadiusMeters?: number | null;
 };
 
 // Average road speed assumption used to convert straight-line distance into
@@ -139,91 +142,10 @@ function formatEta(min: number, t: (k: string, opts?: any) => string): string {
   return t("crewMap.etaHr", { hr, min: rem });
 }
 
-// Top-down car silhouette used as the live crew pin. The SVG is drawn nose-up
-// (north) at viewBox center so we can rotate the whole element by `heading`
-// degrees (CW from N) and the front of the car will point in the direction
-// of travel. When heading is null we lock it to nose-up and dim the body
-// slightly so it reads as "parked / stationary".
-function carSvg(color: string, headingKnown: boolean): string {
-  const opacity = headingKnown ? 1 : 0.78;
-  return `
-    <svg viewBox="-20 -28 40 56" width="40" height="56" xmlns="http://www.w3.org/2000/svg" style="opacity:${opacity};filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));">
-      <!-- Body -->
-      <rect x="-10" y="-22" width="20" height="44" rx="6" ry="8" fill="${color}" stroke="white" stroke-width="1.5"/>
-      <!-- Windshield (front) -->
-      <path d="M-8 -12 L8 -12 L6 -19 L-6 -19 Z" fill="rgba(255,255,255,.85)"/>
-      <!-- Rear window -->
-      <path d="M-7 14 L7 14 L6 19 L-6 19 Z" fill="rgba(255,255,255,.55)"/>
-      <!-- Side mirrors -->
-      <rect x="-12" y="-10" width="2.5" height="3" fill="${color}" stroke="white" stroke-width="0.6"/>
-      <rect x="9.5" y="-10" width="2.5" height="3" fill="${color}" stroke="white" stroke-width="0.6"/>
-      <!-- Headlight cue at the nose -->
-      <circle cx="0" cy="-23" r="1.6" fill="#fef3c7"/>
-    </svg>`;
-}
-
-function carIcon(
-  lowBattery: boolean,
-  heading: number | null,
-  lifecycleState: string | null,
-  titles: { lowBattery: string; stationary: string; heading: (deg: number) => string },
-  flashing: boolean = false,
-) {
-  // Color the car by lifecycle state so the demo audience can read at a glance:
-  // amber = en route, green = on site, sky = anything else (fallback).
-  const color =
-    lifecycleState === "en_route"
-      ? "#f59e0b"
-      : lifecycleState === "on_location"
-        ? "#6366f1"
-        : lifecycleState === "on_site"
-      ? "#10b981"
-      : "#0ea5e9";
-  const rotation = heading != null ? heading : 0;
-  const headingTitle =
-    heading != null ? titles.heading(Math.round(heading)) : titles.stationary;
-  const badge = lowBattery
-    ? `<div title="${titles.lowBattery}" style="position:absolute;right:-2px;top:-2px;width:14px;height:14px;border-radius:50%;background:#dc2626;border:2px solid white;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;font-family:sans-serif;line-height:1;z-index:2;">!</div>`
-    : "";
-  // When `flashing` is true we render an extra absolutely-positioned ring
-  // overlay that pulses outward for ~2s. We deliberately do NOT animate the
-  // outer container itself: the outer div carries an inline `transform:
-  // translate(-20px,-28px)` that anchors the pin on the geo-coordinate, and
-  // any keyframe `transform` on that element would replace the translate and
-  // make the pin jump. The ring is its own sibling element so the car body
-  // (and the existing rotation transform on the SVG wrapper) stay untouched.
-  const ring = flashing
-    ? `<div data-testid="crew-car-pin-flash-ring" class="lifecycle-flash-pin-ring" aria-hidden="true"></div>`
-    : "";
-  const html = `
-    <div title="${headingTitle}" data-testid="crew-car-pin" data-heading="${heading != null ? Math.round(heading) : ""}" data-lifecycle="${lifecycleState ?? ""}" data-flashing="${flashing ? "1" : "0"}" style="position:relative;width:40px;height:56px;transform:translate(-20px,-28px);overflow:visible;">
-      ${ring}
-      <div style="position:absolute;inset:0;transform:rotate(${rotation}deg);transform-origin:50% 50%;z-index:2;">
-        ${carSvg(color, heading != null)}
-      </div>
-      ${badge}
-    </div>`;
-  return L.divIcon({
-    html,
-    className: "vndrly-crew-car-pin",
-    iconSize: [40, 56],
-    iconAnchor: [20, 28],
-    popupAnchor: [0, -28],
-  });
-}
-
 function compassPoint(deg: number): string {
   const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   const idx = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
   return dirs[idx];
-}
-
-function visitorIcon() {
-  const html = `<div style="position:relative;width:32px;height:40px;transform:translate(-16px,-36px);">
-    <div style="position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;background:#7c3aed;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;font-family:sans-serif;">V</div>
-    <div style="position:absolute;left:13px;top:30px;width:0;height:0;border-left:3px solid transparent;border-right:3px solid transparent;border-top:8px solid #7c3aed;"></div>
-  </div>`;
-  return L.divIcon({ html, className: "vndrly-visitor-pin", iconSize: [32, 40], iconAnchor: [16, 36], popupAnchor: [0, -34] });
 }
 
 function formatTime(iso: string): string {
@@ -264,6 +186,15 @@ function lifecycleLabel(
   return translated;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export type CrewMapPageProps = { portalMode?: "default" | "foreman" };
 
 export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps) {
@@ -271,7 +202,6 @@ export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps
   const { t } = useTranslation();
   const { user } = useAuth();
   const brand = useBrand();
-  const tileConfig = useMemo(() => getLeafletTileLayerConfig("street"), []);
   const iconStyle = { color: brand.isOrgBranded ? brand.primary : "#f59e0b" };
   const [locations, setLocations] = useState<LiveLocation[]>([]);
   const [visitors, setVisitors] = useState<VisitorRow[]>([]);
@@ -341,7 +271,7 @@ export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps
   const [flashingEmployeeIds, setFlashingEmployeeIds] = useState<Set<number>>(new Set());
   useEffect(() => {
     return () => {
-      flashTimersRef.current.forEach((t) => clearTimeout(t));
+      flashTimersRef.current.forEach((timer: ReturnType<typeof setTimeout>) => clearTimeout(timer));
       flashTimersRef.current.clear();
     };
   }, []);
@@ -857,6 +787,112 @@ export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps
     return [lat, lng];
   }, [locations, visitors]);
 
+  const mapPoints = useMemo<MapboxPoint[]>(() => {
+    const points: MapboxPoint[] = displayedLocations.map((loc) => {
+      const lowBattery = loc.batteryLevel != null && loc.batteryLevel <= LOW_BATTERY_THRESHOLD;
+      const color =
+        lowBattery
+          ? "#dc2626"
+          : loc.lifecycleState === "en_route"
+            ? "#f59e0b"
+            : loc.lifecycleState === "on_location"
+              ? "#6366f1"
+              : loc.lifecycleState === "on_site"
+                ? "#10b981"
+                : "#0ea5e9";
+      const heading = loc.heading != null ? `${compassPoint(loc.heading)} ${Math.round(loc.heading)}°` : t("crewMap.stationary", "Stationary");
+      return {
+        id: `crew-${loc.employeeId}`,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        color,
+        label: lowBattery ? "!" : "C",
+        title: loc.employeeName,
+        flashing: flashingEmployeeIds.has(loc.employeeId),
+        popupHtml: `
+          <div class="text-sm space-y-1 min-w-[200px]">
+            <div class="font-semibold">${escapeHtml(loc.employeeName)}</div>
+            <div class="text-xs"><a href="/tickets/${loc.ticketId}" class="underline">${escapeHtml(t("crewMap.ticketLabel", { id: loc.ticketId }))}</a></div>
+            ${loc.vendorId ? `<div class="text-xs text-muted-foreground">${escapeHtml(t("crewMap.vendorId", "Vendor ID"))}: ${loc.vendorId}</div>` : ""}
+            ${loc.siteName ? `<div class="text-xs">${escapeHtml(loc.siteName)}</div>` : ""}
+            ${loc.lifecycleState ? `<div class="text-xs">${escapeHtml(lifecycleLabel(loc.lifecycleState, t))}</div>` : ""}
+            <div class="text-xs">${escapeHtml(heading)}</div>
+            <div class="text-xs">${escapeHtml(formatSpeed(loc.speedMps, t))}</div>
+            <div class="text-xs">${escapeHtml(t("crewMap.lastSeen", "Last seen"))}: ${escapeHtml(timeAgo(loc.recordedAt, t))}</div>
+          </div>`,
+      };
+    });
+    const sitePoints = Array.from(
+      new Map(
+        locations
+          .filter((l) => l.siteLatitude != null && l.siteLongitude != null)
+          .map((l) => [
+            `${l.siteLatitude},${l.siteLongitude}`,
+            {
+              id: `site-${l.siteLatitude}-${l.siteLongitude}`,
+              latitude: l.siteLatitude as number,
+              longitude: l.siteLongitude as number,
+              color: "#2563eb",
+              label: "S",
+              title: l.siteName ?? t("crewMap.atSite"),
+              popupHtml: `<div class="text-xs font-medium">${escapeHtml(l.siteName ?? t("crewMap.atSite"))}</div>`,
+            } satisfies MapboxPoint,
+          ]),
+      ).values(),
+    );
+    const visitorPoints: MapboxPoint[] = isForemanPortal
+      ? []
+      : visitors.map((v) => ({
+          id: `visitor-${v.id}`,
+          latitude: Number(v.checkInLatitude),
+          longitude: Number(v.checkInLongitude),
+          color: "#7c3aed",
+          label: "V",
+          title: `${v.firstName} ${v.lastName}`,
+          popupHtml: `
+            <div class="text-sm space-y-1 min-w-[180px]" data-testid="popup-visitor-${v.id}">
+              <div class="font-semibold">${escapeHtml(`${v.firstName} ${v.lastName}`)}${v.company ? ` <span class="text-xs text-muted-foreground">(${escapeHtml(v.company)})</span>` : ""}</div>
+              <div class="text-xs">${escapeHtml(v.siteName ?? "")}</div>
+              <div class="text-xs">${escapeHtml(t("crewMap.lastSeen", "Last seen"))}: ${escapeHtml(timeAgo(v.checkInTime, t))}</div>
+            </div>`,
+        }));
+    return [...points, ...sitePoints, ...visitorPoints];
+  }, [displayedLocations, flashingEmployeeIds, isForemanPortal, locations, t, visitors]);
+
+  const mapLines = useMemo<MapboxLine[]>(
+    () =>
+      locations
+        .filter((loc) => loc.lifecycleState === "en_route" && loc.siteLatitude != null && loc.siteLongitude != null)
+        .map((loc) => ({
+          id: `route-${loc.employeeId}`,
+          coordinates: [
+            [loc.latitude, loc.longitude],
+            [loc.siteLatitude as number, loc.siteLongitude as number],
+          ],
+          color: "#f59e0b",
+          width: 2,
+          opacity: 0.75,
+        })),
+    [locations],
+  );
+
+  const mapCircles = useMemo<MapboxCircle[]>(
+    () =>
+      showGeofences
+        ? geofenceSites
+            .filter((site) => site.latitude != null && site.longitude != null)
+            .map((site) => ({
+              id: `geofence-${site.id}`,
+              latitude: site.latitude as number,
+              longitude: site.longitude as number,
+              radiusMeters: site.siteRadiusMeters ?? 402,
+              color: selectedSiteId === site.id ? "#f59e0b" : "#2563eb",
+              opacity: selectedSiteId === site.id ? 0.14 : 0.06,
+            }))
+        : [],
+    [geofenceSites, selectedSiteId, showGeofences],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -1017,227 +1053,15 @@ export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps
           <Card className="border-2" style={{ borderColor: "var(--brand-primary)" }}>
             <CardContent className="p-0">
               <div style={{ height: 520, isolation: "isolate" }}>
-                <MapContainer center={center} zoom={locations.length + visitors.length > 0 ? 8 : 4} zoomControl={false} style={{ height: "100%", width: "100%" }}>
-                  <BrandZoomControlInMap />
-                  <TileLayer
-                    attribution={tileConfig.attribution}
-                    url={tileConfig.url}
-                    maxZoom={tileConfig.maxZoom}
-                    tileSize={tileConfig.tileSize}
-                  />
-                  {showGeofences && geofenceSites.length > 0 && (
-                    <GeofenceCirclesLayer
-                      sites={geofenceSites}
-                      highlightSiteId={selectedSiteId}
-                    />
-                  )}
-                  {displayedLocations.map((loc) => {
-                    const lowBattery = loc.batteryLevel != null && loc.batteryLevel <= LOW_BATTERY_THRESHOLD;
-                    const eta = etaMinutes(
-                      loc.latitude,
-                      loc.longitude,
-                      loc.siteLatitude,
-                      loc.siteLongitude,
-                      loc.speedMps,
-                    );
-                    return (
-                      <Marker
-                        key={loc.employeeId}
-                        position={[loc.latitude, loc.longitude]}
-                        icon={carIcon(
-                          lowBattery,
-                          loc.heading,
-                          loc.lifecycleState,
-                          {
-                            lowBattery: t("crewMap.lowBatteryTitle"),
-                            stationary: t("crewMap.stationary"),
-                            heading: (deg) => t("crewMap.headingTitle", { deg }),
-                          },
-                          flashingEmployeeIds.has(loc.employeeId),
-                        )}
-                      >
-                        <Popup>
-                          <div className="text-sm space-y-1 min-w-[200px]">
-                            <div className="font-semibold">{loc.employeeName}</div>
-                            <div className="text-xs">
-                              <Link href={`/tickets/${loc.ticketId}`} className="underline">
-                                {t("crewMap.ticketLabel", { id: loc.ticketId })}
-                              </Link>
-                              {" — "}{lifecycleLabel(loc.lifecycleState, t)}
-                            </div>
-                            {loc.siteName && <div className="text-xs flex items-center gap-1"><MapPin className="h-3 w-3" />{loc.siteName}</div>}
-                            <div
-                              className="text-xs flex items-center gap-1 text-foreground font-medium"
-                              data-testid={`text-speed-${loc.employeeId}`}
-                            >
-                              <Gauge className="h-3 w-3 text-sky-600" />
-                              {formatSpeed(loc.speedMps, t)}
-                            </div>
-                            {eta && (
-                              <div
-                                className="text-xs flex items-center gap-1 text-muted-foreground"
-                                data-testid={`text-eta-${loc.employeeId}`}
-                              >
-                                <Navigation className="h-3 w-3 text-emerald-600" />
-                                {formatDistance(eta.meters, t)}
-                                {" · "}
-                                {formatEta(eta.minutes, t)}
-                              </div>
-                            )}
-                            <div
-                              className="text-xs text-muted-foreground flex items-center gap-1"
-                              data-testid={`text-heading-${loc.employeeId}`}
-                            >
-                              {loc.heading != null ? (
-                                <>
-                                  <Navigation
-                                    className="h-3 w-3 text-sky-600"
-                                    style={{ transform: `rotate(${loc.heading}deg)` }}
-                                  />
-                                  {t("crewMap.heading")} {compassPoint(loc.heading)} ({Math.round(loc.heading)}&deg;)
-                                </>
-                              ) : (
-                                <>
-                                  <Navigation className="h-3 w-3 opacity-40" />
-                                  {t("crewMap.stationary")}
-                                </>
-                              )}
-                            </div>
-                            <div className="text-xs text-muted-foreground">{t("crewMap.lastSeen", { when: timeAgo(loc.recordedAt, t) })}</div>
-                            {loc.batteryLevel != null && (
-                              <div
-                                className={`text-xs flex items-center gap-1 ${lowBattery ? "text-red-600 font-medium" : "text-muted-foreground"}`}
-                                data-testid={`text-battery-${loc.employeeId}`}
-                              >
-                                {lowBattery && <BatteryLow className="h-3 w-3" />}
-                                {t("crewMap.battery", { pct: Math.round(loc.batteryLevel * 100) })}
-                                {lowBattery && ` ${t("crewMap.lowSuffix")}`}
-                              </div>
-                            )}
-                            <div className="flex gap-1 pt-1">
-                              <a
-                                className="inline-flex items-center text-xs underline"
-                                href={
-                                  loc.siteLatitude != null && loc.siteLongitude != null
-                                    ? `https://www.google.com/maps/dir/?api=1&origin=${loc.latitude},${loc.longitude}&destination=${loc.siteLatitude},${loc.siteLongitude}`
-                                    : `https://www.google.com/maps/dir/?api=1&destination=${loc.latitude},${loc.longitude}`
-                                }
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                <Navigation className="h-3 w-3 mr-0.5" />
-                                {t("crewMap.directions")}
-                              </a>
-                              <span>·</span>
-                              <Link href={`/crew-map/${loc.employeeId}?date=${todayISO()}`} className="text-xs underline">
-                                {t("crewMap.replayToday")}
-                              </Link>
-                            </div>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    );
-                  })}
-                  {/* Destination route lines: dashed polyline from each en-route
-                      car to its assigned site. Only drawn for en_route tickets
-                      so on-site cars don't get a tiny vestigial line through
-                      themselves. */}
-                  {locations.map((loc) => {
-                    if (loc.lifecycleState !== "en_route") return null;
-                    if (loc.siteLatitude == null || loc.siteLongitude == null) return null;
-                    return (
-                      <Polyline
-                        key={`route-${loc.employeeId}`}
-                        positions={[
-                          [loc.latitude, loc.longitude],
-                          [loc.siteLatitude, loc.siteLongitude],
-                        ]}
-                        pathOptions={{
-                          color: "#f59e0b",
-                          weight: 3,
-                          opacity: 0.85,
-                          dashArray: "8 6",
-                        }}
-                      />
-                    );
-                  })}
-                  {/* Site marker for each unique destination so the audience can
-                      see the car closing in on a real point on the map. */}
-                  {Array.from(
-                    new Map(
-                      locations
-                        .filter(
-                          (l) =>
-                            l.lifecycleState === "en_route" &&
-                            l.siteLatitude != null &&
-                            l.siteLongitude != null,
-                        )
-                        .map((l) => [
-                          `${l.siteLatitude},${l.siteLongitude}`,
-                          {
-                            key: `site-${l.siteLatitude},${l.siteLongitude}`,
-                            lat: l.siteLatitude as number,
-                            lng: l.siteLongitude as number,
-                            name: l.siteName,
-                          },
-                        ]),
-                    ).values(),
-                  ).map((s) => (
-                    <Marker
-                      key={s.key}
-                      position={[s.lat, s.lng]}
-                      icon={L.divIcon({
-                        html: `<div style="position:relative;width:24px;height:32px;transform:translate(-12px,-28px);">
-                          <div style="position:absolute;left:0;top:0;width:24px;height:24px;border-radius:50%;background:#dc2626;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;font-family:sans-serif;">📍</div>
-                        </div>`,
-                        className: "vndrly-site-pin",
-                        iconSize: [24, 32],
-                        iconAnchor: [12, 28],
-                        popupAnchor: [0, -26],
-                      })}
-                    >
-                      <Popup>
-                        <div className="text-xs font-medium">{s.name ?? t("crewMap.atSite")}</div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                  {!isForemanPortal
-                    ? visitors.map((v) => {
-                    const host = v.hostType === "partner" ? v.hostPartnerName : v.hostVendorName;
-                    return (
-                      <Marker
-                        key={`visitor-${v.id}`}
-                        position={[v.checkInLatitude as number, v.checkInLongitude as number]}
-                        icon={visitorIcon()}
-                      >
-                        <Popup>
-                          <div className="text-sm space-y-1 min-w-[180px]" data-testid={`popup-visitor-${v.id}`}>
-                            <div className="font-semibold flex items-center gap-1">
-                              <UserCheck className="h-3.5 w-3.5 text-violet-600" />
-                              {v.firstName} {v.lastName}
-                              {v.company ? <span className="text-xs text-muted-foreground">({v.company})</span> : null}
-                            </div>
-                            {host && (
-                              <div className="text-xs">
-                                <span className="text-muted-foreground">{t("crewMap.visiting")}</span> {host}
-                              </div>
-                            )}
-                            {v.purpose && (
-                              <div className="text-xs">
-                                <span className="text-muted-foreground">{t("crewMap.purpose")}</span> {v.purpose}
-                              </div>
-                            )}
-                            {v.siteName && <div className="text-xs">{v.siteName}</div>}
-                            <div className="text-xs text-muted-foreground">
-                              {t("crewMap.visitorCheckedIn", { time: formatTime(v.checkInTime), ago: timeAgo(v.checkInTime, t) })}
-                            </div>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    );
-                  })
-                    : null}
-                </MapContainer>
+                <MapboxMap
+                  points={mapPoints}
+                  lines={mapLines}
+                  circles={mapCircles}
+                  center={[center[1], center[0]]}
+                  zoom={locations.length + visitors.length > 0 ? 8 : 4}
+                  styleKind="street"
+                  height="100%"
+                />
               </div>
             </CardContent>
           </Card>

@@ -1,13 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import L from "leaflet";
-import {
-  MapContainer,
-  Marker,
-  Popup,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import SphereBackButton from "@/components/sphere-back-button";
@@ -28,7 +19,6 @@ import {
 } from "@/components/ui/select";
 import { BatteryLow, Gauge, MapPin, Navigation, RefreshCw } from "lucide-react";
 import LiveConnectionPill, { type LiveConnectionStatus } from "@/components/live-connection-pill";
-import { GeofenceCirclesLayer, type GeofenceSite } from "@/components/map/geofence-circles-layer";
 import { resolveSiteMapRadiusMeters } from "@workspace/map-utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RecentTicketsCard } from "@/components/map/recent-tickets-card";
@@ -38,8 +28,7 @@ import {
   getListSiteLocationsQueryKey,
 } from "@workspace/api-client-react";
 import { visitsApi, type VisitorRow } from "@/lib/visits-api";
-import { BrandZoomControl } from "@/components/brand-zoom-control";
-import { getLeafletTileLayerConfig } from "@/lib/maps";
+import { MapboxMap, type MapboxCircle, type MapboxPoint } from "@/components/mapbox-map";
 
 const LOW_BATTERY_THRESHOLD = 0.2;
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -86,6 +75,14 @@ type SiteMapResponse = {
   };
   radiusMeters: number;
   employees: NearbyEmployee[];
+};
+
+type GeofenceSite = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  siteRadiusMeters?: number | null;
 };
 
 type OverviewSite = GeofenceSite & {
@@ -136,104 +133,26 @@ function lifecycleLabel(
 // employee's current ticket lifecycle state when they are actively signed
 // in to a ticket; otherwise we use a neutral slate color since they're on
 // site without an active visit record.
-function carSvg(color: string, headingKnown: boolean): string {
-  const opacity = headingKnown ? 1 : 0.78;
-  return `
-    <svg viewBox="-20 -28 40 56" width="40" height="56" xmlns="http://www.w3.org/2000/svg" style="opacity:${opacity};filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));">
-      <rect x="-10" y="-22" width="20" height="44" rx="6" ry="8" fill="${color}" stroke="white" stroke-width="1.5"/>
-      <path d="M-8 -12 L8 -12 L6 -19 L-6 -19 Z" fill="rgba(255,255,255,.85)"/>
-      <path d="M-7 14 L7 14 L6 19 L-6 19 Z" fill="rgba(255,255,255,.55)"/>
-      <rect x="-12" y="-10" width="2.5" height="3" fill="${color}" stroke="white" stroke-width="0.6"/>
-      <rect x="9.5" y="-10" width="2.5" height="3" fill="${color}" stroke="white" stroke-width="0.6"/>
-      <circle cx="0" cy="-23" r="1.6" fill="#fef3c7"/>
-    </svg>`;
-}
-
-function carIcon(emp: NearbyEmployee) {
+function employeeColor(emp: NearbyEmployee): string {
   const lifecycle = emp.activeTicket?.lifecycleState ?? null;
-  const color =
+  return (
     lifecycle === "en_route"
       ? "#f59e0b"
       : lifecycle === "on_location"
         ? "#6366f1"
         : lifecycle === "on_site"
           ? "#10b981"
-          : "#64748b"; // slate when no active ticket
-  const lowBattery =
-    emp.batteryLevel != null && emp.batteryLevel <= LOW_BATTERY_THRESHOLD;
-  const rotation = emp.heading != null ? emp.heading : 0;
-  const badge = lowBattery
-    ? `<div style="position:absolute;right:-2px;top:-2px;width:14px;height:14px;border-radius:50%;background:#dc2626;border:2px solid white;display:flex;align-items:center;justify-content:center;color:white;font-size:9px;font-weight:700;font-family:sans-serif;line-height:1;z-index:2;">!</div>`
-    : "";
-  const html = `
-    <div data-testid="site-map-employee-pin" data-employee-id="${emp.employeeId}" style="position:relative;width:40px;height:56px;transform:translate(-20px,-28px);">
-      <div style="position:absolute;inset:0;transform:rotate(${rotation}deg);transform-origin:50% 50%;">
-        ${carSvg(color, emp.heading != null)}
-      </div>
-      ${badge}
-    </div>`;
-  return L.divIcon({
-    html,
-    className: "vndrly-site-map-pin",
-    iconSize: [40, 56],
-    iconAnchor: [20, 28],
-    popupAnchor: [0, -28],
-  });
+          : "#64748b"
+  );
 }
 
-function siteIcon(): L.DivIcon {
-  const html = `<div style="position:relative;width:28px;height:36px;transform:translate(-14px,-32px);">
-    <div style="position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:#2563eb;border:3px solid white;box-shadow:0 1px 4px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px;font-family:sans-serif;">📍</div>
-  </div>`;
-  return L.divIcon({
-    html,
-    className: "vndrly-site-pin",
-    iconSize: [28, 36],
-    iconAnchor: [14, 32],
-    popupAnchor: [0, -30],
-  });
-}
-
-// Brand-tinted teardrop pin for an actively-checked-in visitor.
-// Uses `var(--brand-primary)` so the marker picks up the partner's
-// brand color, visually tying the pin to the rest of the brand-aware
-// chrome on this page (2px frame, on-site TogglePill, etc.).
-function visitorIcon(): L.DivIcon {
-  const html = `
-    <div style="position:relative;width:28px;height:36px;transform:translate(-14px,-32px);filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));">
-      <svg viewBox="0 0 28 36" width="28" height="36" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14 0 C6.27 0 0 6.27 0 14 C0 24.5 14 36 14 36 C14 36 28 24.5 28 14 C28 6.27 21.73 0 14 0 Z"
-              fill="var(--brand-primary)" stroke="white" stroke-width="2"/>
-        <circle cx="14" cy="11" r="3.6" fill="white"/>
-        <path d="M7 22 C7 17.6 10.13 15 14 15 C17.87 15 21 17.6 21 22 Z" fill="white"/>
-      </svg>
-    </div>`;
-  return L.divIcon({
-    html,
-    className: "vndrly-visitor-pin",
-    iconSize: [28, 36],
-    iconAnchor: [14, 32],
-    popupAnchor: [0, -30],
-  });
-}
-
-// Re-center the map whenever the selected site changes. Wrapping this in a
-// child component is the react-leaflet idiom — `useMap()` only works inside
-// a `MapContainer`.
-function RecenterMap({
-  center,
-  zoom,
-}: {
-  center: [number, number] | null;
-  zoom: number;
-}) {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.setView(center, zoom, { animate: true });
-    }
-  }, [center, zoom, map]);
-  return null;
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export default function SiteMapPage() {
@@ -277,11 +196,6 @@ export default function SiteMapPage() {
   const [loading, setLoading] = useState(false);
   const [liveStatus, setLiveStatus] = useState<LiveConnectionStatus>("connecting");
   const fetchSeqRef = useRef(0);
-  // Held by the MapContainer ref so the custom BrandZoomControl
-  // overlay (rendered as a sibling of MapContainer) can call
-  // zoomIn() / zoomOut() on the underlying L.Map instance.
-  const mapRef = useRef<L.Map | null>(null);
-  const tileConfig = useMemo(() => getLeafletTileLayerConfig("satellite"), []);
 
   // Auto-select the first site as soon as the list resolves so the user
   // lands on a usable map without an extra click.
@@ -476,6 +390,85 @@ export default function SiteMapPage() {
     mapCenter = center;
   }
 
+  const mapPoints = useMemo<MapboxPoint[]>(() => {
+    const points: MapboxPoint[] = [];
+    if (viewMode === "single" && mapCenter) {
+      points.push({
+        id: "selected-site",
+        latitude: mapCenter[0],
+        longitude: mapCenter[1],
+        color: "#2563eb",
+        label: "S",
+        title: data?.site.name ?? selectedSite?.name ?? t("siteMap.siteLabel", "Site location"),
+        popupHtml: `
+          <div class="text-sm space-y-1 min-w-[180px]">
+            <div class="font-semibold">${escapeHtml(data?.site.name ?? selectedSite?.name ?? "")}</div>
+            ${data?.site.address ? `<div class="text-xs text-muted-foreground">${escapeHtml(data.site.address)}</div>` : ""}
+            <div class="text-xs text-muted-foreground">${escapeHtml(t("siteMap.radius", "Radius"))}: ${radiusMiles.toFixed(2)} mi</div>
+          </div>`,
+      });
+    }
+
+    for (const v of activeVisitors) {
+      const visitorName =
+        [v.firstName, v.lastName].filter(Boolean).join(" ") ||
+        t("siteMap.visitor.unknownName", "Visitor");
+      points.push({
+        id: `visitor-${v.id}`,
+        latitude: Number(v.checkInLatitude),
+        longitude: Number(v.checkInLongitude),
+        color: "var(--brand-primary)",
+        label: "V",
+        title: visitorName,
+        popupHtml: `
+          <div class="text-sm space-y-1 min-w-[200px]" data-testid="popup-site-visitor-${v.id}">
+            <div class="font-semibold">${escapeHtml(visitorName)}</div>
+            ${v.company ? `<div class="text-xs text-muted-foreground">${escapeHtml(v.company)}</div>` : ""}
+            ${v.siteName ? `<div class="text-xs">${escapeHtml(v.siteName)}</div>` : ""}
+            ${(v.hostPartnerName || v.hostVendorName) ? `<div class="text-xs text-muted-foreground">${escapeHtml(t("siteMap.visitor.hostedBy", "Hosted by"))}: ${escapeHtml(v.hostType === "vendor" ? v.hostVendorName : v.hostPartnerName)}</div>` : ""}
+            <div class="text-xs text-muted-foreground">${escapeHtml(t("siteMap.visitor.checkedIn", "Checked in"))}: ${escapeHtml(timeAgo(v.checkInTime))}</div>
+          </div>`,
+      });
+    }
+
+    for (const emp of employees) {
+      const lowBattery = emp.batteryLevel != null && emp.batteryLevel <= LOW_BATTERY_THRESHOLD;
+      points.push({
+        id: `employee-${emp.employeeId}`,
+        latitude: emp.latitude,
+        longitude: emp.longitude,
+        color: lowBattery ? "#dc2626" : employeeColor(emp),
+        label: lowBattery ? "!" : "C",
+        title: emp.employeeName,
+        popupHtml: `
+          <div class="text-sm space-y-1 min-w-[220px]" data-testid="popup-site-employee-${emp.employeeId}">
+            <div class="font-semibold">${escapeHtml(emp.employeeName)}</div>
+            ${emp.activeTicket ? `<div class="text-xs"><a href="/tickets/${emp.activeTicket.ticketId}" class="underline">${escapeHtml(t("crewMap.ticketLabel", { id: emp.activeTicket.ticketId }))}</a> - ${escapeHtml(lifecycleLabel(emp.activeTicket.lifecycleState, t))}</div>` : `<div class="text-xs italic text-muted-foreground">${escapeHtml(t("siteMap.noActiveTicket", "Not signed in to a ticket"))}</div>`}
+            ${emp.activeTicket?.siteName ? `<div class="text-xs">${escapeHtml(emp.activeTicket.siteName)}</div>` : ""}
+            <div class="text-xs font-medium">${escapeHtml(formatDistance(emp.distanceMeters))} ${escapeHtml(t("siteMap.fromSite", "from site"))}</div>
+            <div class="text-xs">${escapeHtml(formatSpeed(emp.speedMps))}</div>
+            <div class="text-xs text-muted-foreground">${escapeHtml(t("siteMap.lastSeen", "Last seen"))}: ${escapeHtml(timeAgo(emp.recordedAt))}</div>
+            ${emp.batteryLevel != null ? `<div class="text-xs ${lowBattery ? "text-red-600 font-medium" : "text-muted-foreground"}">${Math.round(emp.batteryLevel * 100)}%</div>` : ""}
+          </div>`,
+      });
+    }
+
+    return points;
+  }, [activeVisitors, data, employees, mapCenter, radiusMiles, selectedSite, t, viewMode]);
+
+  const mapCircles = useMemo<MapboxCircle[]>(
+    () =>
+      geofenceSites.map((site) => ({
+        id: `geofence-${site.id}`,
+        latitude: site.latitude,
+        longitude: site.longitude,
+        radiusMeters: resolveSiteMapRadiusMeters(site.siteRadiusMeters ?? null),
+        color: viewMode === "single" && selectedSiteId === site.id ? "#2563eb" : "var(--brand-primary)",
+        opacity: viewMode === "single" && selectedSiteId === site.id ? 0.18 : 0.1,
+      })),
+    [geofenceSites, selectedSiteId, viewMode],
+  );
+
   // Guard: a partner without sites should still see a clear empty state
   // instead of a broken-looking map.
   const noSites = sites.length === 0;
@@ -612,171 +605,14 @@ export default function SiteMapPage() {
             <CardContent className="p-0">
               <div className="relative" style={{ height: 520 }}>
                 {mapCenter ? (
-                  <MapContainer
-                    center={mapCenter}
+                  <MapboxMap
+                    points={mapPoints}
+                    circles={mapCircles}
+                    center={[mapCenter[1], mapCenter[0]]}
                     zoom={viewMode === "all" ? 8 : 15}
-                    zoomControl={false}
-                    ref={mapRef}
-                    style={{ height: "100%", width: "100%" }}
-                  >
-                    <RecenterMap center={mapCenter} zoom={viewMode === "all" ? 8 : 15} />
-                    <TileLayer
-                      attribution={tileConfig.attribution}
-                      url={tileConfig.url}
-                      maxZoom={tileConfig.maxZoom}
-                      tileSize={tileConfig.tileSize}
-                    />
-                    <GeofenceCirclesLayer
-                      sites={geofenceSites}
-                      highlightSiteId={viewMode === "single" ? selectedSiteId : null}
-                    />
-                    {viewMode === "single" && mapCenter && (
-                    <Marker position={mapCenter} icon={siteIcon()}>
-                      <Popup>
-                        <div className="text-sm space-y-1 min-w-[180px]">
-                          <div className="font-semibold flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5 text-blue-600" />
-                            {data?.site.name ?? selectedSite?.name}
-                          </div>
-                          {data?.site.address && (
-                            <div className="text-xs text-muted-foreground">
-                              {data.site.address}
-                            </div>
-                          )}
-                          <div className="text-xs text-muted-foreground">
-                            {t("siteMap.radius", "Radius")}: {radiusMiles.toFixed(2)} mi
-                          </div>
-                        </div>
-                      </Popup>
-                    </Marker>
-                    )}
-                    {/* Brand-tinted pins for anyone currently
-                        checked in at one of this partner's site
-                        locations. Independent of the selected
-                        site — these surface across the partner's
-                        whole footprint so the map doubles as a
-                        live visitor presence view. */}
-                    {activeVisitors.map((v) => (
-                      <Marker
-                        key={`visitor-${v.id}`}
-                        position={[
-                          Number(v.checkInLatitude),
-                          Number(v.checkInLongitude),
-                        ]}
-                        icon={visitorIcon()}
-                      >
-                        <Popup>
-                          <div
-                            className="text-sm space-y-1 min-w-[200px]"
-                            data-testid={`popup-site-visitor-${v.id}`}
-                          >
-                            <div className="font-semibold">
-                              {[v.firstName, v.lastName]
-                                .filter(Boolean)
-                                .join(" ") ||
-                                t("siteMap.visitor.unknownName", "Visitor")}
-                            </div>
-                            {v.company && (
-                              <div className="text-xs text-muted-foreground">
-                                {v.company}
-                              </div>
-                            )}
-                            {v.siteName && (
-                              <div className="text-xs flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {v.siteName}
-                              </div>
-                            )}
-                            {(v.hostPartnerName || v.hostVendorName) && (
-                              <div className="text-xs text-muted-foreground">
-                                {t("siteMap.visitor.hostedBy", "Hosted by")}:{" "}
-                                {v.hostType === "vendor"
-                                  ? v.hostVendorName
-                                  : v.hostPartnerName}
-                              </div>
-                            )}
-                            <div className="text-xs text-muted-foreground">
-                              {t("siteMap.visitor.checkedIn", "Checked in")}:{" "}
-                              {timeAgo(v.checkInTime)}
-                            </div>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
-                    {employees.map((emp) => (
-                      <Marker
-                        key={emp.employeeId}
-                        position={[emp.latitude, emp.longitude]}
-                        icon={carIcon(emp)}
-                      >
-                        <Popup>
-                          <div
-                            className="text-sm space-y-1 min-w-[220px]"
-                            data-testid={`popup-site-employee-${emp.employeeId}`}
-                          >
-                            <div className="font-semibold">{emp.employeeName}</div>
-                            {emp.activeTicket ? (
-                              <div className="text-xs">
-                                <Link
-                                  href={`/tickets/${emp.activeTicket.ticketId}`}
-                                  className="underline"
-                                >
-                                  {t("crewMap.ticketLabel", {
-                                    id: emp.activeTicket.ticketId,
-                                  })}
-                                </Link>
-                                {" — "}
-                                {lifecycleLabel(emp.activeTicket.lifecycleState, t)}
-                              </div>
-                            ) : (
-                              <div className="text-xs italic text-muted-foreground">
-                                {t(
-                                  "siteMap.noActiveTicket",
-                                  "Not signed in to a ticket",
-                                )}
-                              </div>
-                            )}
-                            {emp.activeTicket?.siteName && (
-                              <div className="text-xs flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {emp.activeTicket.siteName}
-                              </div>
-                            )}
-                            <div className="text-xs flex items-center gap-1 font-medium">
-                              <Navigation className="h-3 w-3 text-emerald-600" />
-                              {formatDistance(emp.distanceMeters)}{" "}
-                              {t("siteMap.fromSite", "from site")}
-                            </div>
-                            <div
-                              className="text-xs flex items-center gap-1"
-                              data-testid={`text-site-emp-speed-${emp.employeeId}`}
-                            >
-                              <Gauge className="h-3 w-3 text-sky-600" />
-                              {formatSpeed(emp.speedMps)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {t("siteMap.lastSeen", "Last seen")}:{" "}
-                              {timeAgo(emp.recordedAt)}
-                            </div>
-                            {emp.batteryLevel != null && (
-                              <div
-                                className={`text-xs flex items-center gap-1 ${
-                                  emp.batteryLevel <= LOW_BATTERY_THRESHOLD
-                                    ? "text-red-600 font-medium"
-                                    : "text-muted-foreground"
-                                }`}
-                              >
-                                {emp.batteryLevel <= LOW_BATTERY_THRESHOLD && (
-                                  <BatteryLow className="h-3 w-3" />
-                                )}
-                                {Math.round(emp.batteryLevel * 100)}%
-                              </div>
-                            )}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
-                  </MapContainer>
+                    styleKind="satellite"
+                    height="100%"
+                  />
                 ) : (
                   <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
                     {noSites
@@ -784,21 +620,7 @@ export default function SiteMapPage() {
                           "siteMap.emptyNoSites",
                           "No site locations with coordinates yet.",
                         )
-                      : t("siteMap.loadingMap", "Loading map…")}
-                  </div>
-                )}
-                {/* Custom brand-tinted vertical zoom control,
-                    pinned top-right inside the map. Replaces the
-                    default leaflet zoomControl (disabled above).
-                    z-[1000] sits above leaflet panes (which top
-                    out around z-index 700) but below modal
-                    overlays. */}
-                {mapCenter && (
-                  <div className="absolute top-3 right-3 z-[1000] pointer-events-auto">
-                    <BrandZoomControl
-                      onZoomIn={() => mapRef.current?.zoomIn()}
-                      onZoomOut={() => mapRef.current?.zoomOut()}
-                    />
+                      : t("siteMap.loadingMap", "Loading map...")}
                   </div>
                 )}
               </div>
@@ -842,24 +664,20 @@ export default function SiteMapPage() {
                   return (
                     <div
                       key={emp.employeeId}
-                      className="border rounded p-2 text-sm"
-                      data-testid={`site-map-row-${emp.employeeId}`}
+                      className="border rounded-md p-2 text-sm"
+                      data-testid={`card-site-map-employee-${emp.employeeId}`}
                     >
-                      <div className="font-medium flex items-center gap-1.5">
+                      <div className="font-medium flex items-center gap-2">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-full"
+                          style={{ backgroundColor: employeeColor(emp) }}
+                        />
                         {emp.employeeName}
                         {lowBattery && (
-                          <span
-                            className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-1 py-0.5"
-                            title={`Battery ${Math.round(
-                              (emp.batteryLevel ?? 0) * 100,
-                            )}%`}
-                          >
-                            <BatteryLow className="h-3 w-3" />
-                            {Math.round((emp.batteryLevel ?? 0) * 100)}%
-                          </span>
+                          <BatteryLow className="h-3.5 w-3.5 text-red-600" />
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground mt-0.5">
                         {emp.activeTicket ? (
                           <>
                             <Link
@@ -880,8 +698,7 @@ export default function SiteMapPage() {
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {formatDistance(emp.distanceMeters)} ·{" "}
-                        {timeAgo(emp.recordedAt)}
+                        {formatDistance(emp.distanceMeters)} · {timeAgo(emp.recordedAt)}
                       </div>
                       <Link
                         href={`/crew-map/${emp.employeeId}?date=${todayISO()}`}
@@ -895,13 +712,11 @@ export default function SiteMapPage() {
               )}
               {loadedAt && (
                 <div className="text-[10px] text-muted-foreground pt-1">
-                  {t("siteMap.updated", "Updated")}:{" "}
-                  {loadedAt.toLocaleTimeString()}
+                  {t("siteMap.updated", "Updated")}: {loadedAt.toLocaleTimeString()}
                 </div>
               )}
             </CardContent>
           </Card>
-
           <RecentTicketsCard
             siteLocationId={viewMode === "single" ? selectedSiteId : null}
           />

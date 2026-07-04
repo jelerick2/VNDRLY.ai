@@ -1,47 +1,14 @@
-import { useEffect, useMemo, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Circle, useMap } from "react-leaflet";
-import { BrandZoomControlInMap } from "@/components/brand-zoom-control";
-import { getLeafletTileLayerConfig } from "@/lib/maps";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-
-const markerIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-function Recenter({ lat, lng }: { lat: number; lng: number }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView([lat, lng], map.getZoom(), { animate: true });
-  }, [lat, lng, map]);
-  return null;
-}
+import { useMemo } from "react";
+import { MapboxMap, type MapboxCircle, type MapboxPoint } from "@/components/mapbox-map";
 
 export type SiteLocationMapProps = {
   lat: number;
   lng: number;
   radiusMeters?: number | null;
   onMove?: (lat: number, lng: number) => void;
-  /** Fixed pixel/CSS height. Ignored when `aspectRatio` is provided. */
   height?: number | string;
-  /**
-   * CSS aspect-ratio for the map container (e.g. `"4 / 3"`). When set,
-   * the map fills 100% of its parent's width and computes its own
-   * height from the aspect ratio, so the embed always renders as the
-   * requested rectangle.
-   */
   aspectRatio?: string;
   draggable?: boolean;
-  /**
-   * Base tile layer. Mapbox is used when configured; the values still
-   * choose the Mapbox style family.
-   */
   tileLayer?: "satellite" | "street";
   className?: string;
 };
@@ -57,16 +24,38 @@ export function SiteLocationMap({
   tileLayer = "satellite",
   className,
 }: SiteLocationMapProps) {
-  const center = useMemo<[number, number]>(() => [lat, lng], [lat, lng]);
-  const markerRef = useRef<L.Marker | null>(null);
-  const tileConfig = useMemo(
-    () => getLeafletTileLayerConfig(tileLayer),
-    [tileLayer],
+  const points = useMemo<MapboxPoint[]>(
+    () => [
+      {
+        id: "site",
+        latitude: lat,
+        longitude: lng,
+        color: "var(--brand-primary, #DC2626)",
+        label: "S",
+        title: "Site location",
+      },
+    ],
+    [lat, lng],
   );
-
-  const containerStyle: React.CSSProperties = aspectRatio
+  const circles = useMemo<MapboxCircle[]>(
+    () =>
+      typeof radiusMeters === "number" && radiusMeters > 0
+        ? [
+            {
+              id: "site-radius",
+              latitude: lat,
+              longitude: lng,
+              radiusMeters,
+              color: "var(--brand-primary, #DC2626)",
+              opacity: 0.08,
+            },
+          ]
+        : [],
+    [lat, lng, radiusMeters],
+  );
+  const containerStyle: React.CSSProperties | undefined = aspectRatio
     ? { aspectRatio, width: "100%" }
-    : { height: typeof height === "number" ? `${height}px` : height };
+    : undefined;
 
   return (
     <div
@@ -74,45 +63,17 @@ export function SiteLocationMap({
       style={containerStyle}
       data-testid="site-location-map"
     >
-      <MapContainer
-        center={center}
+      <MapboxMap
+        points={points}
+        circles={circles}
+        center={[lng, lat]}
         zoom={15}
-        zoomControl={false}
-        scrollWheelZoom={false}
-        style={{ height: "100%", width: "100%" }}
-      >
-        <BrandZoomControlInMap />
-        <TileLayer
-          attribution={tileConfig.attribution}
-          url={tileConfig.url}
-          maxZoom={tileConfig.maxZoom}
-          tileSize={tileConfig.tileSize}
-        />
-        <Recenter lat={lat} lng={lng} />
-        <Marker
-          position={center}
-          icon={markerIcon}
-          draggable={draggable && !!onMove}
-          ref={(ref) => {
-            markerRef.current = ref;
-          }}
-          eventHandlers={{
-            dragend: () => {
-              const m = markerRef.current;
-              if (!m || !onMove) return;
-              const p = m.getLatLng();
-              onMove(p.lat, p.lng);
-            },
-          }}
-        />
-        {typeof radiusMeters === "number" && radiusMeters > 0 ? (
-          <Circle
-            center={center}
-            radius={radiusMeters}
-            pathOptions={{ color: "var(--brand-primary, #DC2626)", weight: 2, fillOpacity: 0.08 }}
-          />
-        ) : null}
-      </MapContainer>
+        styleKind={tileLayer}
+        height={aspectRatio ? "100%" : height}
+        scrollZoom={false}
+        fitToData={false}
+        onPointDrag={draggable && onMove ? (_id, nextLat, nextLng) => onMove(nextLat, nextLng) : undefined}
+      />
     </div>
   );
 }

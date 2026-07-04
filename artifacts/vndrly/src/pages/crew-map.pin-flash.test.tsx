@@ -3,12 +3,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // Task #153 — when a crew member's ticket transitions lifecycle stages
 // the live SSE handler flashes the corresponding row in the side panel
-// (existing behaviour) AND must now visibly pulse the marker pin on the
-// map itself. The pulse is rendered as an extra ring element inside the
-// car-pin's divIcon HTML, gated on a `flashing` prop. We can't render
-// real Leaflet in jsdom, so this spec mocks `leaflet.divIcon` to capture
-// the HTML the page actually hands to Leaflet for each marker — that is
-// the exact surface the user sees in production.
+// and the marker pin on the map itself. The map now renders through the
+// shared Mapbox component, so this spec inspects the point model passed
+// into that component instead of a renderer-specific marker DOM.
 
 if (typeof globalThis.ResizeObserver === "undefined") {
   class ResizeObserverPolyfill {
@@ -96,47 +93,17 @@ vi.mock("@/hooks/use-toast", () => ({
   toast: vi.fn(),
 }));
 
-// react-leaflet renders the Marker as a div whose `data-icon-html` we
-// can inspect. The real component just hands the icon to Leaflet; for
-// this spec we just need to surface what HTML each pin actually carries.
-type StubIcon = { __html?: string };
-vi.mock("react-leaflet", () => ({
-  MapContainer: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement("div", { "data-testid": "stub-map" }, children),
-  Marker: ({
-    icon,
-    children,
-  }: {
-    icon?: StubIcon;
-    children?: React.ReactNode;
-  }) =>
-    React.createElement(
-      "div",
-      {
-        "data-testid": "stub-marker",
-        "data-icon-html": icon?.__html ?? "",
-      },
-      children,
-    ),
-  Polyline: () => null,
-  Popup: () => null,
-  TileLayer: () => null,
-  useMap: () => ({
-    zoomIn: vi.fn(),
-    zoomOut: vi.fn(),
-  }),
-}));
+type StubMapboxPoint = {
+  id: string;
+  flashing?: boolean;
+};
 
-// Capture the html argument so the test can assert on what Leaflet
-// would actually render. Mirror the shape react-leaflet expects so the
-// stub Marker can read it back.
-vi.mock("leaflet", () => ({
-  default: {
-    divIcon: (opts: { html: string }) => ({ __html: opts.html }),
-    DomEvent: {
-      disableClickPropagation: vi.fn(),
-      disableScrollPropagation: vi.fn(),
-    },
+let latestMapboxPoints: StubMapboxPoint[] = [];
+
+vi.mock("@/components/mapbox-map", () => ({
+  MapboxMap: ({ points }: { points?: StubMapboxPoint[] }) => {
+    latestMapboxPoints = points ?? [];
+    return React.createElement("div", { "data-testid": "stub-mapbox-map" });
   },
 }));
 
@@ -176,21 +143,17 @@ const SEED_LOCATION = {
   recordedAt: new Date().toISOString(),
 };
 
-function findCarMarkerHtml(): string {
-  const markers = screen.getAllByTestId("stub-marker");
-  for (const m of markers) {
-    const html = m.getAttribute("data-icon-html") ?? "";
-    if (html.includes("crew-car-pin")) return html;
+function findCrewPoint(): StubMapboxPoint {
+  const point = latestMapboxPoints.find((p) => p.id === `crew-${SEED_LOCATION.employeeId}`);
+  if (!point) {
+    throw new Error(`No crew point found. Got: ${latestMapboxPoints.map((p) => p.id).join(", ")}`);
   }
-  throw new Error(
-    `No crew-car-pin marker found. Got: ${markers
-      .map((m) => (m.getAttribute("data-icon-html") ?? "").slice(0, 60))
-      .join(" | ")}`,
-  );
+  return point;
 }
 
 beforeEach(() => {
   FakeEventSource.instances = [];
+  latestMapboxPoints = [];
   // Seed the page with one en-route crew member so the SSE ping below
   // is a true lifecycle transition, not a first sighting.
   (globalThis as { fetch: unknown }).fetch = vi.fn(async () =>
@@ -227,9 +190,7 @@ describe("crew-map page — pin flash on lifecycle transition (Task #153)", () =
     await act(async () => {
       await Promise.resolve();
     });
-    const html = findCarMarkerHtml();
-    expect(html).not.toContain("lifecycle-flash-pin-ring");
-    expect(html).toContain('data-flashing="0"');
+    expect(findCrewPoint().flashing).toBe(false);
   });
 
   it("adds the expanding ring overlay to the pin when an SSE ping flips lifecycle (en_route → on_site)", async () => {
@@ -256,15 +217,7 @@ describe("crew-map page — pin flash on lifecycle transition (Task #153)", () =
       });
     });
 
-    const html = findCarMarkerHtml();
-    expect(html).toContain('data-flashing="1"');
-    expect(html).toContain("lifecycle-flash-pin-ring");
-    // The ring is a sibling of the rotated SVG wrapper so the inline
-    // `transform: translate(...)` on the outer container that anchors
-    // the pin on the map is left intact — verify the anchor transform
-    // is still present in the pin HTML (regression guard for the bug
-    // where animating the outer div clobbered its translate).
-    expect(html).toContain("transform:translate(-20px,-28px)");
+    expect(findCrewPoint().flashing).toBe(true);
   });
 
   it("removes the flash ring after the 2s flash window elapses", async () => {
@@ -286,15 +239,13 @@ describe("crew-map page — pin flash on lifecycle transition (Task #153)", () =
         },
       });
     });
-    expect(findCarMarkerHtml()).toContain("lifecycle-flash-pin-ring");
+    expect(findCrewPoint().flashing).toBe(true);
 
     // The page schedules a 2s timer to clear the flashing state. Once
     // it fires, the pin re-renders without the ring overlay.
     act(() => {
       vi.advanceTimersByTime(2001);
     });
-    const html = findCarMarkerHtml();
-    expect(html).not.toContain("lifecycle-flash-pin-ring");
-    expect(html).toContain('data-flashing="0"');
+    expect(findCrewPoint().flashing).toBe(false);
   });
 });

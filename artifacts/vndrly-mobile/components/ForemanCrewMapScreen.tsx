@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -13,24 +13,40 @@ import {
   Text,
   View,
 } from "react-native";
-import { WebView } from "react-native-webview";
 
 import InPageHeader from "@/components/InPageHeader";
+import MapboxNativeMap, { type NativeMapCircle, type NativeMapLine, type NativeMapPoint } from "@/components/MapboxNativeMap";
 import { useBrand } from "@/hooks/use-brand";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/lib/api";
 import { translateApiError } from "@/lib/apiErrors";
-
-import {
-  buildCrewMapHtml,
-  type CrewMapLocation,
-  type CrewMapSite,
-} from "@/lib/crew-map-html";
 import { SCREEN_SUBTITLE_TEXT, SCREEN_TITLE_TEXT, TEXT_SHADOW } from "@/lib/pill-doctrine";
 
-type LiveLocation = CrewMapLocation;
+type LiveLocation = {
+  employeeId: number;
+  employeeName: string;
+  ticketId: number;
+  vendorName?: string | null;
+  lifecycleState: string | null;
+  siteName: string | null;
+  siteCode: string | null;
+  siteLatitude: number | null;
+  siteLongitude: number | null;
+  latitude: number;
+  longitude: number;
+  batteryLevel: number | null;
+  heading: number | null;
+  speedMps: number | null;
+  recordedAt: string;
+};
 
-type FieldSite = CrewMapSite;
+type FieldSite = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  siteRadiusMeters?: number | null;
+};
 
 function lifecycleColor(state: string | null): string {
   if (state === "en_route") return "#f59e0b";
@@ -49,7 +65,6 @@ export default function ForemanCrewMapScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [liveStatus, setLiveStatus] = useState<"connecting" | "live" | "paused">("connecting");
-  const apiBaseRef = useRef(process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "");
   const [recentTrips, setRecentTrips] = useState<
     Array<{ ticketId: number; employeeId: number; employeeName: string; siteName: string | null; lastActivityAt: string | null; onSiteMinutes: number | null; replayDate: string }>
   >([]);
@@ -72,10 +87,12 @@ export default function ForemanCrewMapScreen() {
       ]);
       setLocations(locJson?.locations ?? []);
       setSites(Array.isArray(siteRows) ? siteRows : []);
+      setLiveStatus("live");
       await loadRecent();
     } catch (e) {
       setError(translateApiError(e, t));
       setLocations([]);
+      setLiveStatus("paused");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -88,38 +105,59 @@ export default function ForemanCrewMapScreen() {
     return () => clearInterval(id);
   }, [load]);
 
-  const mapHtml = useMemo(
-    () => buildCrewMapHtml(locations, sites, brand.primary, apiBaseRef.current),
-    [locations, sites, brand.primary],
+  const mapPoints = useMemo<NativeMapPoint[]>(
+    () => [
+      ...locations.map((loc) => ({
+        id: `crew-${loc.employeeId}`,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        color:
+          loc.batteryLevel != null && loc.batteryLevel <= 0.2
+            ? "#dc2626"
+            : lifecycleColor(loc.lifecycleState),
+        label: loc.batteryLevel != null && loc.batteryLevel <= 0.2 ? "!" : "C",
+        title: loc.employeeName,
+      })),
+      ...sites.map((site) => ({
+        id: `site-${site.id}`,
+        latitude: site.latitude,
+        longitude: site.longitude,
+        color: brand.primary,
+        label: "S",
+        title: site.name,
+      })),
+    ],
+    [brand.primary, locations, sites],
   );
-
-  function onWebViewMessage(event: { nativeEvent: { data: string } }) {
-    try {
-      const msg = JSON.parse(event.nativeEvent.data) as {
-        type: string;
-        status?: string;
-        location?: LiveLocation;
-      };
-      if (msg.type === "live") {
-        setLiveStatus(msg.status === "open" ? "live" : "paused");
-      }
-      if (msg.type === "ping" && msg.location) {
-        const incoming = msg.location;
-        setLocations((prev) => {
-          const idx = prev.findIndex((l) => l.employeeId === incoming.employeeId);
-          if (idx === -1) return [...prev, incoming];
-          const cur = prev[idx]!;
-          if (new Date(cur.recordedAt).getTime() > new Date(incoming.recordedAt).getTime()) return prev;
-          const next = prev.slice();
-          next[idx] = { ...cur, ...incoming };
-          return next;
-        });
-        setLiveStatus("live");
-      }
-    } catch {
-      // ignore malformed messages
-    }
-  }
+  const mapLines = useMemo<NativeMapLine[]>(
+    () =>
+      locations
+        .filter((loc) => loc.lifecycleState === "en_route" && loc.siteLatitude != null && loc.siteLongitude != null)
+        .map((loc) => ({
+          id: `route-${loc.employeeId}`,
+          coordinates: [
+            [loc.latitude, loc.longitude],
+            [loc.siteLatitude as number, loc.siteLongitude as number],
+          ],
+          color: "#f59e0b",
+          width: 3,
+        })),
+    [locations],
+  );
+  const mapCircles = useMemo<NativeMapCircle[]>(
+    () =>
+      sites
+        .filter((site) => Number.isFinite(site.latitude) && Number.isFinite(site.longitude))
+        .map((site) => ({
+          id: `site-radius-${site.id}`,
+          latitude: site.latitude,
+          longitude: site.longitude,
+          radiusMeters: site.siteRadiusMeters ?? 402,
+          color: brand.primary,
+          opacity: 0.12,
+        })),
+    [brand.primary, sites],
+  );
 
   function openDirections(lat: number, lng: number) {
     const url =
@@ -164,16 +202,13 @@ export default function ForemanCrewMapScreen() {
             <ActivityIndicator color={colors.primary} />
           </View>
         ) : (
-          <WebView
-            originWhitelist={["*"]}
-            source={{ html: mapHtml }}
-            style={styles.map}
-            scrollEnabled={false}
-            onMessage={onWebViewMessage}
-            javaScriptEnabled
-            domStorageEnabled
-            sharedCookiesEnabled
-            thirdPartyCookiesEnabled
+          <MapboxNativeMap
+            points={mapPoints}
+            lines={mapLines}
+            circles={mapCircles}
+            height="100%"
+            styleKind="satellite"
+            zoom={locations.length > 0 ? 8 : 4}
           />
         )}
       </View>

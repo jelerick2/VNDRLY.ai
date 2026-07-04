@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -15,10 +15,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { WebView } from "react-native-webview";
 
 import InPageHeader from "@/components/InPageHeader";
 import LayeredPillButton, { LAYERED_PILL_BUTTON_TEXT } from "@/components/LayeredPillButton";
+import MapboxNativeMap, { type NativeMapCircle, type NativeMapLine, type NativeMapPoint } from "@/components/MapboxNativeMap";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/hooks/use-brand";
 import { useColors } from "@/hooks/useColors";
@@ -28,12 +28,33 @@ import {
   isPartnerOfficeUser,
 } from "@/lib/mobile-viewer";
 import { translateApiError } from "@/lib/apiErrors";
-import {
-  buildCrewMapHtml,
-  type CrewMapLocation,
-  type CrewMapSite,
-} from "@/lib/crew-map-html";
 import { SCREEN_SUBTITLE_TEXT, SCREEN_TITLE_TEXT, TEXT_SHADOW } from "@/lib/pill-doctrine";
+
+type CrewMapSite = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  siteRadiusMeters?: number | null;
+};
+
+type CrewMapLocation = {
+  employeeId: number;
+  employeeName: string;
+  ticketId: number;
+  vendorName?: string | null;
+  lifecycleState: string | null;
+  siteName: string | null;
+  siteCode: string | null;
+  siteLatitude: number | null;
+  siteLongitude: number | null;
+  latitude: number;
+  longitude: number;
+  batteryLevel: number | null;
+  heading: number | null;
+  speedMps: number | null;
+  recordedAt: string;
+};
 
 type OverviewSite = CrewMapSite & {
   nearbyCount?: number;
@@ -94,9 +115,6 @@ export default function PartnerSiteCrewMapScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [siteMenuOpen, setSiteMenuOpen] = useState(false);
-  const apiBaseRef = useRef(
-    process.env.EXPO_PUBLIC_DOMAIN ? `https://${process.env.EXPO_PUBLIC_DOMAIN}` : "",
-  );
 
   const load = useCallback(async () => {
     try {
@@ -205,12 +223,58 @@ export default function PartnerSiteCrewMapScreen() {
     return () => clearInterval(id);
   }, [load]);
 
-  const mapHtml = useMemo(
+  const mapPoints = useMemo<NativeMapPoint[]>(
+    () => [
+      ...locations.map((loc) => ({
+        id: `crew-${loc.employeeId}`,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        color:
+          loc.batteryLevel != null && loc.batteryLevel <= 0.2
+            ? "#dc2626"
+            : lifecycleColor(loc.lifecycleState),
+        label: loc.batteryLevel != null && loc.batteryLevel <= 0.2 ? "!" : "C",
+        title: loc.employeeName,
+      })),
+      ...sites.map((site) => ({
+        id: `site-${site.id}`,
+        latitude: site.latitude,
+        longitude: site.longitude,
+        color: brand.primary,
+        label: "S",
+        title: site.name,
+      })),
+    ],
+    [brand.primary, locations, sites],
+  );
+  const mapLines = useMemo<NativeMapLine[]>(
     () =>
-      buildCrewMapHtml(locations, sites, brand.primary, apiBaseRef.current, {
-        enableLiveEvents: false,
-      }),
-    [locations, sites, brand.primary],
+      locations
+        .filter((loc) => loc.lifecycleState === "en_route" && loc.siteLatitude != null && loc.siteLongitude != null)
+        .map((loc) => ({
+          id: `route-${loc.employeeId}`,
+          coordinates: [
+            [loc.latitude, loc.longitude],
+            [loc.siteLatitude as number, loc.siteLongitude as number],
+          ],
+          color: "#f59e0b",
+          width: 3,
+        })),
+    [locations],
+  );
+  const mapCircles = useMemo<NativeMapCircle[]>(
+    () =>
+      sites
+        .filter((site) => Number.isFinite(site.latitude) && Number.isFinite(site.longitude))
+        .map((site) => ({
+          id: `site-radius-${site.id}`,
+          latitude: site.latitude,
+          longitude: site.longitude,
+          radiusMeters: site.siteRadiusMeters ?? 402,
+          color: brand.primary,
+          opacity: 0.12,
+        })),
+    [brand.primary, sites],
   );
 
   function openDirections(lat: number, lng: number) {
@@ -390,15 +454,13 @@ export default function PartnerSiteCrewMapScreen() {
             <ActivityIndicator color={colors.primary} />
           </View>
         ) : (
-          <WebView
-            originWhitelist={["*"]}
-            source={{ html: mapHtml }}
-            style={styles.map}
-            scrollEnabled={false}
-            javaScriptEnabled
-            domStorageEnabled
-            sharedCookiesEnabled
-            thirdPartyCookiesEnabled
+          <MapboxNativeMap
+            points={mapPoints}
+            lines={mapLines}
+            circles={mapCircles}
+            height="100%"
+            styleKind="satellite"
+            zoom={selectedSiteId === "all" ? 8 : 15}
           />
         )}
       </View>

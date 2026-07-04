@@ -9,13 +9,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { WebView } from "react-native-webview";
 
 import InPageHeader from "@/components/InPageHeader";
+import MapboxNativeMap, { type NativeMapLine, type NativeMapPoint } from "@/components/MapboxNativeMap";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/lib/api";
 import { translateApiError } from "@/lib/apiErrors";
-import { getLeafletTileLayerConfig } from "@/lib/maps";
 
 type Ping = {
   id: number;
@@ -23,36 +22,6 @@ type Ping = {
   longitude: number;
   recordedAt: string;
 };
-
-function buildReplayHtml(pings: Ping[], scrubIndex: number): string {
-  const visible = pings.slice(0, scrubIndex + 1);
-  const payload = JSON.stringify({
-    visible,
-    all: pings,
-    tileLayer: getLeafletTileLayerConfig("satellite"),
-  });
-  return `<!DOCTYPE html><html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<style>html,body,#map{margin:0;padding:0;height:100%;}</style></head><body><div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-var data = ${payload};
-var map = L.map('map');
-L.tileLayer(data.tileLayer.url, {
-  attribution: data.tileLayer.attribution,
-  maxZoom: data.tileLayer.maxZoom || 22,
-  tileSize: data.tileLayer.tileSize || 256
-}).addTo(map);
-var latlngs = data.all.map(function(p){ return [p.latitude, p.longitude]; });
-if (latlngs.length > 1) L.polyline(latlngs, { color: '#2563eb', weight: 3, opacity: 0.35 }).addTo(map);
-data.visible.forEach(function(p, i) {
-  L.circleMarker([p.latitude, p.longitude], { radius: i === data.visible.length - 1 ? 8 : 4, color: i === data.visible.length - 1 ? '#f59e0b' : '#2563eb', fillOpacity: 0.9 }).addTo(map);
-});
-if (latlngs.length) map.fitBounds(latlngs, { padding: [24,24] });
-else map.setView([39.5,-98.35], 4);
-</script></body></html>`;
-}
 
 export default function CrewReplayScreen() {
   const colors = useColors();
@@ -84,9 +53,30 @@ export default function CrewReplayScreen() {
       .finally(() => setLoading(false));
   }, [id, date, t]);
 
-  const html = useMemo(
-    () => buildReplayHtml(pings, scrubIndex),
-    [pings, scrubIndex],
+  const visiblePings = useMemo(() => pings.slice(0, scrubIndex + 1), [pings, scrubIndex]);
+  const mapPoints = useMemo<NativeMapPoint[]>(
+    () =>
+      visiblePings.map((ping, index) => ({
+        id: `ping-${ping.id}`,
+        latitude: ping.latitude,
+        longitude: ping.longitude,
+        color: index === visiblePings.length - 1 ? "#f59e0b" : colors.primary,
+        label: String(index + 1),
+        title: new Date(ping.recordedAt).toLocaleString(),
+      })),
+    [colors.primary, visiblePings],
+  );
+  const mapLines = useMemo<NativeMapLine[]>(
+    () =>
+      pings.length >= 2
+        ? [{
+            id: "crew-replay-route",
+            coordinates: pings.map((ping) => [ping.latitude, ping.longitude] as [number, number]),
+            color: colors.primary,
+            width: 3,
+          }]
+        : [],
+    [colors.primary, pings],
   );
 
   return (
@@ -111,7 +101,13 @@ export default function CrewReplayScreen() {
               {scrubIndex + 1} / {Math.max(pings.length, 1)}
             </Text>
             <View style={[styles.mapWrap, { borderColor: colors.border }]}>
-              <WebView originWhitelist={["*"]} source={{ html }} style={styles.map} scrollEnabled={false} />
+              <MapboxNativeMap
+                points={mapPoints}
+                lines={mapLines}
+                height="100%"
+                styleKind="satellite"
+                zoom={pings.length > 0 ? 13 : 4}
+              />
             </View>
             <View style={styles.sliderRow}>
               <Text style={{ color: colors.primary }} onPress={() => setScrubIndex(0)}>

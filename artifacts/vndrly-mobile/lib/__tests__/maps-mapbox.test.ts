@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  getLeafletTileLayerConfig,
   getMapboxStaticTile,
   getMapboxStyleTileUrl,
+  readMapboxAccessToken,
 } from "../maps";
 
 describe("mobile Mapbox provider helpers", () => {
@@ -15,11 +15,9 @@ describe("mobile Mapbox provider helpers", () => {
     expect(getMapboxStyleTileUrl("satellite")).toContain("access_token=pk.mobile-token");
   });
 
-  it("returns Mapbox Leaflet config when configured", () => {
+  it("reads the native SDK access token when configured", () => {
     vi.stubEnv("EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN", "pk.mobile-token");
-    const cfg = getLeafletTileLayerConfig("street");
-    expect(cfg.provider).toBe("mapbox");
-    expect(cfg.url).toContain("mapbox/streets-v12");
+    expect(readMapboxAccessToken()).toBe("pk.mobile-token");
   });
 
   it("uses Mapbox for static tile thumbnails", () => {

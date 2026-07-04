@@ -1,15 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import L from "leaflet";
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap, Circle } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/hooks/use-brand";
 import SplitToggleHalf from "@/components/split-toggle-half";
 import { pickTogglePillSrc, TOGGLE_IDLE_PILL_SRC } from "@/lib/pick-toggle-pill";
-import { BrandZoomControlInMap } from "@/components/brand-zoom-control";
 import { LONG_DWELL_MS as DEFAULT_LONG_DWELL_MS, deriveLongStops, formatDwell } from "@/lib/stops";
-import { getLeafletTileLayerConfig } from "@/lib/maps";
+import { MapboxMap, type MapboxCircle, type MapboxLine, type MapboxPoint } from "@/components/mapbox-map";
 
 export type RoutePoint = {
   id?: number | string;
@@ -40,10 +36,6 @@ type Props = {
   selectedTrackingId?: number | string | null;
   onSelectTracking?: (id: number | string | null) => void;
   longStopThresholdMs?: number;
-  // When true, render rotated arrow icons for each tracking ping using a
-  // heading computed from the next consecutive ping (or a stationary
-  // indicator when the device didn't move). Used by the day-replay view to
-  // mirror the live Crew Map.
   showHeadings?: boolean;
   siteRadiusMeters?: number | null;
   visitPins?: Array<{
@@ -55,187 +47,16 @@ type Props = {
   }>;
 };
 
-function makePinIcon(color: string, label: string) {
-  const html = `
-    <div style="position: relative; width: 28px; height: 36px; transform: translate(-14px, -32px);">
-      <div style="
-        position: absolute;
-        left: 0; top: 0;
-        width: 28px; height: 28px;
-        border-radius: 50%;
-        background: ${color};
-        border: 2px solid white;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.4);
-        display: flex; align-items: center; justify-content: center;
-        color: white; font-weight: 700; font-size: 12px; font-family: sans-serif;
-      ">${label}</div>
-      <div style="
-        position: absolute;
-        left: 11px; top: 26px;
-        width: 0; height: 0;
-        border-left: 3px solid transparent;
-        border-right: 3px solid transparent;
-        border-top: 8px solid ${color};
-      "></div>
-    </div>`;
-  return L.divIcon({
-    html,
-    className: "vndrly-route-pin",
-    iconSize: [28, 36],
-    iconAnchor: [14, 32],
-    popupAnchor: [0, -30],
-  });
+function popup(title: string, lines: Array<string | null | undefined>): string {
+  return `<div class="text-xs"><div class="font-semibold">${title}</div>${lines
+    .filter(Boolean)
+    .map((line) => `<div>${line}</div>`)
+    .join("")}</div>`;
 }
 
-function makeStopIcon(label: string, selected: boolean) {
-  const bg = selected ? "#f59e0b" : "#ea580c";
-  const ring = selected ? "box-shadow: 0 0 0 3px rgba(245,158,11,0.45), 0 1px 4px rgba(0,0,0,0.5);" : "box-shadow: 0 1px 4px rgba(0,0,0,0.45);";
-  const size = selected ? 32 : 28;
-  const fontSize = selected ? 13 : 12;
-  const html = `
-    <div style="position: relative; width: ${size}px; height: ${size + 8}px; transform: translate(-${size / 2}px, -${size + 4}px);">
-      <div style="
-        position: absolute;
-        left: 0; top: 0;
-        width: ${size}px; height: ${size}px;
-        border-radius: 50%;
-        background: ${bg};
-        border: 2px solid white;
-        ${ring}
-        display: flex; align-items: center; justify-content: center;
-        color: white; font-weight: 700; font-size: ${fontSize}px; font-family: sans-serif;
-      ">${label}</div>
-      <div style="
-        position: absolute;
-        left: ${size / 2 - 3}px; top: ${size - 2}px;
-        width: 0; height: 0;
-        border-left: 3px solid transparent;
-        border-right: 3px solid transparent;
-        border-top: 8px solid ${bg};
-      "></div>
-    </div>`;
-  return L.divIcon({
-    html,
-    className: "vndrly-route-stop-pin",
-    iconSize: [size, size + 8],
-    iconAnchor: [size / 2, size + 4],
-    popupAnchor: [0, -size],
-  });
+function coordLine(latitude: number, longitude: number): string {
+  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
 }
-
-const trackingDot = L.divIcon({
-  html: `<div style="
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    background: #2563eb;
-    border: 2px solid white;
-    box-shadow: 0 0 2px rgba(0,0,0,0.5);
-  "></div>`,
-  className: "vndrly-route-dot",
-  iconSize: [10, 10],
-  iconAnchor: [5, 5],
-});
-
-const trackingDotSelected = L.divIcon({
-  html: `<div style="
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    background: #f59e0b;
-    border: 3px solid white;
-    box-shadow: 0 0 0 2px #f59e0b, 0 0 6px rgba(0,0,0,0.6);
-  "></div>`,
-  className: "vndrly-route-dot-selected",
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-});
-
-// Bearing from point A to point B in degrees clockwise from north.
-// Returns null if the two points are effectively the same location, so we
-// don't fabricate a heading for stationary pings.
-function computeBearing(
-  a: { latitude: number; longitude: number },
-  b: { latitude: number; longitude: number },
-): number | null {
-  const dLat = b.latitude - a.latitude;
-  const dLng = b.longitude - a.longitude;
-  // Roughly < ~1.1m of movement at the equator: treat as stationary.
-  if (Math.abs(dLat) < 1e-5 && Math.abs(dLng) < 1e-5) return null;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const lat1 = toRad(a.latitude);
-  const lat2 = toRad(b.latitude);
-  const dLngRad = toRad(dLng);
-  const y = Math.sin(dLngRad) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLngRad);
-  const brng = (Math.atan2(y, x) * 180) / Math.PI;
-  return (brng + 360) % 360;
-}
-
-// Arrow icon used on the day-replay timeline. The triangle points "up" in the
-// raw SVG and we rotate the wrapper so it ends up pointing along `heading`
-// (degrees clockwise from north — same convention as the live Crew Map).
-function trackingArrowIcon(heading: number, selected: boolean, title: string) {
-  const fill = selected ? "#f59e0b" : "#2563eb";
-  const size = selected ? 22 : 16;
-  const rounded = Math.round(heading);
-  const html = `<div data-testid="replay-pin-heading" data-heading="${rounded}" title="${title}" style="width:${size}px;height:${size}px;transform:rotate(${heading}deg);display:flex;align-items:center;justify-content:center;">
-    <div style="width:0;height:0;border-left:${size / 2}px solid transparent;border-right:${size / 2}px solid transparent;border-bottom:${size}px solid ${fill};filter:drop-shadow(0 1px 1px rgba(0,0,0,.5));"></div>
-  </div>`;
-  return L.divIcon({
-    html,
-    className: selected ? "vndrly-route-arrow-selected" : "vndrly-route-arrow",
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-  });
-}
-
-// Stationary indicator used on the day-replay timeline. Mirrors the dashed
-// neutral ring from the live Crew Map so the two views read the same way.
-function trackingStationaryIcon(selected: boolean, title: string) {
-  const size = selected ? 18 : 12;
-  const dot = selected ? "#f59e0b" : "#2563eb";
-  const html = `<div data-testid="replay-pin-heading-neutral" title="${title}" style="position:relative;width:${size + 8}px;height:${size + 8}px;display:flex;align-items:center;justify-content:center;">
-    <div style="position:absolute;inset:0;border-radius:50%;border:2px dashed rgba(37,99,235,.55);"></div>
-    <div style="width:${size}px;height:${size}px;border-radius:50%;background:${dot};border:2px solid white;box-shadow:0 0 2px rgba(0,0,0,0.5);"></div>
-  </div>`;
-  return L.divIcon({
-    html,
-    className: selected ? "vndrly-route-stationary-selected" : "vndrly-route-stationary",
-    iconSize: [size + 8, size + 8],
-    iconAnchor: [(size + 8) / 2, (size + 8) / 2],
-  });
-}
-
-function FitBounds({ points, enabled }: { points: [number, number][]; enabled: boolean }) {
-  const map = useMap();
-  const lastKey = useRef<string>("");
-  useEffect(() => {
-    if (!enabled) return;
-    if (points.length === 0) return;
-    const key = points.map((p) => p.join(",")).join("|");
-    if (key === lastKey.current) return;
-    lastKey.current = key;
-    if (points.length === 1) {
-      map.setView(points[0], 16);
-    } else {
-      const bounds = L.latLngBounds(points.map(([lat, lng]) => L.latLng(lat, lng)));
-      map.fitBounds(bounds, { padding: [32, 32], maxZoom: 17 });
-    }
-  }, [map, points, enabled]);
-  return null;
-}
-
-function PanTo({ point }: { point: [number, number] | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!point) return;
-    const currentZoom = map.getZoom();
-    map.setView(point, Math.max(currentZoom, 16), { animate: true });
-  }, [map, point]);
-  return null;
-}
-
 
 export function TicketRouteMap({
   site,
@@ -246,11 +67,13 @@ export function TicketRouteMap({
   selectedTrackingId,
   onSelectTracking,
   longStopThresholdMs = DEFAULT_LONG_DWELL_MS,
-  showHeadings = false,
   siteRadiusMeters = null,
   visitPins = [],
 }: Props) {
   const { t } = useTranslation();
+  const [view, setView] = useState<"map" | "satellite">("satellite");
+  const brand = useBrand();
+
   const validSite = site && isValidLatLng(site.latitude, site.longitude) ? site : null;
   const validCheckIn = checkIn && isValidLatLng(checkIn.latitude, checkIn.longitude) ? checkIn : null;
   const validCheckOut = checkOut && isValidLatLng(checkOut.latitude, checkOut.longitude) ? checkOut : null;
@@ -267,55 +90,142 @@ export function TicketRouteMap({
       });
   }, [tracking]);
 
-  const pathPoints = useMemo<[number, number][]>(() => {
-    const pts: [number, number][] = [];
+  const pathPoints = useMemo<Array<[number, number]>>(() => {
+    const pts: Array<[number, number]> = [];
     if (validCheckIn) pts.push([validCheckIn.latitude, validCheckIn.longitude]);
     for (const p of sortedTracking) pts.push([p.latitude, p.longitude]);
     if (validCheckOut) pts.push([validCheckOut.latitude, validCheckOut.longitude]);
     return pts;
   }, [validCheckIn, validCheckOut, sortedTracking]);
 
-  const allPoints = useMemo<[number, number][]>(() => {
-    const pts: [number, number][] = [...pathPoints];
+  const allPoints = useMemo<Array<[number, number]>>(() => {
+    const pts: Array<[number, number]> = [...pathPoints];
     if (validSite) pts.push([validSite.latitude, validSite.longitude]);
     for (const pin of visitPins ?? []) {
-      if (isValidLatLng(pin.latitude, pin.longitude)) {
-        pts.push([pin.latitude, pin.longitude]);
-      }
+      if (isValidLatLng(pin.latitude, pin.longitude)) pts.push([pin.latitude, pin.longitude]);
     }
     return pts;
   }, [pathPoints, validSite, visitPins]);
-
-  const siteIcon = useMemo(() => makePinIcon("#f59e0b", t("ticketRouteMap.sitePinLabel")), [t]);
-  const checkInIcon = useMemo(() => makePinIcon("#16a34a", t("ticketRouteMap.checkInPinLabel")), [t]);
-  const checkOutIcon = useMemo(() => makePinIcon("#dc2626", t("ticketRouteMap.checkOutPinLabel")), [t]);
 
   const stops = useMemo(
     () => deriveLongStops(sortedTracking, longStopThresholdMs),
     [sortedTracking, longStopThresholdMs],
   );
 
-  // Heading per tracking ping (clockwise from north), derived from the
-  // bearing toward the *next* ping. Stationary pings (essentially zero
-  // displacement to the next ping) and the final ping (no next ping to
-  // derive direction from) get null and render the neutral indicator.
-  const headings = useMemo<(number | null)[]>(() => {
-    if (!showHeadings || sortedTracking.length === 0) return [];
-    const out: (number | null)[] = new Array(sortedTracking.length).fill(null);
-    for (let i = 0; i < sortedTracking.length - 1; i++) {
-      out[i] = computeBearing(sortedTracking[i], sortedTracking[i + 1]);
+  const mapPoints = useMemo<MapboxPoint[]>(() => {
+    const pts: MapboxPoint[] = [];
+    sortedTracking.forEach((p, i) => {
+      const id = p.id != null ? String(p.id) : `tracking-${i}`;
+      pts.push({
+        id,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        color: p.id != null && p.id === selectedTrackingId ? "#f59e0b" : "#2563eb",
+        label: "",
+        title: t("ticketRouteMap.trackingPoint", { n: i + 1 }),
+        popupHtml: popup(t("ticketRouteMap.trackingPoint", { n: i + 1 }), [
+          p.recordedAt ? new Date(p.recordedAt).toLocaleString() : null,
+          coordLine(p.latitude, p.longitude),
+        ]),
+        onClick: onSelectTracking && p.id != null ? () => onSelectTracking(p.id ?? null) : undefined,
+      });
+    });
+    stops.forEach((stop, i) => {
+      const targetId = stop.endPoint.id;
+      pts.push({
+        id: `stop-${targetId ?? i}`,
+        latitude: stop.startPoint.latitude,
+        longitude: stop.startPoint.longitude,
+        color: "#ea580c",
+        label: String(i + 1),
+        title: t("ticketRouteMap.stop", { n: i + 1 }),
+        popupHtml: popup(t("ticketRouteMap.stop", { n: i + 1 }), [
+          stop.startTime ? stop.startTime.toLocaleString() : null,
+          t("ticketRouteMap.duration", { value: formatDwell(stop.durationMs) }),
+          coordLine(stop.startPoint.latitude, stop.startPoint.longitude),
+        ]),
+        onClick: onSelectTracking && targetId != null ? () => onSelectTracking(targetId) : undefined,
+      });
+    });
+    if (validSite) {
+      pts.push({
+        id: "site",
+        latitude: validSite.latitude,
+        longitude: validSite.longitude,
+        color: "#f59e0b",
+        label: "S",
+        title: validSite.name || t("ticketRouteMap.siteLocation"),
+        popupHtml: popup(validSite.name || t("ticketRouteMap.siteLocation"), [
+          coordLine(validSite.latitude, validSite.longitude),
+        ]),
+      });
     }
-    return out;
-  }, [showHeadings, sortedTracking]);
+    for (const pin of visitPins ?? []) {
+      if (!isValidLatLng(pin.latitude, pin.longitude)) continue;
+      pts.push({
+        id: `visit-${pin.key}`,
+        latitude: pin.latitude,
+        longitude: pin.longitude,
+        color: "#6366f1",
+        label: pin.label,
+        title: pin.title ?? pin.label,
+        popupHtml: popup(pin.title ?? pin.label, []),
+      });
+    }
+    if (validCheckIn) {
+      pts.push({
+        id: "check-in",
+        latitude: validCheckIn.latitude,
+        longitude: validCheckIn.longitude,
+        color: "#16a34a",
+        label: "In",
+        title: t("ticketRouteMap.checkIn"),
+        popupHtml: popup(t("ticketRouteMap.checkIn"), [
+          validCheckIn.time ? new Date(validCheckIn.time).toLocaleString() : null,
+          coordLine(validCheckIn.latitude, validCheckIn.longitude),
+        ]),
+      });
+    }
+    if (validCheckOut) {
+      pts.push({
+        id: "check-out",
+        latitude: validCheckOut.latitude,
+        longitude: validCheckOut.longitude,
+        color: "#dc2626",
+        label: "Out",
+        title: t("ticketRouteMap.checkOut"),
+        popupHtml: popup(t("ticketRouteMap.checkOut"), [
+          validCheckOut.time ? new Date(validCheckOut.time).toLocaleString() : null,
+          coordLine(validCheckOut.latitude, validCheckOut.longitude),
+        ]),
+      });
+    }
+    return pts;
+  }, [onSelectTracking, selectedTrackingId, sortedTracking, stops, t, validCheckIn, validCheckOut, validSite, visitPins]);
 
-  const selectedPoint = useMemo<[number, number] | null>(() => {
-    if (selectedTrackingId == null) return null;
-    const found = sortedTracking.find((p) => p.id === selectedTrackingId);
-    return found ? [found.latitude, found.longitude] : null;
-  }, [selectedTrackingId, sortedTracking]);
-
-  const [view, setView] = useState<"map" | "satellite">("satellite");
-  const brand = useBrand();
+  const lines = useMemo<MapboxLine[]>(
+    () =>
+      pathPoints.length >= 2
+        ? [{ id: "route", coordinates: pathPoints, color: "#2563eb", width: 4, opacity: 0.85 }]
+        : [],
+    [pathPoints],
+  );
+  const circles = useMemo<MapboxCircle[]>(
+    () =>
+      validSite && siteRadiusMeters != null && siteRadiusMeters > 0
+        ? [
+            {
+              id: "site-radius",
+              latitude: validSite.latitude,
+              longitude: validSite.longitude,
+              radiusMeters: siteRadiusMeters,
+              color: "#2563eb",
+              opacity: 0.07,
+            },
+          ]
+        : [],
+    [siteRadiusMeters, validSite],
+  );
 
   if (allPoints.length === 0) {
     return (
@@ -328,18 +238,12 @@ export function TicketRouteMap({
     );
   }
 
-  const center = allPoints[0];
-  const tileConfig = getLeafletTileLayerConfig(view === "satellite" ? "satellite" : "street");
-
   const activePillSrc = pickTogglePillSrc(brand.primary, brand.name);
 
   return (
     <div className="space-y-2">
       <div className="flex justify-end">
-        <div
-          className="inline-flex items-stretch rounded-full overflow-hidden"
-          data-testid="map-view-toggle"
-        >
+        <div className="inline-flex items-stretch rounded-full overflow-hidden" data-testid="map-view-toggle">
           <SplitToggleHalf
             side="left"
             active={view === "map"}
@@ -364,180 +268,17 @@ export function TicketRouteMap({
         </div>
       </div>
       <div
-        className="relative overflow-hidden rounded border-[3px]"
-        style={{ height, borderColor: "var(--brand-primary, #f59e0b)" }}
+        className={cn("relative overflow-hidden rounded border-[3px]")}
+        style={{ borderColor: "var(--brand-primary, #f59e0b)" }}
       >
-        <MapContainer
-          center={center}
-          zoom={15}
-          zoomControl={false}
-          scrollWheelZoom
-          style={{ width: "100%", height: "100%" }}
-        >
-          <BrandZoomControlInMap />
-        <TileLayer
-          key={view}
-          attribution={tileConfig.attribution}
-          url={tileConfig.url}
-          maxZoom={tileConfig.maxZoom}
-          tileSize={tileConfig.tileSize}
+        <MapboxMap
+          points={mapPoints}
+          lines={lines}
+          circles={circles}
+          height={height}
+          styleKind={view === "satellite" ? "satellite" : "street"}
+          selectedPointId={selectedTrackingId != null ? String(selectedTrackingId) : null}
         />
-        <FitBounds points={allPoints} enabled={selectedPoint == null} />
-        <PanTo point={selectedPoint} />
-        {pathPoints.length >= 2 && (
-          <Polyline positions={pathPoints} pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.85 }} />
-        )}
-        {sortedTracking.map((p, i) => {
-          const key =
-            p.id != null
-              ? `t-${p.id}`
-              : p.recordedAt
-                ? `t-${new Date(p.recordedAt).getTime()}-${p.latitude}-${p.longitude}`
-                : `t-${p.latitude}-${p.longitude}-${i}`;
-          const isSelected = p.id != null && p.id === selectedTrackingId;
-          const heading = showHeadings ? headings[i] ?? null : null;
-          const icon = showHeadings
-            ? heading != null
-              ? trackingArrowIcon(heading, isSelected, t("ticketRouteMap.heading", { deg: Math.round(heading) }))
-              : trackingStationaryIcon(isSelected, t("ticketRouteMap.stationary"))
-            : isSelected
-              ? trackingDotSelected
-              : trackingDot;
-          return (
-            <Marker
-              key={key}
-              position={[p.latitude, p.longitude]}
-              icon={icon}
-              zIndexOffset={isSelected ? 1000 : 0}
-              eventHandlers={
-                onSelectTracking && p.id != null
-                  ? { click: () => onSelectTracking(p.id ?? null) }
-                  : undefined
-              }
-            >
-              <Popup>
-                <div className="text-xs">
-                  <div className="font-semibold">{t("ticketRouteMap.trackingPoint", { n: i + 1 })}</div>
-                  {p.recordedAt && <div>{new Date(p.recordedAt).toLocaleString()}</div>}
-                  <div>
-                    {p.latitude.toFixed(5)}, {p.longitude.toFixed(5)}
-                  </div>
-                  {showHeadings && (
-                    <div data-testid={`text-replay-heading-${i}`}>
-                      {heading != null
-                        ? t("ticketRouteMap.heading", { deg: Math.round(heading) })
-                        : t("ticketRouteMap.stationary")}
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-        {stops.map((stop, i) => {
-          const label = String(i + 1);
-          const isSelected =
-            stop.endPoint.id != null && stop.endPoint.id === selectedTrackingId;
-          const icon = makeStopIcon(label, isSelected);
-          const targetId = stop.endPoint.id;
-          return (
-            <Marker
-              key={`stop-${stop.endPoint.id ?? `${stop.startPoint.latitude}-${stop.startPoint.longitude}-${i}`}`}
-              position={[stop.startPoint.latitude, stop.startPoint.longitude]}
-              icon={icon}
-              zIndexOffset={isSelected ? 1500 : 500}
-              eventHandlers={
-                onSelectTracking && targetId != null
-                  ? {
-                      click: () => onSelectTracking(targetId),
-                      mouseover: () => onSelectTracking(targetId),
-                    }
-                  : undefined
-              }
-            >
-              <Popup>
-                <div className="text-xs">
-                  <div className="font-semibold">{t("ticketRouteMap.stop", { n: i + 1 })}</div>
-                  {stop.startTime && (
-                    <div>{stop.startTime.toLocaleString()}</div>
-                  )}
-                  <div>{t("ticketRouteMap.duration", { value: formatDwell(stop.durationMs) })}</div>
-                  <div>
-                    {stop.startPoint.latitude.toFixed(5)},{" "}
-                    {stop.startPoint.longitude.toFixed(5)}
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
-        {validSite && (
-          <Marker position={[validSite.latitude, validSite.longitude]} icon={siteIcon}>
-            <Popup>
-              <div className="text-xs">
-                <div className="font-semibold">{validSite.name || t("ticketRouteMap.siteLocation")}</div>
-                <div>
-                  {validSite.latitude.toFixed(5)}, {validSite.longitude.toFixed(5)}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-        {validSite && siteRadiusMeters != null && siteRadiusMeters > 0 && (
-          <Circle
-            center={[validSite.latitude, validSite.longitude]}
-            radius={siteRadiusMeters}
-            pathOptions={{
-              color: "#2563eb",
-              weight: 2,
-              opacity: 0.55,
-              fillColor: "#2563eb",
-              fillOpacity: 0.07,
-            }}
-          />
-        )}
-        {(visitPins ?? []).map((pin) => {
-          if (!isValidLatLng(pin.latitude, pin.longitude)) return null;
-          const icon = makePinIcon("#6366f1", pin.label);
-          return (
-            <Marker
-              key={pin.key}
-              position={[pin.latitude, pin.longitude]}
-              icon={icon}
-            >
-              <Popup>
-                <div className="text-xs font-semibold">{pin.title ?? pin.label}</div>
-              </Popup>
-            </Marker>
-          );
-        })}
-        {validCheckIn && (
-          <Marker position={[validCheckIn.latitude, validCheckIn.longitude]} icon={checkInIcon}>
-            <Popup>
-              <div className="text-xs">
-                <div className="font-semibold">{t("ticketRouteMap.checkIn")}</div>
-                {validCheckIn.time && <div>{new Date(validCheckIn.time).toLocaleString()}</div>}
-                <div>
-                  {validCheckIn.latitude.toFixed(5)}, {validCheckIn.longitude.toFixed(5)}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-        {validCheckOut && (
-          <Marker position={[validCheckOut.latitude, validCheckOut.longitude]} icon={checkOutIcon}>
-            <Popup>
-              <div className="text-xs">
-                <div className="font-semibold">{t("ticketRouteMap.checkOut")}</div>
-                {validCheckOut.time && <div>{new Date(validCheckOut.time).toLocaleString()}</div>}
-                <div>
-                  {validCheckOut.latitude.toFixed(5)}, {validCheckOut.longitude.toFixed(5)}
-                </div>
-              </div>
-            </Popup>
-          </Marker>
-        )}
-        </MapContainer>
       </div>
     </div>
   );

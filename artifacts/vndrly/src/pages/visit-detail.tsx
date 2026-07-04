@@ -1,10 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
-import { BrandZoomControlInMap } from "@/components/brand-zoom-control";
-import "leaflet/dist/leaflet.css";
 import { visitsApi } from "@/lib/visits-api";
 import { useRateLimitGate } from "@/hooks/use-rate-limit-gate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,34 +8,24 @@ import { Badge } from "@/components/ui/badge";
 import ImagePill from "@/components/image-pill";
 import { ClipboardList, Clock, MapPin } from "lucide-react";
 import SphereBackButton from "@/components/sphere-back-button";
-import { useBrand } from "@/hooks/use-brand";
-import { getLeafletTileLayerConfig } from "@/lib/maps";
+import { MapboxMap, type MapboxPoint } from "@/components/mapbox-map";
 
 function fmt(ts: string | null) {
   if (!ts) return "—";
   return new Date(ts).toLocaleString();
 }
 
-function pinIcon(color: string) {
-  const html = `<div style="width:28px;height:36px;transform:translate(-14px,-32px);">
-    <svg viewBox="0 0 28 36" width="28" height="36" xmlns="http://www.w3.org/2000/svg">
-      <path d="M14 0 C 6 0 0 6 0 14 C 0 24 14 36 14 36 C 14 36 28 24 28 14 C 28 6 22 0 14 0 Z"
-            fill="${color}" stroke="white" stroke-width="2"/>
-      <circle cx="14" cy="14" r="5" fill="white"/>
-    </svg>
-  </div>`;
-  return L.divIcon({
-    html,
-    className: "vndrly-visit-pin",
-    iconSize: [28, 36],
-    iconAnchor: [14, 32],
-  });
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 export default function VisitDetailPage({ id }: { id: string }) {
   const { t } = useTranslation();
-  const brand = useBrand();
-  const tileConfig = getLeafletTileLayerConfig("street");
   const visitId = parseInt(id, 10);
   // Task #710 — visit detail is gated by `visits.rate_limited` on the
   // server. There's no poll to suspend, but we still want to (a) avoid
@@ -90,6 +76,33 @@ export default function VisitDetailPage({ id }: { id: string }) {
   const hasPin =
     typeof data.checkInLatitude === "number" &&
     typeof data.checkInLongitude === "number";
+  const mapPoints: MapboxPoint[] = hasPin
+    ? [
+        {
+          id: "check-in",
+          latitude: data.checkInLatitude as number,
+          longitude: data.checkInLongitude as number,
+          color: "var(--brand-primary)",
+          label: "IN",
+          title: t("visitor.detail.popupCheckIn"),
+          popupHtml: `<div class="text-xs"><div class="font-semibold">${escapeHtml(t("visitor.detail.popupCheckIn"))}</div><div>${escapeHtml(fmt(data.checkInTime))}</div></div>`,
+        },
+        ...(typeof data.checkOutLatitude === "number" &&
+        typeof data.checkOutLongitude === "number"
+          ? [
+              {
+                id: "check-out",
+                latitude: data.checkOutLatitude,
+                longitude: data.checkOutLongitude,
+                color: "#6b7280",
+                label: "OUT",
+                title: t("visitor.detail.popupCheckOut"),
+                popupHtml: `<div class="text-xs"><div class="font-semibold">${escapeHtml(t("visitor.detail.popupCheckOut"))}</div><div>${escapeHtml(fmt(data.checkOutTime))}</div></div>`,
+              } satisfies MapboxPoint,
+            ]
+          : []),
+      ]
+    : [];
 
   return (
     <div className="p-6 max-w-5xl mx-auto" data-testid="visit-detail">
@@ -183,46 +196,14 @@ export default function VisitDetailPage({ id }: { id: string }) {
           <CardContent>
             {hasPin ? (
               <div className="h-[320px] rounded-md overflow-hidden border">
-                <MapContainer
-                  center={[data.checkInLatitude as number, data.checkInLongitude as number]}
+                <MapboxMap
+                  points={mapPoints}
+                  center={[data.checkInLongitude as number, data.checkInLatitude as number]}
                   zoom={16}
-                  zoomControl={false}
-                  style={{ height: "100%", width: "100%" }}
-                  scrollWheelZoom={false}
-                >
-                  <BrandZoomControlInMap />
-                  <TileLayer
-                    attribution={tileConfig.attribution}
-                    url={tileConfig.url}
-                    maxZoom={tileConfig.maxZoom}
-                    tileSize={tileConfig.tileSize}
-                  />
-                  <Marker
-                    position={[data.checkInLatitude as number, data.checkInLongitude as number]}
-                    icon={pinIcon(brand.primary)}
-                  >
-                    <Popup>
-                      <div className="text-xs">
-                        <div className="font-semibold">{t("visitor.detail.popupCheckIn")}</div>
-                        <div>{fmt(data.checkInTime)}</div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                  {typeof data.checkOutLatitude === "number" &&
-                  typeof data.checkOutLongitude === "number" ? (
-                    <Marker
-                      position={[data.checkOutLatitude, data.checkOutLongitude]}
-                      icon={pinIcon("#6b7280")}
-                    >
-                      <Popup>
-                        <div className="text-xs">
-                          <div className="font-semibold">{t("visitor.detail.popupCheckOut")}</div>
-                          <div>{fmt(data.checkOutTime)}</div>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ) : null}
-                </MapContainer>
+                  styleKind="street"
+                  height="100%"
+                  scrollZoom={false}
+                />
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">

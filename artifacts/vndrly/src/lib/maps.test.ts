@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  getLeafletTileLayerConfig,
   getMapboxStaticTile,
+  getMapboxStyleUrl,
   getMapboxStyleTileUrl,
 } from "./maps";
 
@@ -15,11 +15,8 @@ describe("Mapbox map provider helpers", () => {
     expect(getMapboxStyleTileUrl("satellite")).toContain("access_token=pk.test-token");
   });
 
-  it("uses Mapbox for Leaflet tile config when a token exists", () => {
-    vi.stubEnv("VITE_MAPBOX_ACCESS_TOKEN", "pk.test-token");
-    const cfg = getLeafletTileLayerConfig("street");
-    expect(cfg.provider).toBe("mapbox");
-    expect(cfg.url).toContain("mapbox/streets-v12");
+  it("builds SDK style URLs for live map surfaces", () => {
+    expect(getMapboxStyleUrl("street")).toBe("mapbox://styles/mapbox/streets-v12");
   });
 
   it("builds static Mapbox tile URLs for thumbnails", () => {

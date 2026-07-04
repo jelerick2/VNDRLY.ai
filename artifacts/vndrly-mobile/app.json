@@ -119,6 +119,7 @@
       ],
       "expo-updates",
       "@sentry/react-native",
+      "@rnmapbox/maps",
       [
         "expo-dynamic-app-icon",
         {
