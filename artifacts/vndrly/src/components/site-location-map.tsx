@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Circle, useMap } from "react-leaflet";
 import { BrandZoomControlInMap } from "@/components/brand-zoom-control";
+import { getLeafletTileLayerConfig } from "@/lib/maps";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -38,10 +39,8 @@ export type SiteLocationMapProps = {
   aspectRatio?: string;
   draggable?: boolean;
   /**
-   * Base tile layer.
-   *  - "satellite": Esri World Imagery (default — high-resolution
-   *    aerial photography, free with attribution, no API key).
-   *  - "street": OpenStreetMap Standard tiles.
+   * Base tile layer. Mapbox is used when configured; the values still
+   * choose the Mapbox style family.
    */
   tileLayer?: "satellite" | "street";
   className?: string;
@@ -60,6 +59,10 @@ export function SiteLocationMap({
 }: SiteLocationMapProps) {
   const center = useMemo<[number, number]>(() => [lat, lng], [lat, lng]);
   const markerRef = useRef<L.Marker | null>(null);
+  const tileConfig = useMemo(
+    () => getLeafletTileLayerConfig(tileLayer),
+    [tileLayer],
+  );
 
   const containerStyle: React.CSSProperties = aspectRatio
     ? { aspectRatio, width: "100%" }
@@ -79,18 +82,12 @@ export function SiteLocationMap({
         style={{ height: "100%", width: "100%" }}
       >
         <BrandZoomControlInMap />
-        {tileLayer === "satellite" ? (
-          <TileLayer
-            attribution='Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            maxZoom={19}
-          />
-        ) : (
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-        )}
+        <TileLayer
+          attribution={tileConfig.attribution}
+          url={tileConfig.url}
+          maxZoom={tileConfig.maxZoom}
+          tileSize={tileConfig.tileSize}
+        />
         <Recenter lat={lat} lng={lng} />
         <Marker
           position={center}

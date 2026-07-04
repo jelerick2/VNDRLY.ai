@@ -118,6 +118,10 @@ function b64(s) {
   return Buffer.from(s, "utf8").toString("base64");
 }
 
+function shQuote(s) {
+  return `'${String(s).replace(/'/g, "'\\''")}'`;
+}
+
 async function main() {
   const cfg = loadDeployConfig();
   const localEnv = existsSync(path.join(ROOT, ".env.local"))
@@ -141,6 +145,10 @@ async function main() {
   const finnhubKey = localEnv.match(/^FINNHUB_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
   const alphaVantageKey =
     localEnv.match(/^ALPHA_VANTAGE_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
+  const mapboxAccessToken =
+    localEnv.match(/^MAPBOX_ACCESS_TOKEN=(.+)$/m)?.[1]?.trim() ??
+    localEnv.match(/^MAPBOX_API_KEY=(.+)$/m)?.[1]?.trim() ??
+    "";
 
   const supabaseUrl =
     localEnv.match(/^SUPABASE_URL=(.+)$/m)?.[1]?.trim() ||
@@ -168,6 +176,8 @@ async function main() {
     openaiKey ? `OPENAI_API_KEY=${openaiKey}` : "",
     finnhubKey ? `FINNHUB_API_KEY=${finnhubKey}` : "",
     alphaVantageKey ? `ALPHA_VANTAGE_API_KEY=${alphaVantageKey}` : "",
+    mapboxAccessToken ? `MAPBOX_ACCESS_TOKEN=${mapboxAccessToken}` : "",
+    mapboxAccessToken ? `VITE_MAPBOX_ACCESS_TOKEN=${mapboxAccessToken}` : "",
     "OPS_ALERT_EMAIL=admin@vndrly.ai",
     "PUBLIC_APP_URL=https://vndrly.ai",
     "APP_BASE_URL=https://vndrly.ai",
@@ -196,8 +206,9 @@ sudo -u vndrly git remote set-url origin https://github.com/vndrly/VNDRLY.ai.git
 sudo -u vndrly git fetch origin main
 sudo -u vndrly git reset --hard origin/main
 export CI=true
+${mapboxAccessToken ? `export VITE_MAPBOX_ACCESS_TOKEN=${shQuote(mapboxAccessToken)}` : ""}
 sudo -u vndrly env HOME=/home/vndrly pnpm install --frozen-lockfile || sudo -u vndrly env HOME=/home/vndrly pnpm install
-sudo -u vndrly env HOME=/home/vndrly BASE_PATH=/ NODE_ENV=production pnpm --filter @workspace/vndrly run build
+sudo -u vndrly env HOME=/home/vndrly BASE_PATH=/ NODE_ENV=production VITE_MAPBOX_ACCESS_TOKEN="$VITE_MAPBOX_ACCESS_TOKEN" pnpm --filter @workspace/vndrly run build
 sudo -u vndrly env HOME=/home/vndrly pnpm --filter @workspace/api-server run build
 sudo systemctl daemon-reload
 sudo systemctl enable vndrly-api 2>/dev/null || true

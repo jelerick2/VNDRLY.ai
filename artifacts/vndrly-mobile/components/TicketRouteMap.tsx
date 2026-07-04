@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 
 import { useColors } from "@/hooks/useColors";
+import { getLeafletTileLayerConfig } from "@/lib/maps";
 
 export type RoutePoint = {
   id?: number | string;
@@ -108,9 +109,10 @@ function buildHtml(payload: string, labels: MapLabels, brandColor: string): stri
   var data = ${payload};
   var labels = ${labelsLiteral};
   var map = L.map('map', { zoomControl: true, attributionControl: true });
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap',
-    maxZoom: 19
+  L.tileLayer(data.tileLayer.url, {
+    attribution: data.tileLayer.attribution,
+    maxZoom: data.tileLayer.maxZoom || 22,
+    tileSize: data.tileLayer.tileSize || 256
   }).addTo(map);
 
   function pinIcon(color, label) {
@@ -297,6 +299,7 @@ export function TicketRouteMap({
       })),
       path,
       selectedTrackingId: selectedTrackingId ?? null,
+      tileLayer: getLeafletTileLayerConfig("satellite"),
     });
     return buildHtml(payload, {
       tracking: t("routeMap.popupTracking", { n: "{{n}}" }),

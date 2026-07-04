@@ -37,6 +37,7 @@ import {
   ticketScopeFilters,
 } from "./data-tools-helpers";
 import { LIVE_TRACKED_LIFECYCLE_STATES } from "@workspace/ticket-status-meta";
+import { estimateMapboxDrivingRoute } from "../lib/mapbox-routing";
 
 export const OPS_DATA_TOOL_NAMES = [
   "query_safety_events",
@@ -49,6 +50,7 @@ export const OPS_DATA_TOOL_NAMES = [
   "lookup_crew_member_status",
   "query_crew_eta",
   "query_crew_route_summary",
+  "estimate_driving_route",
   "query_hotlist_jobs",
   "query_hotlist_bids",
   "query_vendor_catalog",
@@ -576,6 +578,140 @@ async function queryCrewRouteSummary(args: Record<string, unknown>, session: Ses
   });
 }
 
+function parseCoordinate(raw: unknown): number | null {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+async function loadRouteDestination(args: Record<string, unknown>, session: SessionPayload) {
+  const scope = ticketScopeFilters(session);
+  if (scope === null) return { error: "No org scope on this session." } as const;
+
+  const ticketId = Number(args.ticketId);
+  if (Number.isFinite(ticketId) && ticketId > 0) {
+    const [ticket] = await db
+      .select({
+        ticketId: ticketsTable.id,
+        status: ticketsTable.status,
+        lifecycleState: ticketsTable.lifecycleState,
+        scheduledStartAt: ticketsTable.scheduledStartAt,
+        siteId: siteLocationsTable.id,
+        siteName: siteLocationsTable.name,
+        siteLatitude: siteLocationsTable.latitude,
+        siteLongitude: siteLocationsTable.longitude,
+      })
+      .from(ticketsTable)
+      .innerJoin(siteLocationsTable, eq(ticketsTable.siteLocationId, siteLocationsTable.id))
+      .where(and(eq(ticketsTable.id, Math.floor(ticketId)), ...(scope as Parameters<typeof and>)))
+      .limit(1);
+    if (!ticket) return { error: `Ticket ${Math.floor(ticketId)} not visible to your account.` } as const;
+    return { destination: ticket, basis: "ticket" as const };
+  }
+
+  const siteId = Number(args.siteId);
+  if (Number.isFinite(siteId) && siteId > 0) {
+    const filters = [eq(siteLocationsTable.id, Math.floor(siteId)), eq(siteLocationsTable.hidden, false)];
+    if (session.role === "partner" && session.partnerId) {
+      filters.push(eq(siteLocationsTable.partnerId, session.partnerId));
+    } else if (session.role === "vendor" && session.vendorId) {
+      filters.push(sql`${siteLocationsTable.id} IN (
+        SELECT site_location_id FROM site_work_assignments WHERE vendor_id = ${session.vendorId}
+      )`);
+    } else if (session.role === "field_employee" && session.vendorPeopleId) {
+      filters.push(sql`EXISTS (
+        SELECT 1
+        FROM tickets t
+        LEFT JOIN ticket_crew tc ON tc.ticket_id = t.id AND tc.removed_at IS NULL
+        WHERE t.site_location_id = ${siteLocationsTable.id}
+          AND (t.field_employee_id = ${session.vendorPeopleId} OR tc.employee_id = ${session.vendorPeopleId})
+      )`);
+    } else if (session.role !== "admin") {
+      return { error: "No site scope on this session." } as const;
+    }
+    const [site] = await db
+      .select({
+        ticketId: sql<number | null>`null`,
+        status: sql<string | null>`null`,
+        lifecycleState: sql<string | null>`null`,
+        scheduledStartAt: sql<Date | null>`null`,
+        siteId: siteLocationsTable.id,
+        siteName: siteLocationsTable.name,
+        siteLatitude: siteLocationsTable.latitude,
+        siteLongitude: siteLocationsTable.longitude,
+      })
+      .from(siteLocationsTable)
+      .where(and(...(filters as Parameters<typeof and>)))
+      .limit(1);
+    if (!site) return { error: `Site ${Math.floor(siteId)} not visible to your account.` } as const;
+    return { destination: site, basis: "site" as const };
+  }
+
+  if (session.role !== "field_employee" || !session.vendorPeopleId) {
+    return { error: "ticketId or siteId is required." } as const;
+  }
+
+  const [nextTicket] = await db
+    .select({
+      ticketId: ticketsTable.id,
+      status: ticketsTable.status,
+      lifecycleState: ticketsTable.lifecycleState,
+      scheduledStartAt: ticketsTable.scheduledStartAt,
+      siteId: siteLocationsTable.id,
+      siteName: siteLocationsTable.name,
+      siteLatitude: siteLocationsTable.latitude,
+      siteLongitude: siteLocationsTable.longitude,
+    })
+    .from(ticketsTable)
+    .innerJoin(siteLocationsTable, eq(ticketsTable.siteLocationId, siteLocationsTable.id))
+    .where(and(
+      ...(scope as Parameters<typeof and>),
+      sql`${ticketsTable.status} NOT IN ('cancelled','funds_dispersed','denied','completed','closed')`,
+    ))
+    .orderBy(sql`${ticketsTable.scheduledStartAt} NULLS LAST`, desc(ticketsTable.updatedAt))
+    .limit(1);
+  if (!nextTicket) return { error: "No upcoming assigned ticket found in your scope." } as const;
+  return { destination: nextTicket, basis: "next_ticket" as const };
+}
+
+async function estimateDrivingRoute(args: Record<string, unknown>, session: SessionPayload) {
+  const currentLatitude = parseCoordinate(args.currentLatitude);
+  const currentLongitude = parseCoordinate(args.currentLongitude);
+  if (currentLatitude == null || currentLongitude == null) {
+    return err("currentLatitude and currentLongitude are required.");
+  }
+  const loaded = await loadRouteDestination(args, session);
+  if ("error" in loaded) return JSON.stringify(loaded);
+
+  const route = await estimateMapboxDrivingRoute({
+    origin: { latitude: currentLatitude, longitude: currentLongitude },
+    destination: {
+      latitude: loaded.destination.siteLatitude,
+      longitude: loaded.destination.siteLongitude,
+    },
+  });
+  if (!route.ok) {
+    return JSON.stringify({
+      ok: false,
+      error: route.message,
+      errorCode: route.errorCode,
+      destination: loaded.destination,
+      basis: loaded.basis,
+    });
+  }
+
+  return JSON.stringify({
+    ok: true,
+    basis: loaded.basis,
+    origin: {
+      latitude: currentLatitude,
+      longitude: currentLongitude,
+      source: "mobile_device",
+    },
+    destination: loaded.destination,
+    route,
+  });
+}
+
 async function queryHotlistJobs(args: Record<string, unknown>, session: SessionPayload) {
   const blocked = blockFieldEmployee(session, "query_hotlist_jobs");
   if (blocked) return blocked;
@@ -883,6 +1019,8 @@ export async function runOpsDataTool(
       return queryCrewEta(args, session);
     case "query_crew_route_summary":
       return queryCrewRouteSummary(args, session);
+    case "estimate_driving_route":
+      return estimateDrivingRoute(args, session);
     case "query_hotlist_jobs":
       return queryHotlistJobs(args, session);
     case "query_hotlist_bids":

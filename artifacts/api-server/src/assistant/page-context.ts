@@ -2,7 +2,44 @@
 export type AssistantPageContext = {
   path: string;
   entityId?: number | null;
+  currentLocation?: {
+    latitude: number;
+    longitude: number;
+    accuracyMeters?: number | null;
+    capturedAt?: string | null;
+    source: "mobile_device";
+  };
 };
+
+function parseCurrentLocation(raw: unknown): AssistantPageContext["currentLocation"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const latitude = (raw as { latitude?: unknown }).latitude;
+  const longitude = (raw as { longitude?: unknown }).longitude;
+  if (
+    typeof latitude !== "number" ||
+    typeof longitude !== "number" ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return undefined;
+  }
+  const accuracyRaw = (raw as { accuracyMeters?: unknown }).accuracyMeters;
+  const capturedAtRaw = (raw as { capturedAt?: unknown }).capturedAt;
+  return {
+    latitude,
+    longitude,
+    accuracyMeters:
+      typeof accuracyRaw === "number" && Number.isFinite(accuracyRaw)
+        ? accuracyRaw
+        : null,
+    capturedAt: typeof capturedAtRaw === "string" ? capturedAtRaw : null,
+    source: "mobile_device",
+  };
+}
 
 /** Parse optional pageContext from the assistant chat POST body. */
 export function parsePageContext(
@@ -18,5 +55,10 @@ export function parsePageContext(
     typeof entityIdRaw === "number" && Number.isFinite(entityIdRaw)
       ? Math.floor(entityIdRaw)
       : undefined;
-  return entityId != null ? { path, entityId } : { path };
+  const currentLocation = parseCurrentLocation((raw as { currentLocation?: unknown }).currentLocation);
+  return {
+    path,
+    ...(entityId != null ? { entityId } : {}),
+    ...(currentLocation ? { currentLocation } : {}),
+  };
 }

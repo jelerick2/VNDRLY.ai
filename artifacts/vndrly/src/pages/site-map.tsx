@@ -39,6 +39,7 @@ import {
 } from "@workspace/api-client-react";
 import { visitsApi, type VisitorRow } from "@/lib/visits-api";
 import { BrandZoomControl } from "@/components/brand-zoom-control";
+import { getLeafletTileLayerConfig } from "@/lib/maps";
 
 const LOW_BATTERY_THRESHOLD = 0.2;
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -280,6 +281,7 @@ export default function SiteMapPage() {
   // overlay (rendered as a sibling of MapContainer) can call
   // zoomIn() / zoomOut() on the underlying L.Map instance.
   const mapRef = useRef<L.Map | null>(null);
+  const tileConfig = useMemo(() => getLeafletTileLayerConfig("satellite"), []);
 
   // Auto-select the first site as soon as the list resolves so the user
   // lands on a usable map without an extra click.
@@ -619,9 +621,10 @@ export default function SiteMapPage() {
                   >
                     <RecenterMap center={mapCenter} zoom={viewMode === "all" ? 8 : 15} />
                     <TileLayer
-                      attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
-                      url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                      maxZoom={19}
+                      attribution={tileConfig.attribution}
+                      url={tileConfig.url}
+                      maxZoom={tileConfig.maxZoom}
+                      tileSize={tileConfig.tileSize}
                     />
                     <GeofenceCirclesLayer
                       sites={geofenceSites}

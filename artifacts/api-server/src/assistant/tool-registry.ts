@@ -81,6 +81,7 @@ const TOOL_METADATA: Record<string, Partial<ToolMetadata>> = {
   lookup_crew_member_status: { roles: OFFICE_ROLES, auditTarget: "crew" },
   query_crew_eta: { roles: OFFICE_ROLES, auditTarget: "crew" },
   query_crew_route_summary: { roles: OFFICE_ROLES, auditTarget: "crew" },
+  estimate_driving_route: { auditTarget: "ticket" },
   query_hotlist_jobs: { roles: OFFICE_ROLES, auditTarget: "hotlist" },
   query_hotlist_bids: { roles: ["admin", "vendor"], auditTarget: "hotlist" },
   query_vendor_catalog: { roles: OFFICE_ROLES },

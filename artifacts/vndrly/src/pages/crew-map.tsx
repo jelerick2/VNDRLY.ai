@@ -25,6 +25,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { RecentTripsCard } from "@/components/map/recent-trips-card";
 import { MapComplianceIssuesCard } from "@/components/map/map-compliance-issues-card";
+import { getLeafletTileLayerConfig } from "@/lib/maps";
 
 const LOW_BATTERY_THRESHOLD = 0.2;
 
@@ -270,6 +271,7 @@ export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps
   const { t } = useTranslation();
   const { user } = useAuth();
   const brand = useBrand();
+  const tileConfig = useMemo(() => getLeafletTileLayerConfig("street"), []);
   const iconStyle = { color: brand.isOrgBranded ? brand.primary : "#f59e0b" };
   const [locations, setLocations] = useState<LiveLocation[]>([]);
   const [visitors, setVisitors] = useState<VisitorRow[]>([]);
@@ -1018,8 +1020,10 @@ export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps
                 <MapContainer center={center} zoom={locations.length + visitors.length > 0 ? 8 : 4} zoomControl={false} style={{ height: "100%", width: "100%" }}>
                   <BrandZoomControlInMap />
                   <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution={tileConfig.attribution}
+                    url={tileConfig.url}
+                    maxZoom={tileConfig.maxZoom}
+                    tileSize={tileConfig.tileSize}
                   />
                   {showGeofences && geofenceSites.length > 0 && (
                     <GeofenceCirclesLayer

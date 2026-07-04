@@ -514,6 +514,22 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "estimate_driving_route",
+    description:
+      "Estimate driving miles and ETA from the mobile user's current location to a visible ticket or site location using Mapbox. Use for mobile ticket/map questions like 'how many miles to my next ticket', 'how long to ticket #10959', or 'am I close enough to check in'. Requires currentLatitude/currentLongitude from the mobile location context plus ticketId or siteId; if ticketId/siteId is omitted, field employees get their next assigned scheduled/open ticket when one is visible.",
+    input_schema: {
+      type: "object",
+      properties: {
+        currentLatitude: { type: "number", description: "Current mobile device latitude from CURRENT MOBILE LOCATION." },
+        currentLongitude: { type: "number", description: "Current mobile device longitude from CURRENT MOBILE LOCATION." },
+        ticketId: { type: "number", description: "Ticket number/id, e.g. 10959. Optional when asking for next assigned ticket." },
+        siteId: { type: "number", description: "Site location id when routing directly to a site." },
+      },
+      required: ["currentLatitude", "currentLongitude"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "query_hotlist_jobs",
     description: "Open hotlist marketplace jobs visible to the caller.",
     input_schema: {

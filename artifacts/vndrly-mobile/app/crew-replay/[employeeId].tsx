@@ -15,6 +15,7 @@ import InPageHeader from "@/components/InPageHeader";
 import { useColors } from "@/hooks/useColors";
 import { apiFetch } from "@/lib/api";
 import { translateApiError } from "@/lib/apiErrors";
+import { getLeafletTileLayerConfig } from "@/lib/maps";
 
 type Ping = {
   id: number;
@@ -25,7 +26,11 @@ type Ping = {
 
 function buildReplayHtml(pings: Ping[], scrubIndex: number): string {
   const visible = pings.slice(0, scrubIndex + 1);
-  const payload = JSON.stringify({ visible, all: pings });
+  const payload = JSON.stringify({
+    visible,
+    all: pings,
+    tileLayer: getLeafletTileLayerConfig("satellite"),
+  });
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -34,7 +39,11 @@ function buildReplayHtml(pings: Ping[], scrubIndex: number): string {
 <script>
 var data = ${payload};
 var map = L.map('map');
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+L.tileLayer(data.tileLayer.url, {
+  attribution: data.tileLayer.attribution,
+  maxZoom: data.tileLayer.maxZoom || 22,
+  tileSize: data.tileLayer.tileSize || 256
+}).addTo(map);
 var latlngs = data.all.map(function(p){ return [p.latitude, p.longitude]; });
 if (latlngs.length > 1) L.polyline(latlngs, { color: '#2563eb', weight: 3, opacity: 0.35 }).addTo(map);
 data.visible.forEach(function(p, i) {

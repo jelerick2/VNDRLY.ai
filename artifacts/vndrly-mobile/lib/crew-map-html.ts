@@ -1,3 +1,5 @@
+import { getLeafletTileLayerConfig } from "@/lib/maps";
+
 export type CrewMapLocation = {
   employeeId: number;
   employeeName: string;
@@ -36,6 +38,7 @@ export function buildCrewMapHtml(
     sites,
     brandColor,
     apiBase,
+    tileLayer: getLeafletTileLayerConfig("satellite"),
     enableLiveEvents: options?.enableLiveEvents !== false,
   });
   return `<!DOCTYPE html>
@@ -55,7 +58,11 @@ export function buildCrewMapHtml(
 <script>
   var cfg = ${payload};
   var map = L.map('map', { zoomControl: true });
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+  L.tileLayer(cfg.tileLayer.url, {
+    attribution: cfg.tileLayer.attribution,
+    maxZoom: cfg.tileLayer.maxZoom || 22,
+    tileSize: cfg.tileLayer.tileSize || 256
+  }).addTo(map);
   var bounds = [];
   (cfg.sites || []).forEach(function(site) {
     if (typeof site.latitude !== 'number' || typeof site.longitude !== 'number') return;

@@ -4,10 +4,38 @@ $script:RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $script:MobileRoot = Join-Path $script:RepoRoot "artifacts\vndrly-mobile"
 $script:EasCli = Join-Path $script:MobileRoot "node_modules\.bin\eas.cmd"
 
+function Import-RepoEnvLocal {
+  $envPath = Join-Path $script:RepoRoot ".env.local"
+  if (-not (Test-Path $envPath)) {
+    return
+  }
+
+  Get-Content -LiteralPath $envPath | ForEach-Object {
+    $line = $_.Trim()
+    if (-not $line -or $line.StartsWith("#") -or -not $line.Contains("=")) {
+      return
+    }
+
+    $idx = $line.IndexOf("=")
+    $key = $line.Substring(0, $idx).Trim()
+    $value = $line.Substring($idx + 1).Trim()
+    if ($key -and -not [Environment]::GetEnvironmentVariable($key, "Process")) {
+      [Environment]::SetEnvironmentVariable($key, $value, "Process")
+    }
+  }
+}
+
 function Initialize-EasEnvironment {
   $env:Path = "C:\Program Files\nodejs;$env:APPDATA\npm;" + $env:Path
   Remove-Item Env:NODE_OPTIONS -ErrorAction SilentlyContinue
   $env:EAS_BUILD_NO_EXPO_GO_WARNING = "true"
+  Import-RepoEnvLocal
+  if (-not $env:EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN -and $env:MAPBOX_ACCESS_TOKEN) {
+    $env:EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN = $env:MAPBOX_ACCESS_TOKEN
+  }
+  if (-not $env:EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN -and $env:MAPBOX_API_KEY) {
+    $env:EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN = $env:MAPBOX_API_KEY
+  }
 }
 
 function Assert-EasCli {

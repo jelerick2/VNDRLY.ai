@@ -9,6 +9,7 @@ import SplitToggleHalf from "@/components/split-toggle-half";
 import { pickTogglePillSrc, TOGGLE_IDLE_PILL_SRC } from "@/lib/pick-toggle-pill";
 import { BrandZoomControlInMap } from "@/components/brand-zoom-control";
 import { LONG_DWELL_MS as DEFAULT_LONG_DWELL_MS, deriveLongStops, formatDwell } from "@/lib/stops";
+import { getLeafletTileLayerConfig } from "@/lib/maps";
 
 export type RoutePoint = {
   id?: number | string;
@@ -328,19 +329,7 @@ export function TicketRouteMap({
   }
 
   const center = allPoints[0];
-  const tileConfig = view === "satellite"
-    ? {
-        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        attribution:
-          "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
-        maxZoom: 19,
-      }
-    : {
-        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      };
+  const tileConfig = getLeafletTileLayerConfig(view === "satellite" ? "satellite" : "street");
 
   const activePillSrc = pickTogglePillSrc(brand.primary, brand.name);
 
@@ -391,6 +380,7 @@ export function TicketRouteMap({
           attribution={tileConfig.attribution}
           url={tileConfig.url}
           maxZoom={tileConfig.maxZoom}
+          tileSize={tileConfig.tileSize}
         />
         <FitBounds points={allPoints} enabled={selectedPoint == null} />
         <PanTo point={selectedPoint} />

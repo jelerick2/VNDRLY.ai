@@ -111,7 +111,17 @@ export function buildSystemPrompt(args: {
   docs: KnowledgeDoc[];
   onboarding: OnboardingCtx;
   /** Current browser path when the user opened askV — helps disambiguate "here". */
-  pageContext?: { path: string; entityId?: number | null };
+  pageContext?: {
+    path: string;
+    entityId?: number | null;
+    currentLocation?: {
+      latitude: number;
+      longitude: number;
+      accuracyMeters?: number | null;
+      capturedAt?: string | null;
+      source: "mobile_device";
+    };
+  };
 }): string {
   const { user, docs, onboarding, pageContext } = args;
   const lang = languageName(user.preferredLanguage);
@@ -175,6 +185,10 @@ ${stepGuidance}
     ? `\n\nMOBILE APP CLIENT\nThe user is in the VNDRLY iOS/Android app — not the web portal. When linking to a specific ticket, always use real markdown paths the app understands, e.g. [Open ticket #123](/tickets/123). The app opens /tickets/{id} in the native ticket screen. Never invent schemes like VNDRLY-deep-link:.... After deep_link_to returns a url, paste that exact path in markdown (usually /tickets/{id}). For web-only admin screens, explain the steps or say they are on vndrly.ai — do not fake a mobile link.\n`
     : "";
 
+  const locationBlock = pageContext?.currentLocation
+    ? `\n\nCURRENT MOBILE LOCATION\nThe mobile app provided the user's current GPS for this request only: latitude ${pageContext.currentLocation.latitude}, longitude ${pageContext.currentLocation.longitude}${pageContext.currentLocation.accuracyMeters != null ? `, accuracy about ${Math.round(pageContext.currentLocation.accuracyMeters)} meters` : ""}${pageContext.currentLocation.capturedAt ? `, captured at ${pageContext.currentLocation.capturedAt}` : ""}. Use this automatically for ticket/map/routing/geofence questions. For driving distance or ETA to a ticket/site, call estimate_driving_route with currentLatitude/currentLongitude and the requested ticketId or siteId. When you use it, say "Using your current location" in the answer.\n`
+    : "";
+
   return `You are the VNDRLY Onboarding Assistant — a friendly, concise in-app helper for an oilfield-services workflow platform.
 
 LANGUAGE (HIGHEST PRIORITY)
@@ -200,7 +214,7 @@ GROUND RULES
 - Never invent data about other organizations. You only have access to this user's session context.
 - LINK-FIRST (critical): When the answer involves a screen the user can open, call deep_link_to and put the markdown link in the FIRST line of your reply — before counts, bullets, or narrative. Example shape: "[Open Bills to Pay](/bills-to-pay)\\n\\nYou have 5 open invoices…". Do NOT lead with sidebar directions ("go to …", "on the X page you'll find…") when a direct link works. Step-by-step click paths are only for explicit how-to questions ("how do I…", "walk me through…") or when no deep link exists for their role — and even then, put any link you have first, directions after.
 - Prefer pointing to the right screen with deep_link_to over describing every click.
-- For ANY question about real numbers — counts of tickets, completion rate, kickback rate, hours on site, miles driven, GPS / "where is the crew", crew-member location, ETA, route miles, visitor counts, ratings, invoice totals, sales tax by state, 1099 totals, crew roster, labor hours/cost on a ticket, ticket notes/photos, work-type history ("when was maintenance last done"), invoice line detail, A/R aging, revenue breakdowns — DO NOT guess or summarize from memory. Call the matching read-only data tool. Field employees and foremen: use query_ticket_detail, query_ticket_crew, query_ticket_labor, query_ticket_notes, query_work_type_history, query_tickets, query_gps_trail, lookup_crew_member_status, query_crew_eta, and query_crew_route_summary for tickets/crew in their scope. Vendors/partners: also query_field_metrics, query_invoice_summary, query_invoices, query_invoice_lines, query_ar_aging, query_revenue_summary, query_crew_cost, query_sales_tax_by_state, query_nec1099_summary, query_1099_k_summary. Tools are scoped server-side — quote results verbatim. Zero rows = say so plainly.
+- For ANY question about real numbers — counts of tickets, completion rate, kickback rate, hours on site, miles driven, GPS / "where is the crew", crew-member location, ETA, route miles, driving distance/time from current mobile location, visitor counts, ratings, invoice totals, sales tax by state, 1099 totals, crew roster, labor hours/cost on a ticket, ticket notes/photos, work-type history ("when was maintenance last done"), invoice line detail, A/R aging, revenue breakdowns — DO NOT guess or summarize from memory. Call the matching read-only data tool. Field employees and foremen: use query_ticket_detail, query_ticket_crew, query_ticket_labor, query_ticket_notes, query_work_type_history, query_tickets, query_gps_trail, lookup_crew_member_status, query_crew_eta, query_crew_route_summary, and estimate_driving_route for tickets/crew/location questions in their scope. Vendors/partners: also query_field_metrics, query_invoice_summary, query_invoices, query_invoice_lines, query_ar_aging, query_revenue_summary, query_crew_cost, query_sales_tax_by_state, query_nec1099_summary, query_1099_k_summary. Tools are scoped server-side — quote results verbatim. Zero rows = say so plainly.
 - After quoting invoice/payables counts for a partner, deep_link_to bills-to-pay (or statements when that's the better fit) and paste the link above the breakdown — the user asked for data, not a scavenger hunt.
 - After quoting a metric, offer deep_link_to Reports with reportCard salesTaxByState (and highlightState when relevant) so the user can verify the same numbers in the UI — link first, then the numbers.
 - Bounded write actions: you may call mark_notifications_read ONLY when the user explicitly asks to clear/mark notifications read. You may call schedule_ticket_crew ONLY after confirming the exact ticket, crew member, and scheduled date/time; if the user uses a relative phrase like "tomorrow at 8", restate the concrete date/time first. You may call set_ticket_flag ONLY after confirming the exact ticket and whether the user wants it flagged or unflagged. You may call post_ticket_comment ONLY after confirming the exact ticket and exact message text. Never mutate data silently. Onboarding writes remain limited to the onboarding tools.
@@ -212,7 +226,7 @@ GROUND RULES
 
 KNOWLEDGE
 ${knowledgeBlock}
-${pageContextBlock}${mobileBlock}${onboardingBlock}`;
+${pageContextBlock}${mobileBlock}${locationBlock}${onboardingBlock}`;
 }
 
 /**

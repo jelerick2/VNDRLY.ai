@@ -13,6 +13,7 @@ import ImagePill from "@/components/image-pill";
 import { ClipboardList, Clock, MapPin } from "lucide-react";
 import SphereBackButton from "@/components/sphere-back-button";
 import { useBrand } from "@/hooks/use-brand";
+import { getLeafletTileLayerConfig } from "@/lib/maps";
 
 function fmt(ts: string | null) {
   if (!ts) return "—";
@@ -38,6 +39,7 @@ function pinIcon(color: string) {
 export default function VisitDetailPage({ id }: { id: string }) {
   const { t } = useTranslation();
   const brand = useBrand();
+  const tileConfig = getLeafletTileLayerConfig("street");
   const visitId = parseInt(id, 10);
   // Task #710 — visit detail is gated by `visits.rate_limited` on the
   // server. There's no poll to suspend, but we still want to (a) avoid
@@ -190,8 +192,10 @@ export default function VisitDetailPage({ id }: { id: string }) {
                 >
                   <BrandZoomControlInMap />
                   <TileLayer
-                    attribution={t("visitor.mapAttribution")}
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution={tileConfig.attribution}
+                    url={tileConfig.url}
+                    maxZoom={tileConfig.maxZoom}
+                    tileSize={tileConfig.tileSize}
                   />
                   <Marker
                     position={[data.checkInLatitude as number, data.checkInLongitude as number]}

@@ -6,6 +6,12 @@ import {
   readAssistantErrorMessage,
   readAssistantStreamResponse,
 } from "@/lib/assistant-sse";
+import * as Location from "expo-location";
+import {
+  buildAskVLocationContext,
+  shouldAttachAskVLocation,
+  type AskVLocationContext,
+} from "@/lib/assistant-location-context";
 
 export type AssistantFeedbackRating = "helpful" | "unhelpful";
 
@@ -54,6 +60,22 @@ async function assistantFetch(
   }
   if (token) headers.set("authorization", `Bearer ${token}`);
   return fetch(`${getApiBase()}${path}`, { ...init, headers });
+}
+
+async function readAskVCurrentLocationForMessage(
+  message: string,
+): Promise<AskVLocationContext | null> {
+  if (!shouldAttachAskVLocation(message)) return null;
+  try {
+    const permission = await Location.getForegroundPermissionsAsync();
+    if (permission.status !== "granted") return null;
+    const loc = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    return buildAskVLocationContext(loc);
+  } catch {
+    return null;
+  }
 }
 
 export interface UseAssistantOptions {
@@ -177,16 +199,21 @@ export function useAssistant(opts: UseAssistantOptions = {}) {
 
       try {
         const postChat = (convId: number | null) =>
-          assistantFetch("/api/assistant/chat", {
-            method: "POST",
-            headers: { accept: "text/event-stream" },
-            body: JSON.stringify({
-              message: trimmed,
-              ...(convId !== null ? { conversationId: convId } : {}),
-              pageContext: { path: "/mobile/askv" },
+          readAskVCurrentLocationForMessage(trimmed).then((currentLocation) =>
+            assistantFetch("/api/assistant/chat", {
+              method: "POST",
+              headers: { accept: "text/event-stream" },
+              body: JSON.stringify({
+                message: trimmed,
+                ...(convId !== null ? { conversationId: convId } : {}),
+                pageContext: {
+                  path: "/mobile/askv",
+                  ...(currentLocation ? { currentLocation } : {}),
+                },
+              }),
+              signal: ac.signal,
             }),
-            signal: ac.signal,
-          });
+          );
 
         let res = await postChat(conversationIdRef.current);
         if (res.status === 404 && conversationIdRef.current !== null) {

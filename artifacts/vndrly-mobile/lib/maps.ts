@@ -2,6 +2,7 @@ import { Linking, Platform } from "react-native";
 
 export const MAP_TILE_SIZE = 256;
 export const MAP_TILE_ZOOM = 15;
+export type MapboxMapStyle = "satellite" | "street";
 
 export type TileCoords = {
   url: string;
@@ -9,11 +10,32 @@ export type TileCoords = {
   offsetY: number;
 };
 
-export function getOsmTile(
-  latitude: number,
-  longitude: number,
-  zoom: number = MAP_TILE_ZOOM,
-): TileCoords {
+export type LeafletTileLayerConfig = {
+  provider: "mapbox" | "fallback";
+  url: string;
+  attribution: string;
+  maxZoom: number;
+  tileSize?: number;
+};
+
+const MAPBOX_STYLES: Record<MapboxMapStyle, string> = {
+  satellite: "satellite-streets-v12",
+  street: "streets-v12",
+};
+
+export const MAPBOX_ATTRIBUTION =
+  '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+
+function readMapboxAccessToken(): string {
+  return (
+    process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN ||
+    process.env.EXPO_PUBLIC_MAPBOX_API_KEY ||
+    process.env.MAPBOX_ACCESS_TOKEN ||
+    ""
+  ).trim();
+}
+
+function tilePosition(latitude: number, longitude: number, zoom: number) {
   const MAX_LAT = 85.05112878;
   const clampedLat = Math.max(-MAX_LAT, Math.min(MAX_LAT, latitude));
   const normalizedLng = ((((longitude + 180) % 360) + 360) % 360) - 180;
@@ -26,6 +48,68 @@ export function getOsmTile(
   const yTile = Math.floor(yFloat);
   const offsetX = (xFloat - xTile) * MAP_TILE_SIZE;
   const offsetY = (yFloat - yTile) * MAP_TILE_SIZE;
+  return { xTile, yTile, offsetX, offsetY };
+}
+
+export function getMapboxStyleTileUrl(style: MapboxMapStyle = "satellite"): string {
+  const token = readMapboxAccessToken();
+  return `https://api.mapbox.com/styles/v1/mapbox/${MAPBOX_STYLES[style]}/tiles/256/{z}/{x}/{y}@2x?access_token=${encodeURIComponent(token)}`;
+}
+
+export function getLeafletTileLayerConfig(
+  style: MapboxMapStyle = "satellite",
+): LeafletTileLayerConfig {
+  const token = readMapboxAccessToken();
+  if (token) {
+    return {
+      provider: "mapbox",
+      url: getMapboxStyleTileUrl(style),
+      attribution: MAPBOX_ATTRIBUTION,
+      maxZoom: 22,
+      tileSize: 256,
+    };
+  }
+  return style === "satellite"
+    ? {
+        provider: "fallback",
+        url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        attribution:
+          "Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community",
+        maxZoom: 19,
+      }
+    : {
+        provider: "fallback",
+        url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      };
+}
+
+export function getMapboxStaticTile(
+  latitude: number,
+  longitude: number,
+  zoom: number = MAP_TILE_ZOOM,
+  style: MapboxMapStyle = "satellite",
+): TileCoords {
+  const { xTile, yTile, offsetX, offsetY } = tilePosition(latitude, longitude, zoom);
+  return {
+    url: getMapboxStyleTileUrl(style)
+      .replace("{z}", String(zoom))
+      .replace("{x}", String(xTile))
+      .replace("{y}", String(yTile)),
+    offsetX,
+    offsetY,
+  };
+}
+
+export function getOsmTile(
+  latitude: number,
+  longitude: number,
+  zoom: number = MAP_TILE_ZOOM,
+): TileCoords {
+  if (readMapboxAccessToken()) return getMapboxStaticTile(latitude, longitude, zoom);
+  const { xTile, yTile, offsetX, offsetY } = tilePosition(latitude, longitude, zoom);
   return {
     url: `https://tile.openstreetmap.org/${zoom}/${xTile}/${yTile}.png`,
     offsetX,
