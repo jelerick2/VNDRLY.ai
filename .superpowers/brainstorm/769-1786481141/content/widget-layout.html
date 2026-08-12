@@ -1,0 +1,75 @@
+<style>
+  .layout-grid { display:grid; grid-template-columns:repeat(3,minmax(230px,1fr)); gap:20px; margin-top:24px; }
+  .layout-card { cursor:pointer; border:2px solid transparent; border-radius:18px; padding:14px; background:#171b23; transition:.18s ease; }
+  .layout-card:hover { transform:translateY(-3px); border-color:#596476; }
+  .layout-card.selected { border-color:#5bbcff; box-shadow:0 0 0 3px rgba(91,188,255,.18); }
+  .desktop { min-height:430px; border-radius:13px; padding:18px; background:linear-gradient(145deg,#7bb4d0 0%,#59a8dd 38%,#5167bb 100%); display:flex; align-items:flex-start; justify-content:flex-end; overflow:hidden; }
+  .widget { color:white; text-shadow:0 1px 4px rgba(0,0,0,.35); font-family:"Segoe UI",sans-serif; }
+  .glass { background:rgba(17,25,38,.48); border:1px solid rgba(255,255,255,.18); box-shadow:0 12px 38px rgba(0,0,0,.22); backdrop-filter:blur(15px); }
+  .clock-face { width:112px; height:112px; border:2px solid rgba(255,255,255,.68); border-radius:50%; margin:auto; position:relative; }
+  .clock-face:before { content:""; position:absolute; width:2px; height:35px; background:#fff; left:54px; top:21px; transform:rotate(78deg); transform-origin:bottom; }
+  .clock-face:after { content:""; position:absolute; width:2px; height:43px; background:#ffb13b; left:54px; top:13px; transform:rotate(300deg); transform-origin:bottom; }
+  .dot { width:8px; height:8px; border-radius:50%; background:white; position:absolute; left:51px; top:52px; }
+  .temp { font-size:42px; font-weight:300; line-height:1; }
+  .condition { font-size:15px; opacity:.82; }
+  .actions { display:flex; gap:8px; margin-top:12px; }
+  .action { font-size:12px; padding:7px 9px; border-radius:999px; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.13); }
+  .alert { margin-top:10px; padding:8px 10px; background:rgba(198,39,39,.82); border-radius:9px; font-size:11px; font-weight:650; }
+  .caption { margin-top:13px; }
+  .caption h3 { margin:0 0 5px; color:#fff; }
+  .caption p { margin:0; color:#aeb7c5; font-size:13px; line-height:1.4; }
+  .layout-a .widget { width:185px; text-align:center; }
+  .layout-a .weather { margin-top:17px; }
+  .layout-b .widget { width:205px; border-radius:18px; padding:15px; }
+  .layout-b .time { font-size:36px; font-weight:300; letter-spacing:-1px; }
+  .layout-b .weather-row { display:flex; justify-content:space-between; align-items:flex-end; margin-top:16px; padding-top:14px; border-top:1px solid rgba(255,255,255,.18); }
+  .layout-b .mini { font-size:12px; opacity:.78; }
+  .layout-c .widget { width:228px; }
+  .layout-c .module { border-radius:15px; padding:13px; margin-bottom:10px; }
+  .layout-c .top { display:flex; align-items:center; gap:12px; }
+  .layout-c .small-face { width:65px; height:65px; transform:scale(.86); margin:-4px; }
+  .layout-c .digital { font-size:25px; }
+  @media (max-width:900px){.layout-grid{grid-template-columns:1fr}.desktop{min-height:330px}}
+</style>
+
+<h2>Which desktop-widget layout feels right?</h2>
+<p class="subtitle">All three sit behind normal windows and combine clock, alarms, timers, weather, and NWS warnings. Select the arrangement you want to refine.</p>
+
+<div class="layout-grid">
+  <div class="layout-card layout-a" data-choice="a" onclick="toggleSelect(this)">
+    <div class="desktop">
+      <div class="widget">
+        <div class="clock-face"><div class="dot"></div></div>
+        <div style="font-size:18px;margin-top:8px">3:17 PM</div>
+        <div style="font-size:12px;opacity:.75">Tuesday, August 11</div>
+        <div class="weather"><div style="font-size:35px">⛅</div><div class="temp">99°</div><div class="condition">Fair · Windy</div></div>
+        <div class="actions"><span class="action">⏰ Alarm</span><span class="action">⏱ Timer</span></div>
+      </div>
+    </div>
+    <div class="caption"><h3>A · Open vertical</h3><p>Closest to your screenshot: information floats directly over the wallpaper with almost no container.</p></div>
+  </div>
+
+  <div class="layout-card layout-b" data-choice="b" onclick="toggleSelect(this)">
+    <div class="desktop">
+      <div class="widget glass">
+        <div class="time">3:17 <span style="font-size:15px">PM</span></div>
+        <div class="mini">TUE · AUG 11</div>
+        <div class="weather-row"><div><div style="font-size:36px">⛅</div><div class="condition">Fair · Windy</div></div><div class="temp">99°</div></div>
+        <div class="actions"><span class="action">⏰ 2 alarms</span><span class="action">⏱ 1 timer</span></div>
+        <div class="alert">⚠ Severe thunderstorm warning</div>
+      </div>
+    </div>
+    <div class="caption"><h3>B · Unified glass card</h3><p>The cleanest single-app identity. Weather warnings and controls remain readable over any wallpaper.</p></div>
+  </div>
+
+  <div class="layout-card layout-c" data-choice="c" onclick="toggleSelect(this)">
+    <div class="desktop">
+      <div class="widget">
+        <div class="module glass top"><div class="clock-face small-face"><div class="dot"></div></div><div><div class="digital">3:17 PM</div><div class="mini">Tue, Aug 11</div></div></div>
+        <div class="module glass" style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:30px">⛅</div><div class="condition">Fair · Windy</div></div><div class="temp">99°</div></div>
+        <div class="module glass"><div style="font-size:13px">⏰ Next alarm · 6:30 AM</div><div style="font-size:13px;margin-top:8px">⏱ Dinner · 18:42</div></div>
+      </div>
+    </div>
+    <div class="caption"><h3>C · Modular stack</h3><p>Separate draggable modules for clock, weather, and active alarms/timers, while still running as one app.</p></div>
+  </div>
+</div>

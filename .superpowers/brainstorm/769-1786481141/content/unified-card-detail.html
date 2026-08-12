@@ -1,0 +1,52 @@
+<style>
+  .stage{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:24px}
+  .desktop{min-height:590px;border-radius:18px;padding:28px;background:linear-gradient(145deg,#78b6d0,#559bd2 42%,#4659a4);display:flex;justify-content:center;align-items:flex-start}
+  .widget{width:295px;color:#fff;font-family:"Segoe UI",sans-serif;background:rgba(15,23,36,.48);border:1px solid rgba(255,255,255,.2);border-radius:24px;padding:19px;box-shadow:0 18px 50px rgba(0,0,0,.28);backdrop-filter:blur(18px)}
+  .topbar,.weather-row,.button-row,.forecast-row,.setting-row{display:flex;align-items:center;justify-content:space-between}
+  .iconbtn{width:29px;height:29px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);font-size:13px}
+  .digital{font-size:48px;font-weight:280;letter-spacing:-2px;margin-top:15px}.ampm{font-size:15px;letter-spacing:0}.date{font-size:13px;opacity:.72}
+  .divider{height:1px;background:rgba(255,255,255,.16);margin:17px 0}
+  .weather-icon{font-size:43px}.temp{font-size:46px;font-weight:280}.muted{font-size:12px;opacity:.72}.condition{font-size:16px;margin-top:3px}
+  .hourly{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:15px}.hour{text-align:center;background:rgba(255,255,255,.08);border-radius:11px;padding:8px 3px;font-size:11px}.hour div:nth-child(2){font-size:18px;margin:5px 0}
+  .pill{flex:1;text-align:center;background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:9px 6px;font-size:12px}.button-row{gap:8px;margin-top:16px}
+  .alert{margin-top:13px;border-radius:11px;padding:10px;background:rgba(188,38,38,.88);font-size:11px;font-weight:650;box-shadow:0 0 0 1px rgba(255,255,255,.15) inset}
+  .analog-face{width:145px;height:145px;border:2px solid rgba(255,255,255,.77);border-radius:50%;margin:13px auto 10px;position:relative;background:rgba(255,255,255,.035)}
+  .analog-face:before{content:"";position:absolute;width:3px;height:44px;background:#fff;left:71px;top:30px;transform:rotate(78deg);transform-origin:bottom;border-radius:3px}.analog-face:after{content:"";position:absolute;width:2px;height:55px;background:#ffad2f;left:71px;top:19px;transform:rotate(300deg);transform-origin:bottom}.center{position:absolute;width:9px;height:9px;border-radius:50%;background:#fff;left:68px;top:69px}.numeral{position:absolute;font-size:14px}.n12{top:6px;left:65px}.n3{right:8px;top:63px}.n6{bottom:5px;left:68px}.n9{left:8px;top:63px}
+  .settings{margin-top:18px;background:rgba(4,8,15,.35);border-radius:14px;padding:13px}.settings h4{margin:0 0 12px;font-size:13px}.setting-row{font-size:12px;margin-top:10px}.toggle{padding:5px 9px;background:rgba(92,189,255,.25);border:1px solid rgba(92,189,255,.5);border-radius:999px}.slider{width:112px;height:5px;background:rgba(255,255,255,.25);border-radius:4px;position:relative}.slider:after{content:"";width:13px;height:13px;border-radius:50%;background:#fff;position:absolute;left:58px;top:-4px}
+  .caption{margin-top:12px;color:#b7c0cd;font-size:13px;line-height:1.45}.caption strong{color:#fff}
+  @media(max-width:850px){.stage{grid-template-columns:1fr}.desktop{min-height:540px}}
+</style>
+
+<h2>Design section 2: Unified card interface</h2>
+<p class="subtitle">The same card can switch clock styles without changing the weather, alarm, or timer controls. Settings stay tucked behind the gear icon.</p>
+
+<div class="stage">
+  <div>
+    <div class="desktop">
+      <div class="widget">
+        <div class="topbar"><span class="date">TUE · AUG 11</span><span class="iconbtn">⚙</span></div>
+        <div class="digital">3:17 <span class="ampm">PM</span></div>
+        <div class="divider"></div>
+        <div class="weather-row"><div><div class="weather-icon">⛅</div><div class="condition">Fair · Windy</div><div class="muted">Feels like 101° · 19 mph</div></div><div style="text-align:right"><div class="temp">99°</div><span class="iconbtn" title="Switch to seven day forecast">▦</span></div></div>
+        <div class="hourly"><div class="hour">Now<div>⛅</div>99°</div><div class="hour">4 PM<div>☀</div>98°</div><div class="hour">5 PM<div>🌤</div>96°</div><div class="hour">6 PM<div>🌦</div>93°</div></div>
+        <div class="button-row"><div class="pill">⏰ Alarms</div><div class="pill">⏱ Timers</div></div>
+        <div class="alert">⚠ Severe thunderstorm warning<br><span style="font-weight:400;opacity:.85">Until 4:15 PM · Tap for details</span></div>
+      </div>
+    </div>
+    <p class="caption"><strong>Digital mode</strong> with default current conditions and compact hourly forecast. The grid icon switches this area to seven-day weather.</p>
+  </div>
+  <div>
+    <div class="desktop">
+      <div class="widget" style="background:rgba(15,23,36,.22)">
+        <div class="topbar"><span class="date">TUE · AUG 11</span><span class="iconbtn">⚙</span></div>
+        <div class="analog-face"><span class="numeral n12">12</span><span class="numeral n3">3</span><span class="numeral n6">6</span><span class="numeral n9">9</span><span class="center"></span></div>
+        <div style="text-align:center;font-size:13px;opacity:.72">3:17 PM</div>
+        <div class="divider"></div>
+        <div class="weather-row"><div><div class="weather-icon">⛅</div><div class="condition">Fair · Windy</div></div><div class="temp">99°</div></div>
+        <div class="button-row"><div class="pill">⏰ Alarms</div><div class="pill">⏱ Timers</div></div>
+        <div class="settings"><h4>Quick appearance</h4><div class="setting-row"><span>Clock style</span><span class="toggle">Analog</span></div><div class="setting-row"><span>Card transparency</span><span class="slider"></span></div><div class="setting-row"><span>Background blur</span><span class="toggle">On</span></div></div>
+      </div>
+    </div>
+    <p class="caption"><strong>Analog mode</strong> with the appearance panel open. Transparency can range from a solid card to fully clear; text retains a subtle shadow for readability.</p>
+  </div>
+</div>
