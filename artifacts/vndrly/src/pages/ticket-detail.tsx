@@ -47,6 +47,7 @@ import { CrewTimeSection } from "@/components/crew-time-section";
 import { TicketNudgePanel } from "@/components/ticket-nudge-panel";
 import { TicketFlagPanel } from "@/components/ticket-flag-panel";
 import { getGoogleMapsUrl } from "@/lib/maps";
+import { buildTicketProofPacket } from "@/lib/proof-packet";
 import { forwardRef, useState, useEffect, useMemo, useRef, useCallback, type ButtonHTMLAttributes } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -1325,6 +1326,10 @@ export default function TicketDetail({ id }: { id: number }) {
   const subtotal = taxPreview.subtotal;
   const taxAmount = taxPreview.taxAmount;
   const grandTotal = taxPreview.grandTotal;
+  const proofPacket = useMemo(
+    () => buildTicketProofPacket(ticket ?? {}, lineItems ?? []),
+    [ticket, lineItems],
+  );
   const combinedTaxRateValue = siteLocation?.combinedTaxRate
     ? parseFloat(String(siteLocation.combinedTaxRate))
     : siteLocation?.merchandiseTaxRate
@@ -1796,6 +1801,67 @@ export default function TicketDetail({ id }: { id: number }) {
 
         <TicketSiteVisitSummaryCard ticketId={id} />
       </div>
+
+      <Card data-testid="ticket-proof-packet-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5" style={{ color: "var(--brand-primary, #f59e0b)" }} />
+            {t("ticketDetail.proofPacketTitle", { defaultValue: "Proof-to-Pay Packet" })}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              {proofPacket.status === "complete"
+                ? t("ticketDetail.proofPacketComplete", {
+                  defaultValue: "Core evidence is captured for ticket review, invoice defense, and payment history.",
+                })
+                : t("ticketDetail.proofPacketNeedsAttention", {
+                  defaultValue: "Evidence is still missing before this ticket is fully defensible.",
+                })}
+            </p>
+            <span
+              className={cn(
+                "text-sm font-semibold",
+                proofPacket.status === "complete" ? "text-emerald-600" : "text-amber-600",
+              )}
+              data-testid="ticket-proof-packet-progress"
+            >
+              {proofPacket.completedCount} of {proofPacket.totalCount} complete
+            </span>
+          </div>
+          <div className="grid gap-2 md:grid-cols-5">
+            {proofPacket.sections.map((section) => (
+              <div
+                key={section.id}
+                className={cn(
+                  "rounded-md border p-3 text-sm",
+                  section.complete
+                    ? "border-emerald-200 bg-emerald-50/70"
+                    : "border-amber-200 bg-amber-50/70",
+                )}
+                data-testid={`ticket-proof-packet-section-${section.id}`}
+              >
+                <div className="flex items-center gap-2 font-semibold">
+                  {section.complete ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                  )}
+                  <span>{section.label}</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{section.detail}</p>
+              </div>
+            ))}
+          </div>
+          {proofPacket.missingEvidence.length > 0 && (
+            <p className="text-sm text-amber-700" data-testid="ticket-proof-packet-missing">
+              {t("ticketDetail.proofPacketMissing", { defaultValue: "Missing" })}:{" "}
+              {proofPacket.missingEvidence.join(", ")}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Task #497 â€” Read-only payment summary. Visible to both vendor and
           partner once funds have actually been dispersed. We anchor on

@@ -129,6 +129,7 @@ const { ticketState } = vi.hoisted(() => ({
     data: null as unknown,
     dataUpdatedAt: 1000,
     transitions: [] as Array<Record<string, unknown>>,
+    lineItems: [] as Array<Record<string, unknown>>,
   },
 }));
 
@@ -144,7 +145,7 @@ vi.mock("@workspace/api-client-react", () => ({
   useGetTicketNoteLogs: () => ({ data: [] }),
   useGetTicketUnlocks: () => ({ data: [] }),
   useGetTicketTransitions: () => ({ data: ticketState.transitions }),
-  useGetTicketLineItems: () => ({ data: [] }),
+  useGetTicketLineItems: () => ({ data: ticketState.lineItems }),
   useGetTaxRateByState: () => ({ data: null }),
   useGetVendorRatings: () => ({ data: [] }),
   useGetNearbyVendors: () => ({ data: undefined }),
@@ -265,6 +266,7 @@ beforeEach(() => {
   ticketState.data = { ...baseTicket };
   ticketState.dataUpdatedAt = 1000;
   ticketState.transitions = [];
+  ticketState.lineItems = [];
   FakeEventSource.instances = [];
   stableQueryClient.invalidateQueries.mockClear();
   stableQueryClient.refetchQueries.mockClear();
@@ -365,5 +367,43 @@ describe("ticket-detail — Task #861 reversed-payment audit row (web)", () => {
     expect(
       screen.queryByTestId("audit-trail-payment-reversed-badge-303"),
     ).toBeNull();
+  });
+});
+
+describe("ticket-detail — proof-to-pay packet", () => {
+  it("renders the proof readiness summary from ticket evidence and line items", () => {
+    ticketState.data = {
+      ...baseTicket,
+      status: "funds_dispersed",
+      checkInTime: "2026-08-17T14:00:00.000Z",
+      checkOutTime: "2026-08-17T18:30:00.000Z",
+      checkInLatitude: 31.997,
+      checkInLongitude: -102.077,
+      checkOutLatitude: 31.998,
+      checkOutLongitude: -102.078,
+      siteLatitude: 31.9972,
+      siteLongitude: -102.0772,
+      siteRadiusMeters: 500,
+      startingMileage: "10234.1",
+      endingMileage: "10288.6",
+      approvedAt: "2026-08-17T20:00:00.000Z",
+      paymentDispersedAt: "2026-08-18T15:00:00.000Z",
+      paymentReference: "ACH-9911",
+    };
+    ticketState.lineItems = [
+      { id: 1, type: "labor_regular", description: "Labor", quantity: "4.5", unitPrice: "125.00" },
+      { id: 2, type: "parts", description: "Parts", quantity: "2", unitPrice: "35.00" },
+    ];
+
+    render(<TicketDetail id={TICKET_ID} />);
+
+    expect(screen.getByTestId("ticket-proof-packet-card")).toBeTruthy();
+    expect(screen.getByTestId("ticket-proof-packet-progress").textContent)
+      .toContain("5 of 5 complete");
+    expect(screen.getByTestId("ticket-proof-packet-section-mileage").textContent)
+      .toContain("54.5 mi logged");
+    expect(screen.getByTestId("ticket-proof-packet-section-cost").textContent)
+      .toContain("$632.50 captured");
+    expect(screen.queryByTestId("ticket-proof-packet-missing")).toBeNull();
   });
 });
