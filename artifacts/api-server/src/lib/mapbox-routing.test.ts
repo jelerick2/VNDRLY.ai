@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { estimateMapboxDrivingRoute } from "./mapbox-routing";
+import { clearMapboxRouteCache, estimateMapboxDrivingRoute } from "./mapbox-routing";
 
 describe("estimateMapboxDrivingRoute", () => {
+  beforeEach(() => {
+    clearMapboxRouteCache();
+  });
+
   it("normalizes Mapbox driving route distance and duration", async () => {
     const fetchImpl = async (url: string) => {
       expect(url).toContain("api.mapbox.com/directions/v5/mapbox/driving-traffic");
@@ -48,6 +52,93 @@ describe("estimateMapboxDrivingRoute", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errorCode).toBe("mapbox.missing_token");
+    }
+  });
+
+  it("reuses a cached estimate for the same origin and destination", async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          routes: [{ distance: 16093.44, duration: 900 }],
+          code: "Ok",
+        }),
+      } as Response;
+    };
+    const args = {
+      origin: { latitude: 31.9972, longitude: -102.0779 },
+      destination: { latitude: 31.8342, longitude: -101.9443 },
+    };
+
+    const first = await estimateMapboxDrivingRoute(args, { accessToken: "pk.test", fetchImpl });
+    const second = await estimateMapboxDrivingRoute(args, { accessToken: "pk.test", fetchImpl });
+
+    expect(first).toEqual(second);
+    expect(calls).toBe(1);
+  });
+
+  it("rounds minor GPS jitter into the same cache key", async () => {
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          routes: [{ distance: 16093.44, duration: 900 }],
+          code: "Ok",
+        }),
+      } as Response;
+    };
+
+    await estimateMapboxDrivingRoute(
+      {
+        origin: { latitude: 31.997201, longitude: -102.077901 },
+        destination: { latitude: 31.834201, longitude: -101.944301 },
+      },
+      { accessToken: "pk.test", fetchImpl },
+    );
+    await estimateMapboxDrivingRoute(
+      {
+        origin: { latitude: 31.997204, longitude: -102.077904 },
+        destination: { latitude: 31.834204, longitude: -101.944304 },
+      },
+      { accessToken: "pk.test", fetchImpl },
+    );
+
+    expect(calls).toBe(1);
+  });
+
+  it("expires cached estimates after the configured ttl", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const fetchImpl = async () => {
+        calls += 1;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            routes: [{ distance: 16093.44, duration: 900 }],
+            code: "Ok",
+          }),
+        } as Response;
+      };
+      const args = {
+        origin: { latitude: 31.9972, longitude: -102.0779 },
+        destination: { latitude: 31.8342, longitude: -101.9443 },
+      };
+
+      await estimateMapboxDrivingRoute(args, { accessToken: "pk.test", fetchImpl, cacheTtlMs: 1000 });
+      vi.advanceTimersByTime(1001);
+      await estimateMapboxDrivingRoute(args, { accessToken: "pk.test", fetchImpl, cacheTtlMs: 1000 });
+
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

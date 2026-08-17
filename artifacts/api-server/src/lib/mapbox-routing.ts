@@ -23,9 +23,25 @@ type EstimateArgs = {
 type EstimateOptions = {
   accessToken?: string | null;
   fetchImpl?: typeof fetch;
+  cacheTtlMs?: number;
 };
 
 const METERS_PER_MILE = 1609.344;
+const DEFAULT_CACHE_TTL_MS = 5 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 500;
+
+type CacheEntry = {
+  expiresAt: number;
+  result: RouteEstimateResult;
+};
+
+const routeCache = new Map<string, CacheEntry>();
+const inFlightRoutes = new Map<string, Promise<RouteEstimateResult>>();
+
+export function clearMapboxRouteCache(): void {
+  routeCache.clear();
+  inFlightRoutes.clear();
+}
 
 function isFiniteCoordinate(coord: RouteCoordinate): boolean {
   return (
@@ -36,6 +52,28 @@ function isFiniteCoordinate(coord: RouteCoordinate): boolean {
     coord.longitude >= -180 &&
     coord.longitude <= 180
   );
+}
+
+function roundedCoordinate(coord: RouteCoordinate): string {
+  return `${coord.latitude.toFixed(5)},${coord.longitude.toFixed(5)}`;
+}
+
+function routeCacheKey(args: EstimateArgs): string {
+  return `${roundedCoordinate(args.origin)}>${roundedCoordinate(args.destination)}`;
+}
+
+function cacheTtl(options: EstimateOptions): number {
+  const ttl = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
+  return Number.isFinite(ttl) && ttl > 0 ? ttl : 0;
+}
+
+function rememberRouteEstimate(key: string, result: RouteEstimateResult, ttlMs: number): void {
+  if (!result.ok || ttlMs <= 0) return;
+  routeCache.set(key, { result, expiresAt: Date.now() + ttlMs });
+  if (routeCache.size > MAX_CACHE_ENTRIES) {
+    const oldest = routeCache.keys().next().value;
+    if (oldest) routeCache.delete(oldest);
+  }
 }
 
 export async function estimateMapboxDrivingRoute(
@@ -58,6 +96,34 @@ export async function estimateMapboxDrivingRoute(
     };
   }
 
+  const ttlMs = cacheTtl(options);
+  const key = routeCacheKey(args);
+  if (ttlMs > 0) {
+    const cached = routeCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.result;
+    if (cached) routeCache.delete(key);
+    const inFlight = inFlightRoutes.get(key);
+    if (inFlight) return inFlight;
+  }
+
+  const estimate = requestMapboxDrivingRoute(args, accessToken, options);
+  if (ttlMs <= 0) return estimate;
+
+  inFlightRoutes.set(key, estimate);
+  try {
+    const result = await estimate;
+    rememberRouteEstimate(key, result, ttlMs);
+    return result;
+  } finally {
+    inFlightRoutes.delete(key);
+  }
+}
+
+async function requestMapboxDrivingRoute(
+  args: EstimateArgs,
+  accessToken: string,
+  options: EstimateOptions,
+): Promise<RouteEstimateResult> {
   const url = new URL(
     `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${args.origin.longitude},${args.origin.latitude};${args.destination.longitude},${args.destination.latitude}`,
   );
