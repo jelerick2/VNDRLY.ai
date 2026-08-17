@@ -3734,7 +3734,7 @@
     "conflict": "That action can't be completed right now.",
     "validationFailed": "Some information is missing or invalid. Please check the form and try again.",
     "network": {
-      "unreachable": "Can't reach the server. Check your internet connection and try again."
+      "unreachable": "VNDRLY can't reach the service right now. Check your connection; if other sites work, the VNDRLY host, DNS, or firewall may need attention."
     },
     "invalid_query": "That search has invalid filters. Please review and try again.",
     "audit_trail": {

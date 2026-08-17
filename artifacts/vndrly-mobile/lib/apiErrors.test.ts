@@ -225,6 +225,18 @@ describe("translateApiError", () => {
     expect(translateApiError(err, t)).toBe("Inicia sesión.");
   });
 
+  it("uses outage-aware copy for mobile network failures", async () => {
+    const t = await makeI18n("en");
+    const err = makeApiError({
+      message: "Network request failed",
+      code: "network.unreachable",
+    });
+
+    expect(translateApiError(err, t)).toBe(
+      "VNDRLY can't reach the service right now. Check your connection; if other apps work, the VNDRLY host, DNS, or firewall may need attention.",
+    );
+  });
+
   it("uses the caller-supplied translated fallback as a last resort", () => {
     const t = makeT({});
     const err = makeApiError({ message: "" });

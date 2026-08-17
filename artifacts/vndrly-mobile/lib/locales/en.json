@@ -779,7 +779,7 @@
       "upstream_error": "An upstream service is having trouble. Please try again."
     },
     "network": {
-      "unreachable": "Can't reach the server. Check your internet connection and try again."
+      "unreachable": "VNDRLY can't reach the service right now. Check your connection; if other apps work, the VNDRLY host, DNS, or firewall may need attention."
     },
     "site_not_found": "We couldn't find that site. Pick a different one.",
     "site_vendor_mismatch": "Your vendor isn't assigned to work at this site. Pick a different one.",

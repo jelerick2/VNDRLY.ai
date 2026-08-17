@@ -779,7 +779,7 @@
       "upstream_error": "Un servicio externo tiene problemas. Inténtelo de nuevo."
     },
     "network": {
-      "unreachable": "No se puede conectar con el servidor. Verifica tu conexión e inténtalo de nuevo."
+      "unreachable": "VNDRLY no puede conectarse con el servicio en este momento. Revisa tu conexión; si otras apps funcionan, es posible que el host, DNS o firewall de VNDRLY necesite atención."
     },
     "site_not_found": "No encontramos ese sitio. Elige otro.",
     "site_vendor_mismatch": "Tu proveedor no está asignado a trabajar en este sitio. Elige otro.",

@@ -3734,7 +3734,7 @@
     "conflict": "Esa acción no se puede completar en este momento.",
     "validationFailed": "Falta información o no es válida. Revisa el formulario e inténtalo de nuevo.",
     "network": {
-      "unreachable": "No se puede conectar con el servidor. Revisa tu conexión a internet e inténtalo de nuevo."
+      "unreachable": "VNDRLY no puede conectarse con el servicio en este momento. Revisa tu conexión; si otros sitios funcionan, es posible que el host, DNS o firewall de VNDRLY necesite atención."
     },
     "invalid_query": "Esa búsqueda tiene filtros inválidos. Revísalos e inténtalo de nuevo.",
     "audit_trail": {

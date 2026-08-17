@@ -420,6 +420,16 @@ describe("translateApiError — Task #162 network-failure detection (office web)
       lookup(es, "errors.server.internal_error"),
     );
   });
+
+  it("uses outage-aware English copy for host/DNS/firewall failures", async () => {
+    const t = await makeI18n("en");
+    const err = new Error("Failed to fetch");
+    err.name = "TypeError";
+
+    expect(translateApiError(err, t)).toBe(
+      "VNDRLY can't reach the service right now. Check your connection; if other sites work, the VNDRLY host, DNS, or firewall may need attention.",
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
