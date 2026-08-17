@@ -375,6 +375,7 @@ describe("ticket-detail — proof-to-pay packet", () => {
     ticketState.data = {
       ...baseTicket,
       status: "funds_dispersed",
+      notes: "No issues on location.",
       checkInTime: "2026-08-17T14:00:00.000Z",
       checkOutTime: "2026-08-17T18:30:00.000Z",
       checkInLatitude: 31.997,
@@ -399,7 +400,9 @@ describe("ticket-detail — proof-to-pay packet", () => {
 
     expect(screen.getByTestId("ticket-proof-packet-card")).toBeTruthy();
     expect(screen.getByTestId("ticket-proof-packet-progress").textContent)
-      .toContain("5 of 5 complete");
+      .toContain("6 of 6 complete");
+    expect(screen.getByTestId("ticket-proof-packet-section-field_notes").textContent)
+      .toContain("Field Notes");
     expect(screen.getByTestId("ticket-proof-packet-section-mileage").textContent)
       .toContain("54.5 mi logged");
     expect(screen.getByTestId("ticket-proof-packet-section-cost").textContent)

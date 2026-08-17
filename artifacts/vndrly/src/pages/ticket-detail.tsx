@@ -1327,8 +1327,8 @@ export default function TicketDetail({ id }: { id: number }) {
   const taxAmount = taxPreview.taxAmount;
   const grandTotal = taxPreview.grandTotal;
   const proofPacket = useMemo(
-    () => buildTicketProofPacket(ticket ?? {}, lineItems ?? []),
-    [ticket, lineItems],
+    () => buildTicketProofPacket(ticket ?? {}, lineItems ?? [], noteLogs ?? []),
+    [ticket, lineItems, noteLogs],
   );
   const combinedTaxRateValue = siteLocation?.combinedTaxRate
     ? parseFloat(String(siteLocation.combinedTaxRate))

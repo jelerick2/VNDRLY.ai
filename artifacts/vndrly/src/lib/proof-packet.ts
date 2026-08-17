@@ -1,5 +1,6 @@
 export type ProofPacketTicket = {
   status?: string | null;
+  notes?: string | null;
   checkInTime?: string | Date | null;
   checkOutTime?: string | Date | null;
   checkInLatitude?: number | null;
@@ -22,8 +23,14 @@ export type ProofPacketLineItem = {
   unitPrice?: string | number | null;
 };
 
+export type ProofPacketNoteEvidence = {
+  content?: string | null;
+  attachments?: readonly string[] | null;
+};
+
 export type ProofPacketSectionId =
   | "gps_time"
+  | "field_notes"
   | "mileage"
   | "cost"
   | "approval"
@@ -80,6 +87,7 @@ function costTotal(lineItems: readonly ProofPacketLineItem[]): number {
 export function buildTicketProofPacket(
   ticket: ProofPacketTicket,
   lineItems: readonly ProofPacketLineItem[] = [],
+  noteEvidence: readonly ProofPacketNoteEvidence[] = [],
 ): ProofPacketSummary {
   const hasCheckInProof =
     hasValue(ticket.checkInTime) &&
@@ -89,6 +97,12 @@ export function buildTicketProofPacket(
     hasCoordinate(ticket.checkOutLatitude, ticket.checkOutLongitude);
   const hasSiteProof = hasCoordinate(ticket.siteLatitude, ticket.siteLongitude);
   const gpsComplete = hasCheckInProof && hasCheckOutProof && hasSiteProof;
+  const noteCount = noteEvidence.filter((note) => hasValue(note.content)).length;
+  const attachmentCount = noteEvidence.reduce(
+    (sum, note) => sum + (note.attachments?.length ?? 0),
+    0,
+  );
+  const hasFieldNotes = hasValue(ticket.notes) || noteCount > 0 || attachmentCount > 0;
 
   const startingMileage = numberFrom(ticket.startingMileage);
   const endingMileage = numberFrom(ticket.endingMileage);
@@ -114,6 +128,15 @@ export function buildTicketProofPacket(
         ? "Check-in, check-out, and site coordinates captured"
         : "Needs check-in, check-out, and site coordinate evidence",
       missingLabel: hasCheckOutProof ? "GPS/time evidence" : "checkout GPS/time",
+    },
+    {
+      id: "field_notes",
+      label: "Field Notes / Attachments",
+      complete: hasFieldNotes,
+      detail: hasFieldNotes
+        ? `${noteCount + (hasValue(ticket.notes) ? 1 : 0)} note source(s), ${attachmentCount} attachment(s)`
+        : "Needs a note, photo, or document attachment",
+      missingLabel: "field notes/photos",
     },
     {
       id: "mileage",

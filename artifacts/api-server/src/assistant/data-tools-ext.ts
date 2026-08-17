@@ -223,6 +223,7 @@ async function queryTicketProofPacket(
       id: ticketsTable.id,
       status: ticketsTable.status,
       lifecycleState: ticketsTable.lifecycleState,
+      notes: ticketsTable.notes,
       checkInTime: ticketsTable.checkInTime,
       checkOutTime: ticketsTable.checkOutTime,
       checkInLatitude: ticketsTable.checkInLatitude,
@@ -260,7 +261,24 @@ async function queryTicketProofPacket(
     .from(ticketLineItemsTable)
     .where(eq(ticketLineItemsTable.ticketId, input.ticketId));
 
-  const proofPacket = buildTicketProofPacket(row, lineItems);
+  const noteRows = await db
+    .select({
+      content: ticketNoteLogsTable.content,
+      attachments: ticketNoteLogsTable.attachments,
+    })
+    .from(ticketNoteLogsTable)
+    .where(
+      and(
+        eq(ticketNoteLogsTable.ticketId, input.ticketId),
+        isNull(ticketNoteLogsTable.deletedAt),
+      ),
+    );
+
+  const proofPacket = buildTicketProofPacket(row, lineItems, noteRows);
+  const noteLogAttachmentCount = noteRows.reduce(
+    (sum, note) => sum + (note.attachments?.length ?? 0),
+    0,
+  );
 
   return JSON.stringify({
     ticketId: row.id,
@@ -284,6 +302,8 @@ async function queryTicketProofPacket(
     paymentReference: row.paymentReference,
     hasPaymentReceipt: !!row.paymentReceiptUrl,
     lineItemCount: lineItems.length,
+    noteLogCount: noteRows.length,
+    noteLogAttachmentCount,
     proofPacket,
     recommendation: proofPacket.status === "complete"
       ? "Ticket has the core proof-to-pay evidence captured."

@@ -4,6 +4,7 @@ import { buildTicketProofPacket } from "./proof-packet";
 
 const baseTicket = {
   status: "funds_dispersed",
+  notes: "No issues on location.",
   checkInTime: "2026-08-17T14:00:00.000Z",
   checkOutTime: "2026-08-17T18:30:00.000Z",
   checkInLatitude: 31.997,
@@ -33,6 +34,7 @@ describe("buildTicketProofPacket", () => {
     expect(packet.completedCount).toBe(packet.totalCount);
     expect(packet.sections.map((section) => section.id)).toEqual([
       "gps_time",
+      "field_notes",
       "mileage",
       "cost",
       "approval",
@@ -50,6 +52,7 @@ describe("buildTicketProofPacket", () => {
       {
         ...baseTicket,
         status: "pending_review",
+        notes: null,
         checkOutTime: null,
         checkOutLatitude: null,
         checkOutLongitude: null,
@@ -65,6 +68,7 @@ describe("buildTicketProofPacket", () => {
     expect(packet.completedCount).toBe(0);
     expect(packet.missingEvidence).toEqual([
       "checkout GPS/time",
+      "field notes/photos",
       "ending mileage",
       "parts/labor/equipment line items",
       "partner/admin approval",
