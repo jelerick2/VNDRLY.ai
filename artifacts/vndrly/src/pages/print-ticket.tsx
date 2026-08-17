@@ -12,6 +12,7 @@ import {
   getGetTaxRateByStateQueryKey,
 } from "@workspace/api-client-react";
 import { getBrandColors, hexToRgb } from "@/lib/brand-colors";
+import { buildTicketProofPacket } from "@/lib/proof-packet";
 
 function formatDateTime(s: string | null | undefined): string {
   if (!s) return "-";
@@ -43,6 +44,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   etf: "ETF / Wire",
+  ach: "ACH",
   check: "Check",
   other: "Other",
 };
@@ -84,6 +86,10 @@ export default function PrintTicketPage({ id }: { id: number }) {
   const grandTotal = subtotal + taxAmount;
   const taxLabelState = site?.state || "N/A";
   const taxLabelPct = (taxRateValue * 100).toFixed(2);
+  const proofPacket = useMemo(
+    () => buildTicketProofPacket(ticket ?? {}, lineItems ?? []),
+    [ticket, lineItems],
+  );
 
   const readyToPrint = useMemo(() => {
     if (!ticket) return false;
@@ -162,6 +168,42 @@ export default function PrintTicketPage({ id }: { id: number }) {
       rowL("Status", STATUS_LABELS[ticket.status] ?? ticket.status);
       rowL("Check In", formatDateTime(ticket.checkInTime));
       rowL("Check Out", formatDateTime(ticket.checkOutTime));
+
+      y += 0.1;
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(pr, pg, pb);
+      doc.setFontSize(13);
+      doc.text("Proof-to-Pay Packet", left + 0.3, y);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80);
+      doc.setFontSize(10);
+      doc.text(`${proofPacket.completedCount} of ${proofPacket.totalCount} evidence checks complete`, right - 0.3, y, { align: "right" });
+      y += 0.2;
+      doc.setDrawColor(ar, ag, ab);
+      doc.setLineWidth(0.02);
+      doc.line(left + 0.3, y, right - 0.3, y);
+      y += 0.16;
+      doc.setFontSize(10);
+      for (const section of proofPacket.sections) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(section.complete ? 45 : 145);
+        doc.text(section.complete ? "Complete" : "Needs", left + 0.3, y);
+        doc.setTextColor(ar, ag, ab);
+        doc.text(section.label, left + 1.1, y);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(40);
+        const detailLines = doc.splitTextToSize(section.detail, contentW - 2.8) as string[];
+        doc.text(detailLines, left + 2.5, y);
+        y += 0.18 * Math.max(1, detailLines.length) + 0.03;
+      }
+      if (proofPacket.missingEvidence.length > 0) {
+        const missing = `Missing: ${proofPacket.missingEvidence.join(", ")}`;
+        const missingLines = doc.splitTextToSize(missing, contentW - 0.6) as string[];
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(120);
+        doc.text(missingLines, left + 0.3, y);
+        y += 0.18 * missingLines.length + 0.06;
+      }
 
       y += 0.1;
 
@@ -375,6 +417,43 @@ export default function PrintTicketPage({ id }: { id: number }) {
           <dt className="font-semibold" style={{ color: accentColor }}>Check Out</dt>
           <dd className="col-span-2">{formatDateTime(ticket.checkOutTime)}</dd>
         </dl>
+
+        <section className="mt-6" data-testid="proof-packet-summary">
+          <div className="flex items-start justify-between gap-4 border-b pb-2" style={{ borderColor: accentColor }}>
+            <div>
+              <h2 className="text-lg font-bold" style={{ color: primaryColor }}>Proof-to-Pay Packet</h2>
+              <p className="text-xs text-gray-600 mt-1">
+                Field ticket evidence from dispatch through payment.
+              </p>
+            </div>
+            <div className="text-right text-sm font-semibold" style={{ color: proofPacket.status === "complete" ? primaryColor : accentColor }} data-testid="proof-packet-progress">
+              {proofPacket.completedCount} of {proofPacket.totalCount} complete
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-sm">
+            {proofPacket.sections.map((section) => (
+              <div
+                key={section.id}
+                className="border rounded px-3 py-2"
+                style={{ borderColor: section.complete ? primaryColor : "#d1d5db" }}
+                data-testid={`proof-packet-${section.id}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold" style={{ color: accentColor }}>{section.label}</span>
+                  <span className={section.complete ? "text-green-700" : "text-gray-500"}>
+                    {section.complete ? "Complete" : "Needs"}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-700 mt-1">{section.detail}</p>
+              </div>
+            ))}
+          </div>
+          {proofPacket.missingEvidence.length > 0 && (
+            <p className="text-xs text-gray-600 mt-2" data-testid="proof-packet-missing">
+              Missing: {proofPacket.missingEvidence.join(", ")}
+            </p>
+          )}
+        </section>
 
         {ticket.description && (
           <>
