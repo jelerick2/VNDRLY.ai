@@ -143,6 +143,13 @@
     "couldntCheckIn": "Couldn't check in",
     "pleaseTryAgain": "Please try again",
     "arrivedToast": "Checked in — you're on site",
+    "askvActions": {
+      "title": "AskV map tools",
+      "eta": "ETA",
+      "route": "Route",
+      "mileage": "Mileage",
+      "gps": "GPS summary"
+    },
     "hintCheckIn": "Tap Check In to start tracking time on this ticket.",
     "hintCheckedIn": "You're checked in. Tap Check Out when you leave.",
     "hintCanClose": "Send to your office to review and submit for payment.",
@@ -1522,9 +1529,13 @@
     "transcriptShareUnavailable": "Sharing is not available on this device.",
     "transcribeFailed": "Couldn't understand that. Try again or type your question.",
     "quickActions": {
+      "fieldEtaTicket": "ETA to next ticket",
+      "fieldNextTicket": "Closest ticket",
       "fieldStatus": "Update ticket status",
       "fieldPhoto": "Profile photo & certs",
       "fieldGps": "Pause GPS tracking",
+      "foremanCrewEta": "Crew ticket ETA",
+      "foremanSiteRoute": "Route to active site",
       "foremanCrew": "Crew check-in/out",
       "foremanSchedule": "Schedule tab help",
       "foremanMap": "Crew map help",

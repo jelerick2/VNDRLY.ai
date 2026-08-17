@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAskVLocationContext,
+  readAskVCurrentLocationForMessage,
   shouldAttachAskVLocation,
+  type AskVLocationProvider,
 } from "../assistant-location-context";
 
 describe("shouldAttachAskVLocation", () => {
@@ -36,5 +38,72 @@ describe("buildAskVLocationContext", () => {
       capturedAt: "2026-09-02T10:40:00.000Z",
       source: "mobile_device",
     });
+  });
+});
+
+describe("readAskVCurrentLocationForMessage", () => {
+  function provider(overrides: Partial<AskVLocationProvider> = {}) {
+    const defaults: AskVLocationProvider = {
+      getForegroundPermissionsAsync: async () => ({ status: "undetermined" }),
+      requestForegroundPermissionsAsync: async () => ({ status: "granted" }),
+      getCurrentPositionAsync: async () => ({
+        coords: { latitude: 32.002, longitude: -102.101, accuracy: 18 },
+        timestamp: 1_788_345_600_000,
+      }),
+    };
+    return {
+      ...defaults,
+      ...overrides,
+    };
+  }
+
+  it("requests foreground permission when a map question needs live GPS", async () => {
+    let requested = false;
+    const loc = await readAskVCurrentLocationForMessage(
+      "What is my ETA to ticket #10959?",
+      provider({
+        requestForegroundPermissionsAsync: async () => {
+          requested = true;
+          return { status: "granted" };
+        },
+      }),
+      "balanced",
+    );
+
+    expect(requested).toBe(true);
+    expect(loc).toMatchObject({
+      latitude: 32.002,
+      longitude: -102.101,
+      source: "mobile_device",
+    });
+  });
+
+  it("does not request GPS for non-location AskV questions", async () => {
+    let requested = false;
+    const loc = await readAskVCurrentLocationForMessage(
+      "Summarize my notifications",
+      provider({
+        requestForegroundPermissionsAsync: async () => {
+          requested = true;
+          return { status: "granted" };
+        },
+      }),
+      "balanced",
+    );
+
+    expect(loc).toBeNull();
+    expect(requested).toBe(false);
+  });
+
+  it("returns null when foreground location is denied", async () => {
+    const loc = await readAskVCurrentLocationForMessage(
+      "How far am I from the site?",
+      provider({
+        requestForegroundPermissionsAsync: async () => ({ status: "denied" }),
+      }),
+      "balanced",
+    );
+
+    expect(loc).toBeNull();
   });
 });

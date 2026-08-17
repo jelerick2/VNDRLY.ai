@@ -30,6 +30,14 @@ export function quickActionsForUser(user: StoredUser | null): QuickAction[] {
   }
   if (role === "field_employee" && isForemanEmployeeUser(user)) {
     return [
+      {
+        labelKey: "askv.quickActions.foremanCrewEta",
+        prompt: "Using my current location, what is my ETA to the next scheduled crew ticket?",
+      },
+      {
+        labelKey: "askv.quickActions.foremanSiteRoute",
+        prompt: "Using my current location, show me the driving route and road miles to my crew's active site.",
+      },
       { labelKey: "askv.quickActions.foremanCrew", prompt: "How do I check my crew in and out on a ticket?" },
       { labelKey: "askv.quickActions.foremanSchedule", prompt: "How does the schedule tab work for foremen?" },
       { labelKey: "askv.quickActions.foremanMap", prompt: "How do I use the crew map to see where my team is?" },
@@ -37,6 +45,14 @@ export function quickActionsForUser(user: StoredUser | null): QuickAction[] {
   }
   if (role === "field_employee") {
     return [
+      {
+        labelKey: "askv.quickActions.fieldEtaTicket",
+        prompt: "Using my current location, what is my ETA and driving distance to my next scheduled ticket?",
+      },
+      {
+        labelKey: "askv.quickActions.fieldNextTicket",
+        prompt: "Using my current location, which ticket is closest and how many road miles away is it?",
+      },
       { labelKey: "askv.quickActions.fieldStatus", prompt: "How do I update my ticket status from the field portal?" },
       { labelKey: "askv.quickActions.fieldPhoto", prompt: "How do I update my profile photo and certifications?" },
       { labelKey: "askv.quickActions.fieldGps", prompt: "How do I pause GPS tracking for the day?" },

@@ -56,6 +56,7 @@ import {
   noteTicketsRateLimit,
 } from "@/lib/ticketsRateLimitGate";
 import { getUser, type StoredUser } from "@/lib/auth";
+import { askVActionsForTicket, askVPromptRoute } from "@/lib/assistant-ticket-actions";
 import { nudgeLiveLocationReporter } from "@/lib/liveLocationReporter";
 import { MAP_TILE_SIZE, getOsmTile, openInMaps } from "@/lib/maps";
 import { captureAndUploadImage } from "@/lib/photos";
@@ -2102,6 +2103,42 @@ export default function TicketDetailScreen() {
           </Text>
         </LayeredPillButton>
       ) : null}
+
+      <View
+        style={[
+          styles.askVActionPanel,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+        testID="ticket-askv-actions"
+      >
+        <View style={styles.askVActionHeader}>
+          <Feather name="zap" size={15} color={colors.primary} />
+          <Text style={[styles.askVActionTitle, { color: colors.foreground }]}>
+            {t("tickets.askvActions.title")}
+          </Text>
+        </View>
+        <View style={styles.askVActionGrid}>
+          {askVActionsForTicket(ticket.id).map((action) => (
+            <Pressable
+              key={action.key}
+              onPress={() => router.push(askVPromptRoute(action.prompt) as never)}
+              style={[
+                styles.askVActionButton,
+                { borderColor: colors.border, backgroundColor: colors.background },
+              ]}
+              testID={`button-ticket-askv-${action.key}`}
+            >
+              <Feather name={action.icon} size={14} color={colors.primary} />
+              <Text
+                style={[styles.askVActionButtonText, { color: colors.foreground }]}
+                numberOfLines={1}
+              >
+                {t(action.labelKey)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
 
       {siteLocation &&
       (siteLocation.status === "inactive" || siteLocation.isActive === false) &&
@@ -4479,6 +4516,44 @@ const styles = StyleSheet.create({
   actionBtnHalf: { flex: 1 },
   actionBtnFull: { width: "100%" },
   actionBtnText: { fontFamily: "Inter_400Regular", fontSize: 14 },
+  askVActionPanel: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
+  },
+  askVActionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  askVActionTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  askVActionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  askVActionButton: {
+    width: "48%",
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  askVActionButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    flexShrink: 1,
+  },
   actionBtnTextShadow: {
     textShadowColor: "rgba(0, 0, 0, 0.63)",
     textShadowOffset: { width: 0, height: 2 },

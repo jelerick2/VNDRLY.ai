@@ -18,8 +18,15 @@ describe("quickActionsForUser", () => {
       availableMemberships: [],
       requiresContextChoice: false,
     });
-    expect(chips).toHaveLength(3);
-    expect(chips[0].labelKey).toBe("askv.quickActions.fieldStatus");
+    expect(chips).toHaveLength(5);
+    expect(chips.map((chip) => chip.labelKey)).toEqual([
+      "askv.quickActions.fieldEtaTicket",
+      "askv.quickActions.fieldNextTicket",
+      "askv.quickActions.fieldStatus",
+      "askv.quickActions.fieldPhoto",
+      "askv.quickActions.fieldGps",
+    ]);
+    expect(chips[0].prompt).toContain("current location");
   });
 
   it("returns foreman chips when vendorRole is foreman", () => {
@@ -37,7 +44,13 @@ describe("quickActionsForUser", () => {
       availableMemberships: [],
       requiresContextChoice: false,
     });
-    expect(chips[0].labelKey).toBe("askv.quickActions.foremanCrew");
+    expect(chips.map((chip) => chip.labelKey)).toEqual([
+      "askv.quickActions.foremanCrewEta",
+      "askv.quickActions.foremanSiteRoute",
+      "askv.quickActions.foremanCrew",
+      "askv.quickActions.foremanSchedule",
+      "askv.quickActions.foremanMap",
+    ]);
   });
 
   it("returns vendor chips for vendor office login", () => {

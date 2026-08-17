@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -36,6 +36,7 @@ import { isAskVSpeaking, speakAskV, stopAskVSpeech } from "@/lib/askv-speech";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import { readAskVTextOnly, writeAskVTextOnly } from "@/lib/askvVoicePreferences";
 import { shareAssistantTranscript } from "@/lib/assistant-transcript";
+import { readInitialAskVPromptParam } from "@/lib/assistant-ticket-actions";
 import {
   createPttRecorder,
   PttMicPermissionError,
@@ -88,6 +89,8 @@ export default function AskVScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const params = useLocalSearchParams<{ prompt?: string | string[] }>();
+  const autoPromptRef = useRef<string | null>(null);
   const voiceRecorderRef = useRef<PttRecorder | null>(null);
   const [draft, setDraft] = useState("");
   const [readAloud, setReadAloud] = useState(true);
@@ -153,6 +156,13 @@ export default function AskVScreen() {
   useEffect(() => {
     void loadLatest();
   }, [loadLatest]);
+
+  useEffect(() => {
+    const initialPrompt = readInitialAskVPromptParam(params.prompt);
+    if (!initialPrompt || autoPromptRef.current === initialPrompt) return;
+    autoPromptRef.current = initialPrompt;
+    void send(initialPrompt);
+  }, [params.prompt, send]);
 
   const quickActions = useMemo(() => quickActionsForUser(user), [user]);
 

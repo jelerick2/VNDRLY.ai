@@ -592,6 +592,49 @@ function parseMileage(raw: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+export type AskVRouteActionLink = {
+  label: string;
+  url: string;
+};
+
+export function buildRouteActionLinks(destination: {
+  ticketId?: unknown;
+  siteId?: unknown;
+  siteLatitude?: unknown;
+  siteLongitude?: unknown;
+}): AskVRouteActionLink[] {
+  const actions: AskVRouteActionLink[] = [];
+  const ticketId = Number(destination.ticketId);
+  const siteId = Number(destination.siteId);
+  const latitude = parseCoordinate(destination.siteLatitude);
+  const longitude = parseCoordinate(destination.siteLongitude);
+
+  if (Number.isFinite(ticketId) && ticketId > 0) {
+    actions.push({
+      label: `Open ticket #${Math.floor(ticketId)}`,
+      url: `/tickets/${Math.floor(ticketId)}`,
+    });
+  }
+
+  if (Number.isFinite(siteId) && siteId > 0) {
+    actions.push({
+      label: "Open map",
+      url: `/site-map?siteId=${encodeURIComponent(String(Math.floor(siteId)))}`,
+    });
+  } else {
+    actions.push({ label: "Open map", url: "/crew-map" });
+  }
+
+  if (latitude != null && longitude != null) {
+    actions.push({
+      label: "Start navigation",
+      url: `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${latitude},${longitude}`)}`,
+    });
+  }
+
+  return actions;
+}
+
 async function queryTicketLoggedMiles(args: Record<string, unknown>, session: SessionPayload) {
   const ticketId = Number(args.ticketId);
   if (!Number.isFinite(ticketId) || ticketId <= 0) return err("ticketId is required.");
@@ -843,6 +886,7 @@ async function estimateDrivingRoute(args: Record<string, unknown>, session: Sess
       errorCode: route.errorCode,
       destination: loaded.destination,
       basis: loaded.basis,
+      actions: buildRouteActionLinks(loaded.destination),
     });
   }
 
@@ -852,6 +896,7 @@ async function estimateDrivingRoute(args: Record<string, unknown>, session: Sess
     origin,
     destination: loaded.destination,
     route,
+    actions: buildRouteActionLinks(loaded.destination),
   });
 }
 

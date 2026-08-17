@@ -6,6 +6,10 @@ export type AskVLocationContext = {
   source: "mobile_device";
 };
 
+export type AskVLocationPermission = {
+  status: "granted" | "denied" | "undetermined" | string;
+};
+
 type ExpoLocationLike = {
   coords: {
     latitude: number;
@@ -13,6 +17,12 @@ type ExpoLocationLike = {
     accuracy?: number | null;
   };
   timestamp: number;
+};
+
+export type AskVLocationProvider<TAccuracy = unknown> = {
+  getForegroundPermissionsAsync: () => Promise<AskVLocationPermission>;
+  requestForegroundPermissionsAsync: () => Promise<AskVLocationPermission>;
+  getCurrentPositionAsync: (options: { accuracy: TAccuracy }) => Promise<ExpoLocationLike>;
 };
 
 const LOCATION_INTENT_RE =
@@ -43,4 +53,24 @@ export function buildAskVLocationContext(
     capturedAt: new Date(location.timestamp).toISOString(),
     source: "mobile_device",
   };
+}
+
+export async function readAskVCurrentLocationForMessage<TAccuracy>(
+  message: string,
+  provider: AskVLocationProvider<TAccuracy>,
+  accuracy: TAccuracy,
+): Promise<AskVLocationContext | null> {
+  if (!shouldAttachAskVLocation(message)) return null;
+  try {
+    const existingPermission = await provider.getForegroundPermissionsAsync();
+    const permission =
+      existingPermission.status === "granted"
+        ? existingPermission
+        : await provider.requestForegroundPermissionsAsync();
+    if (permission.status !== "granted") return null;
+    const loc = await provider.getCurrentPositionAsync({ accuracy });
+    return buildAskVLocationContext(loc);
+  } catch {
+    return null;
+  }
 }

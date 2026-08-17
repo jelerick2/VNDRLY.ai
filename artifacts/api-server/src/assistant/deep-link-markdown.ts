@@ -57,6 +57,9 @@ export function normalizeAssistantMarkdownHref(href: string): string | null {
   if (/^https?:\/\//i.test(trimmed)) {
     try {
       const u = new URL(trimmed);
+      if (!/^(vndrly\.ai|www\.vndrly\.ai|localhost)$/i.test(u.hostname)) {
+        return u.toString();
+      }
       return `${u.pathname}${u.search}`;
     } catch {
       return null;
@@ -100,6 +103,28 @@ function textReferencesUrl(text: string, url: string): boolean {
 
 type ToolTraceRow = { name: string; output: string };
 
+type AssistantActionLink = { label: string; url: string };
+
+function parseActionLinks(output: string): AssistantActionLink[] {
+  let parsed: { actions?: unknown };
+  try {
+    parsed = JSON.parse(output) as { actions?: unknown };
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed.actions)) return [];
+  return parsed.actions.flatMap((action): AssistantActionLink[] => {
+    if (!action || typeof action !== "object") return [];
+    const label = (action as { label?: unknown }).label;
+    const url = (action as { url?: unknown }).url;
+    if (typeof label !== "string" || typeof url !== "string") return [];
+    const trimmedLabel = label.trim();
+    const normalizedUrl = normalizeAssistantMarkdownHref(url);
+    if (!trimmedLabel || !normalizedUrl) return [];
+    return [{ label: trimmedLabel, url: normalizedUrl }];
+  });
+}
+
 /** Prepend markdown links for deep_link_to tool results missing from the reply. */
 export function ensureDeepLinksInAssistantReply(text: string, toolCalls: ToolTraceRow[]): string {
   let result = repairAssistantMarkdownLinks(text);
@@ -116,6 +141,14 @@ export function ensureDeepLinksInAssistantReply(text: string, toolCalls: ToolTra
     if (typeof parsed.url !== "string" || !parsed.url.startsWith("/")) continue;
     if (textReferencesUrl(result, parsed.url)) continue;
     prefixes.push(`[${linkLabelForUrl(parsed.url)}](${parsed.url})`);
+  }
+
+  for (const call of toolCalls) {
+    for (const action of parseActionLinks(call.output)) {
+      if (textReferencesUrl(result, action.url)) continue;
+      const markdown = `[${action.label}](${action.url})`;
+      if (!prefixes.includes(markdown)) prefixes.push(markdown);
+    }
   }
 
   if (prefixes.length === 0) return result;

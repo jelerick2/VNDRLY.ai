@@ -143,6 +143,13 @@
     "couldntCheckIn": "No se pudo registrar la entrada",
     "pleaseTryAgain": "Por favor, inténtalo de nuevo",
     "arrivedToast": "Entrada registrada — estás en el sitio",
+    "askvActions": {
+      "title": "Herramientas de mapa AskV",
+      "eta": "ETA",
+      "route": "Ruta",
+      "mileage": "Millas",
+      "gps": "Resumen GPS"
+    },
     "hintCheckIn": "Toca Marcar Entrada para empezar a registrar tiempo en este ticket.",
     "hintCheckedIn": "Tu entrada está registrada. Toca Marcar Salida cuando te vayas.",
     "hintCanClose": "Envía a tu oficina para revisión y cobro.",
@@ -1522,9 +1529,13 @@
     "transcriptShareUnavailable": "Compartir no está disponible en este dispositivo.",
     "transcribeFailed": "No pude entender eso. Inténtalo de nuevo o escribe tu pregunta.",
     "quickActions": {
+      "fieldEtaTicket": "ETA al próximo ticket",
+      "fieldNextTicket": "Ticket más cercano",
       "fieldStatus": "Actualizar estado del ticket",
       "fieldPhoto": "Foto de perfil y certificados",
       "fieldGps": "Pausar seguimiento GPS",
+      "foremanCrewEta": "ETA del ticket de cuadrilla",
+      "foremanSiteRoute": "Ruta al sitio activo",
       "foremanCrew": "Entrada/salida de cuadrilla",
       "foremanSchedule": "Ayuda de la pestaña Horario",
       "foremanMap": "Ayuda del mapa de cuadrilla",

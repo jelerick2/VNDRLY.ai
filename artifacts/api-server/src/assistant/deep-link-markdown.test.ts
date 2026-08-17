@@ -32,4 +32,31 @@ describe("deep-link-markdown", () => {
     ]);
     expect(out).toBe(text);
   });
+
+  it("prepends actionable links from map tool outputs", () => {
+    const out = ensureDeepLinksInAssistantReply(
+      "Using your current location, ticket #42 is 18.4 road miles away.",
+      [
+        {
+          name: "query_ticket_route_eta",
+          output: JSON.stringify({
+            ok: true,
+            actions: [
+              { label: "Open ticket #42", url: "/tickets/42" },
+              { label: "Open map", url: "/crew-map?ticketId=42" },
+              {
+                label: "Start navigation",
+                url: "https://www.google.com/maps/dir/?api=1&destination=32.1,-102.2",
+              },
+            ],
+          }),
+        },
+      ],
+    );
+
+    expect(out.startsWith(
+      "[Open ticket #42](/tickets/42)\n[Open map](/crew-map?ticketId=42)\n[Start navigation](https://www.google.com/maps/dir/?api=1&destination=32.1,-102.2)",
+    )).toBe(true);
+    expect(out).toContain("18.4 road miles");
+  });
 });
