@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { visitsApi } from "@/lib/visits-api";
@@ -8,7 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import ImagePill from "@/components/image-pill";
 import { ClipboardList, Clock, MapPin } from "lucide-react";
 import SphereBackButton from "@/components/sphere-back-button";
-import { MapboxMap, type MapboxPoint } from "@/components/mapbox-map";
+import type { MapboxPoint } from "@/components/mapbox-map";
+
+const LazyMapboxMap = lazy(() =>
+  import("@/components/mapbox-map").then((mod) => ({ default: mod.MapboxMap })),
+);
 
 function fmt(ts: string | null) {
   if (!ts) return "—";
@@ -196,14 +201,22 @@ export default function VisitDetailPage({ id }: { id: string }) {
           <CardContent>
             {hasPin ? (
               <div className="h-[320px] rounded-md overflow-hidden border">
-                <MapboxMap
-                  points={mapPoints}
-                  center={[data.checkInLongitude as number, data.checkInLatitude as number]}
-                  zoom={16}
-                  styleKind="street"
-                  height="100%"
-                  scrollZoom={false}
-                />
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center bg-muted/40 text-sm text-muted-foreground">
+                      {t("common.loading")}
+                    </div>
+                  }
+                >
+                  <LazyMapboxMap
+                    points={mapPoints}
+                    center={[data.checkInLongitude as number, data.checkInLatitude as number]}
+                    zoom={16}
+                    styleKind="street"
+                    height="100%"
+                    scrollZoom={false}
+                  />
+                </Suspense>
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">

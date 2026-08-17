@@ -1,11 +1,15 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { useBrand } from "@/hooks/use-brand";
 import SplitToggleHalf from "@/components/split-toggle-half";
 import { pickTogglePillSrc, TOGGLE_IDLE_PILL_SRC } from "@/lib/pick-toggle-pill";
 import { LONG_DWELL_MS as DEFAULT_LONG_DWELL_MS, deriveLongStops, formatDwell } from "@/lib/stops";
-import { MapboxMap, type MapboxCircle, type MapboxLine, type MapboxPoint } from "@/components/mapbox-map";
+import type { MapboxCircle, MapboxLine, MapboxPoint } from "@/components/mapbox-map";
+
+const LazyMapboxMap = lazy(() =>
+  import("@/components/mapbox-map").then((mod) => ({ default: mod.MapboxMap })),
+);
 
 export type RoutePoint = {
   id?: number | string;
@@ -271,14 +275,25 @@ export function TicketRouteMap({
         className={cn("relative overflow-hidden rounded border-[3px]")}
         style={{ borderColor: "var(--brand-primary, #f59e0b)" }}
       >
-        <MapboxMap
-          points={mapPoints}
-          lines={lines}
-          circles={circles}
-          height={height}
-          styleKind={view === "satellite" ? "satellite" : "street"}
-          selectedPointId={selectedTrackingId != null ? String(selectedTrackingId) : null}
-        />
+        <Suspense
+          fallback={
+            <div
+              className="flex items-center justify-center bg-muted/40 text-sm text-muted-foreground"
+              style={{ height }}
+            >
+              {t("common.loading")}
+            </div>
+          }
+        >
+          <LazyMapboxMap
+            points={mapPoints}
+            lines={lines}
+            circles={circles}
+            height={height}
+            styleKind={view === "satellite" ? "satellite" : "street"}
+            selectedPointId={selectedTrackingId != null ? String(selectedTrackingId) : null}
+          />
+        </Suspense>
       </div>
     </div>
   );

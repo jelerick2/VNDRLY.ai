@@ -1,5 +1,8 @@
 import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
+import "../../scripts/load-env-local.mjs";
+import "../../scripts/dev-local-defaults.mjs";
 
 const baseURL =
   process.env.E2E_BASE_URL ?? "http://localhost:23539";
@@ -13,10 +16,35 @@ const baseURL =
 function resolveChromiumPath(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM) return process.env.PLAYWRIGHT_CHROMIUM;
   try {
-    const which = execSync("which chromium", { encoding: "utf8" }).trim();
-    if (which) return which;
+    const command = process.platform === "win32" ? "where.exe chromium" : "command -v chromium";
+    const chromium = execSync(command, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .find(Boolean);
+    if (chromium) return chromium;
   } catch {
     // fall through to bundled binary
+  }
+  if (process.platform === "win32") {
+    const candidates = [
+      process.env.LOCALAPPDATA &&
+        `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
+      process.env.PROGRAMFILES &&
+        `${process.env.PROGRAMFILES}\\Google\\Chrome\\Application\\chrome.exe`,
+      process.env["PROGRAMFILES(X86)"] &&
+        `${process.env["PROGRAMFILES(X86)"]}\\Google\\Chrome\\Application\\chrome.exe`,
+      process.env.LOCALAPPDATA &&
+        `${process.env.LOCALAPPDATA}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      process.env.PROGRAMFILES &&
+        `${process.env.PROGRAMFILES}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      process.env["PROGRAMFILES(X86)"] &&
+        `${process.env["PROGRAMFILES(X86)"]}\\Microsoft\\Edge\\Application\\msedge.exe`,
+    ].filter((candidate): candidate is string => Boolean(candidate));
+    const installedBrowser = candidates.find((candidate) => existsSync(candidate));
+    if (installedBrowser) return installedBrowser;
   }
   return undefined;
 }
@@ -44,7 +72,7 @@ export default defineConfig({
   // ports, Playwright reuses them instead of spawning duplicates.
   webServer: [
     {
-      command: "pnpm --filter @workspace/api-server run dev",
+      command: "pnpm --filter @workspace/api-server run dev:local",
       url: "http://localhost:8080/api/healthz",
       reuseExistingServer: true,
       timeout: 120_000,
@@ -53,7 +81,8 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      command: "pnpm --filter @workspace/vndrly run dev",
+      command:
+        "pnpm --dir ../../artifacts/vndrly exec vite --config vite.config.ts --host 0.0.0.0 --strictPort",
       url: "http://localhost:23539/",
       reuseExistingServer: true,
       timeout: 120_000,

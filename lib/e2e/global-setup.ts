@@ -1,9 +1,9 @@
 import type { FullConfig } from "@playwright/test";
 
 // Idempotent dev-only safety net: hit POST /api/auth/seed before any spec
-// runs so the canonical demo credentials (admin/admin123, exxon/exxon123,
+// runs so the canonical demo credentials (admin/vndrly123, exxon/exxon123,
 // …) always verify against the dev database. Several browser specs in
-// this suite log in with `admin/admin123` directly (see
+// this suite log in with `admin/vndrly123` directly (see
 // bulk-1099-recategorize.spec.ts, crew-map-gap-warning.spec.ts,
 // visit-public.spec.ts via the field-employee portal, etc.). If a SQL
 // import or a previous test run leaves a drifted bcrypt hash behind,

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import type { FeatureCollection, Position } from "geojson";
 import mapboxgl, { type GeoJSONSource, type LngLatBoundsLike, type Map as MapboxMapInstance } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import "./mapbox-map.css";
@@ -49,7 +50,7 @@ type Props = {
   onPointDrag?: (id: string, latitude: number, longitude: number) => void;
 };
 
-const EMPTY_COLLECTION: GeoJSON.FeatureCollection = {
+const EMPTY_COLLECTION: FeatureCollection = {
   type: "FeatureCollection",
   features: [],
 };
@@ -84,8 +85,8 @@ function escapeHtml(value: string): string {
   });
 }
 
-function circlePolygon(latitude: number, longitude: number, radiusMeters: number): GeoJSON.Position[] {
-  const points: GeoJSON.Position[] = [];
+function circlePolygon(latitude: number, longitude: number, radiusMeters: number): Position[] {
+  const points: Position[] = [];
   const earthRadius = 6371008.8;
   const latRad = (latitude * Math.PI) / 180;
   const lngRad = (longitude * Math.PI) / 180;
@@ -107,7 +108,7 @@ function circlePolygon(latitude: number, longitude: number, radiusMeters: number
   return points;
 }
 
-function setSourceData(map: MapboxMapInstance, id: string, data: GeoJSON.FeatureCollection) {
+function setSourceData(map: MapboxMapInstance, id: string, data: FeatureCollection) {
   const source = map.getSource(id) as GeoJSONSource | undefined;
   source?.setData(data);
 }

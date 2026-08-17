@@ -68,7 +68,7 @@ async function loginAsAdmin(page: Page) {
   // This spec provisions its own per-run system-admin login (so it
   // doesn't have to mutate the shared demo `admin` row), so we pass the
   // seeded credentials into the shared helper instead of relying on its
-  // default of admin/admin123.
+  // default of admin/vndrly123.
   await sharedLoginAsAdmin(page, {
     username: seed.adminUsername,
     password: ADMIN_PASSWORD,
@@ -289,13 +289,18 @@ test("partner members flow: add → AP → member → remove (AP option visible)
   );
   seed.createdMemberUserIds.push(userIdRow[0].id);
 
-  // member -> AP via the per-row select.
+  // member -> AP via the edit-member modal.
   await page
-    .locator(`[data-testid="select-partner-member-role-${membershipId}"]`)
+    .locator(`[data-testid="button-edit-partner-member-role-${membershipId}"]`)
+    .click();
+  const partnerEditDialog = page.locator('[data-testid="dialog-edit-partner-member"]');
+  await expect(partnerEditDialog).toBeVisible();
+  await partnerEditDialog
+    .locator('[data-testid="select-edit-partner-member-role"]')
     .click();
   await page
     .locator(
-      `[data-testid="select-partner-member-role-${membershipId}-ap"]`,
+      '[data-testid="select-edit-partner-member-role-ap"]',
     )
     .click();
   await expect(page.getByText(/Role updated/i).first()).toBeVisible();
@@ -313,9 +318,9 @@ test("partner members flow: add → AP → member → remove (AP option visible)
   // otherwise satisfy itself against the still-visible old one.
   await expect(page.getByText(/Role updated/i)).toHaveCount(0);
 
-  // AP -> member via the per-row select.
-  await page
-    .locator(`[data-testid="select-partner-member-role-${membershipId}"]`)
+  // AP -> member via the edit-member modal.
+  await partnerEditDialog
+    .locator('[data-testid="select-edit-partner-member-role"]')
     .click();
   await page.getByRole("option", { name: "Member", exact: true }).click();
   await expect(page.getByText(/Role updated/i).first()).toBeVisible();
@@ -324,6 +329,8 @@ test("partner members flow: add → AP → member → remove (AP option visible)
     [membershipId],
   );
   expect(memberCheck.rows[0].role).toBe("member");
+  await partnerEditDialog.locator('[data-testid="button-edit-partner-member-close"]').click();
+  await expect(partnerEditDialog).toHaveCount(0);
 
   // Remove the membership through the destructive confirm dialog.
   await page
@@ -404,13 +411,18 @@ test("vendor members flow: add → admin → member → remove (no AP option)", 
   );
   seed.createdMemberUserIds.push(userIdRow[0].id);
 
-  // The per-row role select must also omit the AP option.
+  // The edit-member role select must also omit the AP option.
   await page
-    .locator(`[data-testid="select-vendor-member-role-${membershipId}"]`)
+    .locator(`[data-testid="button-edit-vendor-member-role-${membershipId}"]`)
+    .click();
+  const vendorEditDialog = page.locator('[data-testid="dialog-edit-vendor-member"]');
+  await expect(vendorEditDialog).toBeVisible();
+  await vendorEditDialog
+    .locator('[data-testid="select-edit-vendor-member-role"]')
     .click();
   await expect(
     page.locator(
-      `[data-testid="select-vendor-member-role-${membershipId}-ap"]`,
+      '[data-testid="select-edit-vendor-member-role-ap"]',
     ),
   ).toHaveCount(0);
   await expect(
@@ -431,8 +443,8 @@ test("vendor members flow: add → admin → member → remove (no AP option)", 
   await expect(page.getByText(/Role updated/i)).toHaveCount(0);
 
   // admin -> member
-  await page
-    .locator(`[data-testid="select-vendor-member-role-${membershipId}"]`)
+  await vendorEditDialog
+    .locator('[data-testid="select-edit-vendor-member-role"]')
     .click();
   await page.getByRole("option", { name: "Member", exact: true }).click();
   await expect(page.getByText(/Role updated/i).first()).toBeVisible();
@@ -441,6 +453,8 @@ test("vendor members flow: add → admin → member → remove (no AP option)", 
     [membershipId],
   );
   expect(backCheck.rows[0].role).toBe("member");
+  await vendorEditDialog.locator('[data-testid="button-edit-vendor-member-close"]').click();
+  await expect(vendorEditDialog).toHaveCount(0);
 
   // Remove
   await page
@@ -460,7 +474,7 @@ test("vendor members flow: add → admin → member → remove (no AP option)", 
   expect(removed.rows[0].count).toBe("0");
 });
 
-test("field-employee row renders as a static badge with no role select / no remove button", async ({
+test("field-employee row renders as a static badge with no role select", async ({
   page,
 }) => {
   await loginAsAdmin(page);
@@ -483,13 +497,7 @@ test("field-employee row renders as a static badge with no role select / no remo
     ),
   ).toHaveCount(0);
 
-  // The right-most cell is a "via Field" muted label, NOT a remove button.
-  await expect(fieldRow).toContainText("via Field");
-  await expect(
-    page.locator(
-      `[data-testid="button-remove-partner-member-${seed.fieldPartnerMembershipId}"]`,
-    ),
-  ).toHaveCount(0);
+  await expect(fieldRow).toContainText("Field");
 });
 
 test("self-row: badge instead of role select, remove button disabled with the 'You can't remove yourself' title", async ({

@@ -1,5 +1,9 @@
-import { useMemo } from "react";
-import { MapboxMap, type MapboxCircle, type MapboxPoint } from "@/components/mapbox-map";
+import { lazy, Suspense, useMemo } from "react";
+import type { MapboxCircle, MapboxPoint } from "@/components/mapbox-map";
+
+const LazyMapboxMap = lazy(() =>
+  import("@/components/mapbox-map").then((mod) => ({ default: mod.MapboxMap })),
+);
 
 export type SiteLocationMapProps = {
   lat: number;
@@ -63,17 +67,28 @@ export function SiteLocationMap({
       style={containerStyle}
       data-testid="site-location-map"
     >
-      <MapboxMap
-        points={points}
-        circles={circles}
-        center={[lng, lat]}
-        zoom={15}
-        styleKind={tileLayer}
-        height={aspectRatio ? "100%" : height}
-        scrollZoom={false}
-        fitToData={false}
-        onPointDrag={draggable && onMove ? (_id, nextLat, nextLng) => onMove(nextLat, nextLng) : undefined}
-      />
+      <Suspense
+        fallback={
+          <div
+            className="flex items-center justify-center bg-muted/40 text-sm text-muted-foreground"
+            style={{ height: aspectRatio ? "100%" : height }}
+          >
+            Loading...
+          </div>
+        }
+      >
+        <LazyMapboxMap
+          points={points}
+          circles={circles}
+          center={[lng, lat]}
+          zoom={15}
+          styleKind={tileLayer}
+          height={aspectRatio ? "100%" : height}
+          scrollZoom={false}
+          fitToData={false}
+          onPointDrag={draggable && onMove ? (_id, nextLat, nextLng) => onMove(nextLat, nextLng) : undefined}
+        />
+      </Suspense>
     </div>
   );
 }

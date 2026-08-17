@@ -32,7 +32,7 @@ exposed on a different host/port (e.g. behind a reverse proxy).
   to verify both the off-geofence error path and the happy-path check-in
   + check-out flow; cleans up its seed data.
 - `tests/bulk-1099-recategorize.spec.ts` — bulk 1099 income-category
-  controls: signs in as the demo admin (`admin` / `admin123`), seeds a
+  controls: signs in as the demo admin (`admin` / `vndrly123`), seeds a
   deterministic vendor + draft invoice + paid invoice via the dev-only
   `POST /api/auth/seed-1099-fixture` endpoint, then exercises both the
   multi-select bulk-apply toolbar on `/invoices/:id` and the per-vendor

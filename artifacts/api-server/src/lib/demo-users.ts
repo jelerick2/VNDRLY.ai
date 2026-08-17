@@ -41,7 +41,7 @@ export interface DemoUser {
 export const DEMO_USERS: DemoUser[] = [
   {
     username: "admin",
-    password: "winchester2",
+    password: "vndrly123",
     role: "admin",
     displayName: "System Admin",
     labels: { en: "System Admin", es: "Administrador del Sistema" },
@@ -50,7 +50,7 @@ export const DEMO_USERS: DemoUser[] = [
   },
   {
     username: "exxon",
-    password: "winchester2",
+    password: "exxon123",
     role: "partner",
     displayName: "ExxonMobil User",
     labels: { en: "ExxonMobil", es: "ExxonMobil" },
@@ -146,7 +146,7 @@ export const DEMO_USERS: DemoUser[] = [
   },
   {
     username: "baker",
-    password: "winchester2",
+    password: "baker123",
     role: "vendor",
     displayName: "Baker Hughes Field Svcs User",
     labels: { en: "Baker Hughes Field Svcs", es: "Baker Hughes Field Svcs" },

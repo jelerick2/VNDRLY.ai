@@ -9,7 +9,7 @@ import { logger } from "./logger";
  * with a bcrypt hash that does NOT verify against the canonical password
  * declared in `DEMO_USERS`. This catches the failure mode from Task #739
  * where a SQL import (or a manual change) leaves a stale hash behind, so
- * `admin/admin123`, `exxon/exxon123`, etc. silently 401 on every login
+ * `admin/vndrly123`, `exxon/exxon123`, etc. silently 401 on every login
  * attempt and there is no in-product signal of why.
  *
  * The check is read-only — it logs a one-line warning per drifted demo

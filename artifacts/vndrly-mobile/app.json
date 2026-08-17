@@ -32,12 +32,10 @@
         "NSLocationAlwaysUsageDescription": "VNDRLY shares your live location with your vendor while you are en route or on site, even when the app is in the background.",
         "UIBackgroundModes": [
           "location",
-          "fetch",
-          "location",
           "fetch"
         ],
         "NSFaceIDUsageDescription": "VNDRLY uses Face ID to sign you in quickly and securely.",
-        "NSMicrophoneUsageDescription": "VNDRLY uses the microphone for crew push-to-talk voice messages on active tickets.",
+        "NSMicrophoneUsageDescription": "VNDRLY uses the microphone for AskV voice commands and crew push-to-talk voice messages on active tickets.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

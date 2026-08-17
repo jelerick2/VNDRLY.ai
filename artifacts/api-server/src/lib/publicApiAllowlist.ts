@@ -27,8 +27,18 @@ export const GUEST_ALLOWLIST: ApiAllowRule[] = [
   { method: "GET", pattern: /^\/api\/public\/login-brand\/?$/ },
 ];
 
+const DEV_UNAUTHENTICATED_ALLOWLIST: ApiAllowRule[] =
+  process.env.NODE_ENV === "development"
+    ? [
+        { method: "POST", pattern: /^\/api\/auth\/seed\/?$/ },
+        { method: "POST", pattern: /^\/api\/auth\/seed-1099-fixture\/?$/ },
+        { method: "POST", pattern: /^\/api\/auth\/seed-audit-pagination-fixture\/?$/ },
+      ]
+    : [];
+
 export const PUBLIC_UNAUTHENTICATED_ALLOWLIST: ApiAllowRule[] = [
   ...GUEST_ALLOWLIST,
+  ...DEV_UNAUTHENTICATED_ALLOWLIST,
   { method: "GET", pattern: /^\/api\/healthz\/?$/ },
   { method: "GET", pattern: /^\/api\/health\/?$/ },
   { method: "POST", pattern: /^\/api\/onboarding\/partner\/?$/ },

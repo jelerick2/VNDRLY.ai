@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // `index.ts` actually *calls* the self-check during startup. If a future
 // refactor of the boot sequence drops the call, the existing unit test still
 // passes and operators silently lose the warning that tells them
-// `admin/admin123`, `exxon/exxon123`, etc. are 401-ing because of drifted
+// `admin/vndrly123`, `exxon/exxon123`, etc. are 401-ing because of drifted
 // hashes.
 //
 // This test loads `./index` with every heavy dependency mocked out so the

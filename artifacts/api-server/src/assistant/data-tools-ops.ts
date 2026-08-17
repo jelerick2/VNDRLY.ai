@@ -50,7 +50,10 @@ export const OPS_DATA_TOOL_NAMES = [
   "lookup_crew_member_status",
   "query_crew_eta",
   "query_crew_route_summary",
+  "lookup_map_origin",
   "query_ticket_logged_miles",
+  "query_ticket_route_eta",
+  "query_ticket_mileage_audit",
   "estimate_driving_route",
   "query_hotlist_jobs",
   "query_hotlist_bids",
@@ -700,6 +703,29 @@ async function loadShopOrigin(session: SessionPayload) {
   return { error: "Shop-origin routing is currently available for vendor and field employee sessions with configured vendor coordinates." } as const;
 }
 
+function loadCurrentOrigin(args: Record<string, unknown>) {
+  const currentLatitude = parseCoordinate(args.currentLatitude);
+  const currentLongitude = parseCoordinate(args.currentLongitude);
+  if (currentLatitude == null || currentLongitude == null) {
+    return { error: "currentLatitude and currentLongitude are required for current-location routing." } as const;
+  }
+  return {
+    origin: {
+      latitude: currentLatitude,
+      longitude: currentLongitude,
+      source: "current_location" as const,
+      accuracyMeters: parseCoordinate(args.accuracyMeters),
+      capturedAt: typeof args.capturedAt === "string" ? args.capturedAt : null,
+    },
+  } as const;
+}
+
+async function loadMapOrigin(args: Record<string, unknown>, session: SessionPayload) {
+  const originKind = args.origin === "shop" ? "shop" : "current_location";
+  if (originKind === "shop") return loadShopOrigin(session);
+  return loadCurrentOrigin(args);
+}
+
 async function loadRouteDestination(args: Record<string, unknown>, session: SessionPayload) {
   const scope = ticketScopeFilters(session);
   if (scope === null) return { error: "No org scope on this session." } as const;
@@ -790,27 +816,16 @@ async function loadRouteDestination(args: Record<string, unknown>, session: Sess
   return { destination: nextTicket, basis: "next_ticket" as const };
 }
 
+async function lookupMapOrigin(args: Record<string, unknown>, session: SessionPayload) {
+  const loaded = await loadMapOrigin(args, session);
+  if ("error" in loaded) return JSON.stringify(loaded);
+  return JSON.stringify({ ok: true, origin: loaded.origin });
+}
+
 async function estimateDrivingRoute(args: Record<string, unknown>, session: SessionPayload) {
-  const originKind = args.origin === "shop" ? "shop" : "current_location";
-  let origin:
-    | { latitude: number; longitude: number; source: "current_location" }
-    | { latitude: number; longitude: number; source: "vendor_shop"; vendorId: number; vendorName: string; address: string | null };
-  if (originKind === "shop") {
-    const loadedOrigin = await loadShopOrigin(session);
-    if ("error" in loadedOrigin) return JSON.stringify(loadedOrigin);
-    origin = loadedOrigin.origin;
-  } else {
-    const currentLatitude = parseCoordinate(args.currentLatitude);
-    const currentLongitude = parseCoordinate(args.currentLongitude);
-    if (currentLatitude == null || currentLongitude == null) {
-      return err("currentLatitude and currentLongitude are required for current-location routing.");
-    }
-    origin = {
-      latitude: currentLatitude,
-      longitude: currentLongitude,
-      source: "current_location",
-    };
-  }
+  const loadedOrigin = await loadMapOrigin(args, session);
+  if ("error" in loadedOrigin) return JSON.stringify(loadedOrigin);
+  const origin = loadedOrigin.origin;
   const loaded = await loadRouteDestination(args, session);
   if ("error" in loaded) return JSON.stringify(loaded);
 
@@ -837,6 +852,68 @@ async function estimateDrivingRoute(args: Record<string, unknown>, session: Sess
     origin,
     destination: loaded.destination,
     route,
+  });
+}
+
+async function queryTicketRouteEta(args: Record<string, unknown>, session: SessionPayload) {
+  const ticketId = Number(args.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) return err("ticketId is required.");
+  return estimateDrivingRoute({ ...args, ticketId: Math.floor(ticketId) }, session);
+}
+
+async function queryTicketMileageAudit(args: Record<string, unknown>, session: SessionPayload) {
+  const ticketId = Number(args.ticketId);
+  if (!Number.isFinite(ticketId) || ticketId <= 0) return err("ticketId is required.");
+
+  const logged = JSON.parse(await queryTicketLoggedMiles({ ticketId: Math.floor(ticketId) }, session)) as Record<string, unknown>;
+  if (typeof logged.error === "string") return JSON.stringify(logged);
+
+  const routeArgs: Record<string, unknown> = { ...args, ticketId: Math.floor(ticketId) };
+  let expectedRoute: unknown = null;
+  const originKind = routeArgs.origin === "shop" ? "shop" : "current_location";
+  const hasCurrent =
+    parseCoordinate(routeArgs.currentLatitude) != null &&
+    parseCoordinate(routeArgs.currentLongitude) != null;
+  if (originKind === "shop" || hasCurrent) {
+    expectedRoute = JSON.parse(await estimateDrivingRoute(routeArgs, session));
+  }
+
+  const loggedMiles = logged.loggedMiles as
+    | { odometerMiles?: unknown; gpsRouteMilesApprox?: unknown; basis?: unknown }
+    | undefined;
+  const odometerMiles = parseMileage(loggedMiles?.odometerMiles);
+  const gpsRouteMilesApprox = parseMileage(loggedMiles?.gpsRouteMilesApprox);
+  const expectedMiles =
+    expectedRoute &&
+    typeof expectedRoute === "object" &&
+    "route" in expectedRoute &&
+    (expectedRoute as { route?: { distanceMiles?: unknown } }).route
+      ? parseMileage((expectedRoute as { route: { distanceMiles?: unknown } }).route.distanceMiles)
+      : null;
+  const bestLoggedMiles = odometerMiles ?? gpsRouteMilesApprox;
+  const varianceMiles =
+    bestLoggedMiles != null && expectedMiles != null
+      ? Math.round((bestLoggedMiles - expectedMiles) * 10) / 10
+      : null;
+  const variancePercent =
+    varianceMiles != null && expectedMiles != null && expectedMiles > 0
+      ? Math.round((varianceMiles / expectedMiles) * 1000) / 10
+      : null;
+
+  return JSON.stringify({
+    ticketId: Math.floor(ticketId),
+    logged,
+    expectedRoute,
+    comparison: {
+      bestLoggedMiles,
+      expectedRoadMiles: expectedMiles,
+      varianceMiles,
+      variancePercent,
+      note:
+        expectedRoute == null
+          ? "Expected road miles require origin=shop or currentLatitude/currentLongitude."
+          : "Compare odometer miles first, otherwise GPS trail miles, against Mapbox road miles.",
+    },
   });
 }
 
@@ -1147,8 +1224,14 @@ export async function runOpsDataTool(
       return queryCrewEta(args, session);
     case "query_crew_route_summary":
       return queryCrewRouteSummary(args, session);
+    case "lookup_map_origin":
+      return lookupMapOrigin(args, session);
     case "query_ticket_logged_miles":
       return queryTicketLoggedMiles(args, session);
+    case "query_ticket_route_eta":
+      return queryTicketRouteEta(args, session);
+    case "query_ticket_mileage_audit":
+      return queryTicketMileageAudit(args, session);
     case "estimate_driving_route":
       return estimateDrivingRoute(args, session);
     case "query_hotlist_jobs":

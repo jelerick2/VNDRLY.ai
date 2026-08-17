@@ -1372,8 +1372,7 @@
       "errorTitle": "Could not complete request",
       "metersSuffix": "m",
       "offGeofence": "You are {{distance}} m away — must be within {{radius}} m of the site to check in."
-    },
-    "mapAttribution": "&copy; OpenStreetMap"
+    }
   },
   "fieldNewTicket": {
     "back": "Back",
@@ -1961,8 +1960,6 @@
     "liveUpdatesPaused": "Live updates paused — reconnecting…",
     "visitorGapWarning": "Reconnected to live updates — some visitor pins may have been missed. Refreshing now…",
     "ticketLabel": "Ticket #{{id}}",
-    "heading": "Heading",
-    "headingTitle": "Heading {{deg}}°",
     "stationary": "Stationary",
     "speedMph": "{{mph}} mph",
     "speedParked": "Parked",
@@ -1970,12 +1967,9 @@
     "etaMin": "ETA {{min}} min",
     "etaHr": "ETA {{hr}}h {{min}}m",
     "atSite": "At site",
-    "lowBatteryTitle": "Low battery",
     "failedToLoad": "Failed to load",
     "failedToLoadVisitors": "Failed to load visitors",
     "lastSeen": "Last seen {{when}}",
-    "battery": "Battery: {{pct}}%",
-    "lowSuffix": "(low)",
     "lowBattery": "Low battery ({{pct}}%)",
     "directions": "Directions",
     "replayToday": "Replay today",
@@ -1985,11 +1979,8 @@
     "nobodyOnClock": "Nobody is on the clock right now.",
     "updated": "Updated {{time}}",
     "visitorsOnSite": "Visitors on site ({{count}})",
-    "visiting": "Visiting:",
     "visitingHost": "Visiting {{host}}",
-    "purpose": "Purpose:",
     "visitor": "Visitor",
-    "visitorCheckedIn": "Checked in {{time}} · {{ago}}",
     "visitorCheckedInShort": "Checked in {{ago}}",
     "lifecycleState": {
       "pending_arrival": "pending arrival",
@@ -2125,11 +2116,6 @@
     "siteLocation": "Site location",
     "checkIn": "Check-in",
     "checkOut": "Check-out",
-    "heading": "Heading {{deg}}°",
-    "stationary": "Stationary",
-    "sitePinLabel": "S",
-    "checkInPinLabel": "In",
-    "checkOutPinLabel": "Out",
     "viewMap": "Map",
     "viewSatellite": "Satellite"
   },

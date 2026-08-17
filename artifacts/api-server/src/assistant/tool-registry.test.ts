@@ -6,6 +6,9 @@ describe("AskV tool registry", () => {
     const names = ASK_V_TOOL_REGISTRY.map((tool) => tool.name);
     expect(names).toContain("query_tickets");
     expect(names).toContain("query_crew_eta");
+    expect(names).toContain("lookup_map_origin");
+    expect(names).toContain("query_ticket_route_eta");
+    expect(names).toContain("query_ticket_mileage_audit");
     expect(names).toContain("schedule_ticket_crew");
     expect(names).toContain("set_ticket_flag");
     expect(names).toContain("post_ticket_comment");
@@ -43,6 +46,9 @@ describe("AskV tool registry", () => {
     const fieldTools = toolsForRole("field_employee").map((tool) => tool.name);
     expect(fieldTools).toContain("query_ticket_detail");
     expect(fieldTools).toContain("query_ticket_logged_miles");
+    expect(fieldTools).toContain("query_ticket_route_eta");
+    expect(fieldTools).toContain("query_ticket_mileage_audit");
+    expect(fieldTools).toContain("lookup_map_origin");
     expect(fieldTools).toContain("post_ticket_comment");
     expect(fieldTools).not.toContain("query_invoice_summary");
     expect(fieldTools).not.toContain("query_crew_route_summary");

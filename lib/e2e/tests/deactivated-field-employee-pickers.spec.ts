@@ -355,14 +355,11 @@ test.describe.serial("Task #522 — vendor-side pickers exclude deactivated fiel
     await loginAsVendor(page, seed.vendorUsername);
     await page.goto(`/portal/${seed.siteCode}`);
     await page.locator('[data-testid="select-portal-vendor"]').click();
-    await page
-      .getByRole("option", { name: new RegExp(`E522 Vendor `) })
-      .first()
-      .click();
+    await page.locator(`[data-testid="portal-vendor-option-${seed.vendorId}"]`).click();
 
     await page.locator('[data-testid="select-portal-employee"]').click();
-    await expect(page.getByRole("option", { name: /E522ActiveForeman/ })).toBeVisible();
-    await expect(page.getByRole("option", { name: /E522DeactivatedForeman/ })).toHaveCount(0);
+    await expect(page.locator(`[data-testid="portal-employee-option-${seed.activeFeId}"]`)).toBeVisible();
+    await expect(page.locator(`[data-testid="portal-employee-option-${seed.deactivatedFeId}"]`)).toHaveCount(0);
     await page.keyboard.press("Escape");
   });
 
@@ -493,10 +490,7 @@ test.describe.serial("Task #522 — vendor-side pickers exclude deactivated fiel
       await loginAsVendor(page, seed.vendorUsername);
       await page.goto(`/portal/${seed.siteCode}`);
       await page.locator('[data-testid="select-portal-vendor"]').click();
-      await page
-        .getByRole("option", { name: new RegExp(`E522 Vendor `) })
-        .first()
-        .click();
+      await page.locator(`[data-testid="portal-vendor-option-${seed.vendorId}"]`).click();
       await page.locator('[data-testid="select-portal-employee"]').click();
       const empty = page.locator('[data-testid="empty-portal-employee-list"]');
       await expect(empty).toBeVisible();

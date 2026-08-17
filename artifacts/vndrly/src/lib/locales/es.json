@@ -1372,8 +1372,7 @@
       "errorTitle": "No se pudo completar la solicitud",
       "metersSuffix": "m",
       "offGeofence": "Está a {{distance}} m — debe estar a menos de {{radius}} m del sitio para registrarse."
-    },
-    "mapAttribution": "&copy; OpenStreetMap"
+    }
   },
   "fieldNewTicket": {
     "back": "Atrás",
@@ -1961,8 +1960,6 @@
     "liveUpdatesPaused": "Actualizaciones en vivo pausadas — reconectando…",
     "visitorGapWarning": "Reconectado a actualizaciones en vivo — es posible que algunos pines de visitantes se hayan perdido. Actualizando ahora…",
     "ticketLabel": "Ticket #{{id}}",
-    "heading": "Rumbo",
-    "headingTitle": "Rumbo {{deg}}°",
     "stationary": "Detenido",
     "speedMph": "{{mph}} mph",
     "speedParked": "Detenido",
@@ -1970,12 +1967,9 @@
     "etaMin": "Llegada en {{min}} min",
     "etaHr": "Llegada en {{hr}}h {{min}}m",
     "atSite": "En el sitio",
-    "lowBatteryTitle": "Batería baja",
     "failedToLoad": "No se pudo cargar",
     "failedToLoadVisitors": "No se pudieron cargar los visitantes",
     "lastSeen": "Visto por última vez {{when}}",
-    "battery": "Batería: {{pct}}%",
-    "lowSuffix": "(baja)",
     "lowBattery": "Batería baja ({{pct}}%)",
     "directions": "Cómo llegar",
     "replayToday": "Reproducir hoy",
@@ -1985,11 +1979,8 @@
     "nobodyOnClock": "Nadie está en turno en este momento.",
     "updated": "Actualizado {{time}}",
     "visitorsOnSite": "Visitantes en sitio ({{count}})",
-    "visiting": "Visitando:",
     "visitingHost": "Visitando a {{host}}",
-    "purpose": "Propósito:",
     "visitor": "Visitante",
-    "visitorCheckedIn": "Entrada registrada {{time}} · {{ago}}",
     "visitorCheckedInShort": "Entrada registrada {{ago}}",
     "lifecycleState": {
       "pending_arrival": "pendiente de llegada",
@@ -2125,11 +2116,6 @@
     "siteLocation": "Ubicación del sitio",
     "checkIn": "Entrada",
     "checkOut": "Salida",
-    "heading": "Rumbo {{deg}}°",
-    "stationary": "Detenido",
-    "sitePinLabel": "S",
-    "checkInPinLabel": "Ent",
-    "checkOutPinLabel": "Sal",
     "viewMap": "Mapa",
     "viewSatellite": "Satélite"
   },

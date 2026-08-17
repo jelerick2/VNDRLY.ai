@@ -527,6 +527,70 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "lookup_map_origin",
+    description:
+      "Resolve the origin AskV should use for map/routing questions. Use origin=current_location with currentLatitude/currentLongitude from CURRENT DEVICE LOCATION for 'where am I' or 'from me'; use origin=shop for 'from the shop'. Returns only request-scoped current coordinates or configured vendor shop coordinates. Read-only and role scoped.",
+    input_schema: {
+      type: "object",
+      properties: {
+        origin: {
+          type: "string",
+          enum: ["current_location", "shop"],
+          description: "Defaults to current_location. Use shop for vendor/shop-origin questions.",
+        },
+        currentLatitude: { type: "number", description: "Current device latitude from CURRENT DEVICE LOCATION." },
+        currentLongitude: { type: "number", description: "Current device longitude from CURRENT DEVICE LOCATION." },
+        accuracyMeters: { type: "number", description: "Optional GPS accuracy from CURRENT DEVICE LOCATION." },
+        capturedAt: { type: "string", description: "Optional timestamp from CURRENT DEVICE LOCATION." },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "query_ticket_route_eta",
+    description:
+      "Estimate Mapbox driving road miles and ETA from current location or vendor shop to a visible ticket's site. Use for 'how far to ticket #10959', 'ETA to ticket #10959', 'route from the shop to ticket #10959', or 'how much time will it take from my current location to ticket #10959'. For current-location questions, pass currentLatitude/currentLongitude from CURRENT DEVICE LOCATION.",
+    input_schema: {
+      type: "object",
+      properties: {
+        origin: {
+          type: "string",
+          enum: ["current_location", "shop"],
+          description: "Defaults to current_location. Use shop for vendor/shop-origin questions.",
+        },
+        currentLatitude: { type: "number", description: "Current device latitude from CURRENT DEVICE LOCATION." },
+        currentLongitude: { type: "number", description: "Current device longitude from CURRENT DEVICE LOCATION." },
+        accuracyMeters: { type: "number", description: "Optional GPS accuracy from CURRENT DEVICE LOCATION." },
+        capturedAt: { type: "string", description: "Optional timestamp from CURRENT DEVICE LOCATION." },
+        ticketId: { type: "number", description: "Ticket number/id, e.g. 10959." },
+      },
+      required: ["ticketId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "query_ticket_mileage_audit",
+    description:
+      "Compare ticket mileage captured by VNDRLY against expected Mapbox road miles when an origin is available. Returns odometer miles, GPS trail miles, expected road miles from current location or shop to the ticket site, and variance. Use for 'how many miles did I log', 'did this mileage look reasonable', or 'compare logged miles to route miles for ticket #10959'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        origin: {
+          type: "string",
+          enum: ["current_location", "shop"],
+          description: "Optional. Use shop for expected shop-to-site road miles, current_location for current device to site.",
+        },
+        currentLatitude: { type: "number", description: "Current device latitude from CURRENT DEVICE LOCATION." },
+        currentLongitude: { type: "number", description: "Current device longitude from CURRENT DEVICE LOCATION." },
+        accuracyMeters: { type: "number", description: "Optional GPS accuracy from CURRENT DEVICE LOCATION." },
+        capturedAt: { type: "string", description: "Optional timestamp from CURRENT DEVICE LOCATION." },
+        ticketId: { type: "number", description: "Ticket number/id, e.g. 10959." },
+      },
+      required: ["ticketId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "estimate_driving_route",
     description:
       "Estimate driving miles and ETA to a visible ticket or site location using Mapbox. Use for ticket/map questions like 'how many miles to my next ticket', 'how long to ticket #10959', 'route from the shop to this site', or 'am I close enough to check in'. Use origin=current_location with currentLatitude/currentLongitude from CURRENT DEVICE LOCATION, or origin=shop to route from the caller's vendor shop coordinates when configured. If ticketId/siteId is omitted, field employees get their next assigned scheduled/open ticket when one is visible.",

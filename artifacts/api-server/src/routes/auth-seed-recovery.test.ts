@@ -23,7 +23,7 @@ import { sql } from "drizzle-orm";
 //      bogus value that cannot match the canonical demo password.
 //   3. Calls `POST /api/auth/seed` again and asserts:
 //        - the response's `passwordReset` array contains `admin`
-//        - the stored hash now verifies against `admin123`
+//        - the stored hash now verifies against `vndrly123`
 //        - `POST /api/auth/login` with the canonical credentials
 //          returns 200 (the recovery path actually restored login).
 //
@@ -115,7 +115,7 @@ describe.skip("POST /api/auth/seed demo password recovery", () => {
     // Sanity: admin currently logs in with the canonical password.
     const before = await request(app)
       .post("/api/auth/login")
-      .send({ username: "admin", password: "admin123" });
+      .send({ username: "admin", password: "vndrly123" });
     expectStatus(before, 200);
 
     // Overwrite the admin password hash with a value that cannot match
@@ -133,7 +133,7 @@ describe.skip("POST /api/auth/seed demo password recovery", () => {
     // Confirm the drift actually broke login before we assert recovery.
     const broken = await request(app)
       .post("/api/auth/login")
-      .send({ username: "admin", password: "admin123" });
+      .send({ username: "admin", password: "vndrly123" });
     expect(broken.status).toBe(401);
     expect(broken.body.code).toBe("auth.invalid_credentials");
 
@@ -144,18 +144,18 @@ describe.skip("POST /api/auth/seed demo password recovery", () => {
     expect(Array.isArray(recovered.body.passwordReset)).toBe(true);
     expect(recovered.body.passwordReset).toContain("admin");
 
-    // The stored hash should once again verify against `admin123`.
+    // The stored hash should once again verify against `vndrly123`.
     const [row] = await db
       .select({ passwordHash: usersTable.passwordHash })
       .from(usersTable)
       .where(sql`lower(${usersTable.username}) = lower('admin')`);
     expect(row).toBeDefined();
-    expect(bcrypt.compareSync("admin123", row.passwordHash)).toBe(true);
+    expect(bcrypt.compareSync("vndrly123", row.passwordHash)).toBe(true);
 
     // And the canonical login path returns 200 again.
     const after = await request(app)
       .post("/api/auth/login")
-      .send({ username: "admin", password: "admin123" });
+      .send({ username: "admin", password: "vndrly123" });
     expectStatus(after, 200);
     expect(after.body.username).toBe("admin");
   });

@@ -461,22 +461,24 @@ test.describe.serial("Task #499 — vendor accept/deny round-trip", () => {
     // Server side: the ticket transitioned to `initiated`.
     expect(await ticketStatus(ticketId)).toBe("initiated");
 
-    // Drive check-in and submit through the admin API.  We do these
+    // Drive check-in, check-out, and submit through the admin API. We do these
     // via the API instead of the UI on purpose:
     //   * /check-in: the vendor has no UI to drive their own
     //     check-in (that lives on the field-employee mobile screen).
     //     This spec exists to verify the new accept gate is wired
     //     through to the existing in-flight lifecycle, not to
     //     re-prove the mobile arrival flow.
+    //   * /check-out: submit is intentionally refused while the ticket is
+    //     still in_progress; checkout moves it to pending_review first.
     //   * /submit: the vendor's web "Submit" button is gated on
     //     having line items with grandTotal > 0; that's covered by
     //     the line-items specs and is orthogonal to the handshake.
     //
     // Together these two API calls demonstrate that the ticket can
     // walk all the way from awaiting_acceptance → initiated →
-    // in_progress → submitted now that the accept gate is cleared,
+    // in_progress → pending_review → submitted now that the accept gate is cleared,
     // which is what `Task #494` ensureAccepted() guards.
-    const adminCtx = await createAuthedRequest(baseURL!, "admin", "admin123");
+    const adminCtx = await createAuthedRequest(baseURL!, "admin", "vndrly123");
     try {
       const checkInRes = await adminCtx.post(
         `/api/tickets/${ticketId}/check-in`,
@@ -487,6 +489,16 @@ test.describe.serial("Task #499 — vendor accept/deny round-trip", () => {
         `check-in failed: ${checkInRes.status()} ${await checkInRes.text().catch(() => "")}`,
       ).toBeTruthy();
       expect(await ticketStatus(ticketId)).toBe("in_progress");
+
+      const checkOutRes = await adminCtx.post(
+        `/api/tickets/${ticketId}/check-out`,
+        { data: { latitude: 40.0, longitude: -74.0, workCompleted: false } },
+      );
+      expect(
+        checkOutRes.ok(),
+        `check-out failed: ${checkOutRes.status()} ${await checkOutRes.text().catch(() => "")}`,
+      ).toBeTruthy();
+      expect(await ticketStatus(ticketId)).toBe("pending_review");
 
       const submitRes = await adminCtx.post(`/api/tickets/${ticketId}/submit`);
       expect(

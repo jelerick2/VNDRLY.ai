@@ -17,9 +17,9 @@ import { expect, type Page } from "@playwright/test";
 //     (in particular vendor logins do navigate("/", { replace: true })).
 
 // Canonical seed credentials reset by the dev-only POST /api/auth/seed
-// endpoint (see lib/e2e/global-setup.ts).
+// endpoint (see lib/e2e/global-setup.ts and docs/canonical-credentials.md).
 export const SEED_ADMIN_USERNAME = "admin";
-export const SEED_ADMIN_PASSWORD = "admin123";
+export const SEED_ADMIN_PASSWORD = "vndrly123";
 
 export interface LoginOptions {
   username: string;
@@ -39,7 +39,7 @@ export async function login(
 }
 
 /**
- * Log in with the canonical seed admin (admin/admin123) unless explicit
+ * Log in with the canonical seed admin (admin/vndrly123) unless explicit
  * credentials are provided. The org-members-flow spec provisions its own
  * per-run system-admin login (so it doesn't have to mutate the shared
  * demo `admin` row) and passes those credentials in.

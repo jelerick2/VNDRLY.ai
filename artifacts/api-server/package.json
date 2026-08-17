@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
+    "dev": "pnpm run dev:local",
     "dev:local": "pnpm run build && node ../../scripts/run-api-local.mjs",
     "build": "node ./build.mjs",
     "start": "node --import ../../scripts/load-env-local.mjs --enable-source-maps ./dist/index.mjs",
