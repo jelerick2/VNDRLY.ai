@@ -9,6 +9,7 @@ describe("AskV tool registry", () => {
     expect(names).toContain("lookup_map_origin");
     expect(names).toContain("query_ticket_route_eta");
     expect(names).toContain("query_ticket_mileage_audit");
+    expect(names).toContain("query_ticket_proof_packet");
     expect(names).toContain("schedule_ticket_crew");
     expect(names).toContain("set_ticket_flag");
     expect(names).toContain("post_ticket_comment");
@@ -45,6 +46,7 @@ describe("AskV tool registry", () => {
   it("role-filters office-only tools before a Realtime session is minted", () => {
     const fieldTools = toolsForRole("field_employee").map((tool) => tool.name);
     expect(fieldTools).toContain("query_ticket_detail");
+    expect(fieldTools).toContain("query_ticket_proof_packet");
     expect(fieldTools).toContain("query_ticket_logged_miles");
     expect(fieldTools).toContain("query_ticket_route_eta");
     expect(fieldTools).toContain("query_ticket_mileage_audit");

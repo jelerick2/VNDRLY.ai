@@ -44,9 +44,10 @@ import { runDataTool } from "./data-tools";
 import { EXT_DATA_TOOL_NAMES } from "./data-tools-ext";
 
 describe("EXT_DATA_TOOL_NAMES", () => {
-  it("registers twelve extended tools", () => {
-    expect(EXT_DATA_TOOL_NAMES).toHaveLength(12);
+  it("registers thirteen extended tools", () => {
+    expect(EXT_DATA_TOOL_NAMES).toHaveLength(13);
     expect(EXT_DATA_TOOL_NAMES).toContain("query_ticket_detail");
+    expect(EXT_DATA_TOOL_NAMES).toContain("query_ticket_proof_packet");
     expect(EXT_DATA_TOOL_NAMES).toContain("query_1099_misc_summary");
   });
 });
@@ -59,6 +60,13 @@ describe("runDataTool — extended toolbox gates", () => {
   it("query_ticket_detail requires ticketId", async () => {
     const out = JSON.parse(
       await runDataTool("query_ticket_detail", {}, { role: "vendor", vendorId: 1, userId: 1 } as never),
+    );
+    expect(out.error).toMatch(/ticketId/i);
+  });
+
+  it("query_ticket_proof_packet requires ticketId", async () => {
+    const out = JSON.parse(
+      await runDataTool("query_ticket_proof_packet", {}, { role: "vendor", vendorId: 1, userId: 1 } as never),
     );
     expect(out.error).toMatch(/ticketId/i);
   });

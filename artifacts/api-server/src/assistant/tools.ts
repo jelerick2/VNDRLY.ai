@@ -242,6 +242,17 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "query_ticket_proof_packet",
+    description:
+      "Returns proof-to-pay readiness for one visible ticket: GPS/time evidence, mileage, billable parts/labor/equipment lines, approval, payment record, missing evidence, and a short recommendation. Use for 'is ticket # ready to invoice/pay/defend', 'what proof is missing', or 'proof packet for ticket #'. Scoped like query_ticket_detail.",
+    input_schema: {
+      type: "object",
+      properties: { ticketId: { type: "number" } },
+      required: ["ticketId"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "query_ticket_crew",
     description:
       "Lists active crew members on a ticket: names, roles, acknowledgment status, when added. Use for 'how many field employees on this job', 'who is on the crew', 'did everyone ack'. Scoped to the same ticket visibility as query_ticket_detail.",

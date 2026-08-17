@@ -30,6 +30,7 @@ import {
 import { crewHoursBilledVsCost } from "../lib/reports/crew-cost";
 import { k1099Rows, thresholdForYear } from "../lib/reports/k1099";
 import { misc1099Rows } from "../lib/reports/misc1099";
+import { buildTicketProofPacket } from "../lib/ticket-proof-packet";
 import {
   blockFieldEmployee,
   clampLimit,
@@ -198,6 +199,95 @@ async function queryTicketDetail(
     noteCount: Number(noteAgg?.n ?? 0),
     notesWithAttachments: Number(noteAgg?.withAttachments ?? 0),
     lineItemCount: Number(lineAgg?.n ?? 0),
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────
+// query_ticket_proof_packet
+// ─────────────────────────────────────────────────────────────────
+
+interface QueryTicketProofPacketInput {
+  ticketId?: number;
+}
+
+async function queryTicketProofPacket(
+  input: QueryTicketProofPacketInput,
+  session: SessionPayload,
+): Promise<string> {
+  if (typeof input.ticketId !== "number") return err("Missing 'ticketId'.");
+  const denied = await assertTicketVisible(input.ticketId, session);
+  if (denied) return denied;
+
+  const [row] = await db
+    .select({
+      id: ticketsTable.id,
+      status: ticketsTable.status,
+      lifecycleState: ticketsTable.lifecycleState,
+      checkInTime: ticketsTable.checkInTime,
+      checkOutTime: ticketsTable.checkOutTime,
+      checkInLatitude: ticketsTable.checkInLatitude,
+      checkInLongitude: ticketsTable.checkInLongitude,
+      checkOutLatitude: ticketsTable.checkOutLatitude,
+      checkOutLongitude: ticketsTable.checkOutLongitude,
+      startingMileage: ticketsTable.startingMileage,
+      endingMileage: ticketsTable.endingMileage,
+      approvedAt: ticketsTable.approvedAt,
+      paymentDispersedAt: ticketsTable.paymentDispersedAt,
+      paymentReference: ticketsTable.paymentReference,
+      paymentReceiptUrl: ticketsTable.paymentReceiptUrl,
+      workTypeId: ticketsTable.workTypeId,
+      workTypeName: workTypesTable.name,
+      siteId: ticketsTable.siteLocationId,
+      siteName: siteLocationsTable.name,
+      siteLatitude: siteLocationsTable.latitude,
+      siteLongitude: siteLocationsTable.longitude,
+      siteRadiusMeters: siteLocationsTable.siteRadiusMeters,
+      vendorId: ticketsTable.vendorId,
+    })
+    .from(ticketsTable)
+    .innerJoin(workTypesTable, eq(workTypesTable.id, ticketsTable.workTypeId))
+    .innerJoin(siteLocationsTable, eq(siteLocationsTable.id, ticketsTable.siteLocationId))
+    .where(eq(ticketsTable.id, input.ticketId))
+    .limit(1);
+  if (!row) return err(`Ticket ${input.ticketId} not found.`);
+
+  const lineItems = await db
+    .select({
+      type: ticketLineItemsTable.type,
+      quantity: ticketLineItemsTable.quantity,
+      unitPrice: ticketLineItemsTable.unitPrice,
+    })
+    .from(ticketLineItemsTable)
+    .where(eq(ticketLineItemsTable.ticketId, input.ticketId));
+
+  const proofPacket = buildTicketProofPacket(row, lineItems);
+
+  return JSON.stringify({
+    ticketId: row.id,
+    status: row.status,
+    lifecycleState: row.lifecycleState,
+    workType: { id: row.workTypeId, name: row.workTypeName },
+    site: {
+      id: row.siteId,
+      name: row.siteName,
+      latitude: row.siteLatitude,
+      longitude: row.siteLongitude,
+      radiusMeters: row.siteRadiusMeters,
+    },
+    vendorId: row.vendorId,
+    checkInTime: row.checkInTime,
+    checkOutTime: row.checkOutTime,
+    startingMileage: row.startingMileage,
+    endingMileage: row.endingMileage,
+    approvedAt: row.approvedAt,
+    paymentDispersedAt: row.paymentDispersedAt,
+    paymentReference: row.paymentReference,
+    hasPaymentReceipt: !!row.paymentReceiptUrl,
+    lineItemCount: lineItems.length,
+    proofPacket,
+    recommendation: proofPacket.status === "complete"
+      ? "Ticket has the core proof-to-pay evidence captured."
+      : `Ticket needs: ${proofPacket.missingEvidence.join(", ")}.`,
   });
 }
 
@@ -759,6 +849,7 @@ async function query1099MiscSummary(
 
 export const EXT_DATA_TOOL_NAMES = [
   "query_ticket_detail",
+  "query_ticket_proof_packet",
   "query_ticket_crew",
   "query_ticket_labor",
   "query_ticket_notes",
@@ -787,6 +878,8 @@ export async function runExtDataTool(
   switch (name) {
     case "query_ticket_detail":
       return queryTicketDetail(args as QueryTicketDetailInput, session);
+    case "query_ticket_proof_packet":
+      return queryTicketProofPacket(args as QueryTicketProofPacketInput, session);
     case "query_ticket_crew":
       return queryTicketCrew(args as QueryTicketCrewInput, session);
     case "query_ticket_labor":

@@ -60,6 +60,7 @@ const TOOL_METADATA: Record<string, Partial<ToolMetadata>> = {
   query_sales_tax_by_state: { roles: OFFICE_ROLES },
   query_nec1099_summary: { roles: OFFICE_ROLES },
   query_ticket_detail: { auditTarget: "ticket" },
+  query_ticket_proof_packet: { auditTarget: "ticket" },
   query_ticket_crew: { auditTarget: "crew" },
   query_ticket_labor: { auditTarget: "ticket" },
   query_ticket_notes: { auditTarget: "ticket" },
