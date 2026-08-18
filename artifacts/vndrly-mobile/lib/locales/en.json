@@ -148,7 +148,8 @@
       "eta": "ETA",
       "route": "Route",
       "mileage": "Mileage",
-      "gps": "GPS summary"
+      "gps": "GPS summary",
+      "proof": "Proof packet"
     },
     "hintCheckIn": "Tap Check In to start tracking time on this ticket.",
     "hintCheckedIn": "You're checked in. Tap Check Out when you leave.",

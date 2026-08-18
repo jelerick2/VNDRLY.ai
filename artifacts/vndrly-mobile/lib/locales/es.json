@@ -148,7 +148,8 @@
       "eta": "ETA",
       "route": "Ruta",
       "mileage": "Millas",
-      "gps": "Resumen GPS"
+      "gps": "Resumen GPS",
+      "proof": "Pruebas"
     },
     "hintCheckIn": "Toca Marcar Entrada para empezar a registrar tiempo en este ticket.",
     "hintCheckedIn": "Tu entrada está registrada. Toca Marcar Salida cuando te vayas.",

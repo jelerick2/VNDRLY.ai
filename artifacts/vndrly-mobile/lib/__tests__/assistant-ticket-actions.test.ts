@@ -15,10 +15,13 @@ describe("askVActionsForTicket", () => {
       "route",
       "mileage",
       "gps",
+      "proof",
     ]);
     expect(actions[0].prompt).toContain("current location");
     expect(actions[0].prompt).toContain("ticket #42");
     expect(actions[2].prompt).toContain("expected road miles");
+    expect(actions[4].prompt).toContain("proof-to-pay");
+    expect(actions[4].prompt).toContain("ticket #42");
   });
 
   it("encodes prompts into the AskV tab route", () => {

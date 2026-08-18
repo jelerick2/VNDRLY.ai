@@ -1,7 +1,7 @@
 export type TicketAskVAction = {
-  key: "eta" | "route" | "mileage" | "gps";
+  key: "eta" | "route" | "mileage" | "gps" | "proof";
   labelKey: string;
-  icon: "navigation" | "map" | "activity" | "crosshair";
+  icon: "navigation" | "map" | "activity" | "crosshair" | "file-text";
   prompt: string;
 };
 
@@ -30,6 +30,12 @@ export function askVActionsForTicket(ticketId: number): TicketAskVAction[] {
       labelKey: "tickets.askvActions.gps",
       icon: "crosshair",
       prompt: `Summarize the GPS trail and site location history for ticket #${ticketId}.`,
+    },
+    {
+      key: "proof",
+      labelKey: "tickets.askvActions.proof",
+      icon: "file-text",
+      prompt: `Check proof-to-pay readiness for ticket #${ticketId}. Tell me what evidence is complete and what is missing before this ticket can be invoiced, paid, or defended.`,
     },
   ];
 }
