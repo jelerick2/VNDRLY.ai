@@ -60,6 +60,7 @@ import { askVActionsForTicket, askVPromptRoute } from "@/lib/assistant-ticket-ac
 import { nudgeLiveLocationReporter } from "@/lib/liveLocationReporter";
 import { MAP_TILE_SIZE, getOsmTile, openInMaps } from "@/lib/maps";
 import { captureAndUploadImage } from "@/lib/photos";
+import { buildTicketProofPacket } from "@/lib/proof-packet";
 import { ticketStatusLabel, ticketStatusPillStyle } from "@/lib/ticketStatusLabels";
 import { PILL_CHIP_LAYOUT, PILL_TEXT, PILL_HEIGHT_PX } from "@/lib/pill-doctrine";
 
@@ -79,6 +80,11 @@ type Ticket = {
   checkInLongitude?: number | null;
   checkOutLatitude?: number | null;
   checkOutLongitude?: number | null;
+  siteLatitude?: number | null;
+  siteLongitude?: number | null;
+  startingMileage?: string | number | null;
+  endingMileage?: string | number | null;
+  approvedAt?: string | null;
   vendorId?: number | null;
   scheduledStartAt?: string | null;
   foremanUserId?: number | null;
@@ -225,6 +231,7 @@ type LineItem = {
 type NoteLog = {
   id: number;
   content: string;
+  attachments?: string[] | null;
   createdAt: string;
   createdByName?: string | null;
   createdByRole?: string | null;
@@ -1768,6 +1775,10 @@ export default function TicketDetailScreen() {
   const subtotal = taxPreview.subtotal;
   const taxAmount = taxPreview.taxAmount;
   const grandTotal = taxPreview.grandTotal;
+  const proofPacket = useMemo(
+    () => buildTicketProofPacket(ticket ?? {}, items, notes),
+    [ticket, items, notes],
+  );
 
   const ticketIdValid = Number.isFinite(ticketId) && ticketId > 0;
 
@@ -3501,6 +3512,74 @@ export default function TicketDetailScreen() {
 
       <TicketSiteVisitSummary ticketId={ticketId} refreshKey={lastLoadedAt} />
 
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+        testID="ticket-proof-packet-card"
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Feather name="shield" size={18} color={colors.primary} />
+          <Text style={[styles.section, { color: colors.foreground, marginTop: 0 }]}>
+            {t("ticketDetail.proofPacketTitle", { defaultValue: "Proof-to-Pay Packet" })}
+          </Text>
+        </View>
+        <Text style={{ color: colors.mutedForeground, marginBottom: 8 }}>
+          {proofPacket.status === "complete"
+            ? t("ticketDetail.proofPacketComplete", {
+              defaultValue: "Core evidence is captured for ticket review, invoice defense, and payment history.",
+            })
+            : t("ticketDetail.proofPacketNeedsAttention", {
+              defaultValue: "Evidence is still missing before this ticket is fully defensible.",
+            })}
+        </Text>
+        <Text
+          style={{
+            color: proofPacket.status === "complete" ? "#16a34a" : "#d97706",
+            fontFamily: "Inter_600SemiBold",
+            marginBottom: 8,
+          }}
+          testID="ticket-proof-packet-progress"
+        >
+          {proofPacket.completedCount} of {proofPacket.totalCount} complete
+        </Text>
+        <View style={{ gap: 8 }}>
+          {proofPacket.sections.map((section) => (
+            <View
+              key={section.id}
+              style={[
+                styles.proofPacketRow,
+                {
+                  borderColor: section.complete ? "#bbf7d0" : "#fde68a",
+                  backgroundColor: section.complete ? "#f0fdf4" : "#fffbeb",
+                },
+              ]}
+              testID={`ticket-proof-packet-section-${section.id}`}
+            >
+              <Feather
+                name={section.complete ? "check-circle" : "alert-circle"}
+                size={16}
+                color={section.complete ? "#16a34a" : "#d97706"}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.proofPacketLabel}>{section.label}</Text>
+                <Text style={styles.proofPacketDetail}>{section.detail}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+        {proofPacket.missingEvidence.length > 0 ? (
+          <Text
+            style={{ color: "#b45309", marginTop: 8 }}
+            testID="ticket-proof-packet-missing"
+          >
+            {t("ticketDetail.proofPacketMissing", { defaultValue: "Missing" })}:{" "}
+            {proofPacket.missingEvidence.join(", ")}
+          </Text>
+        ) : null}
+      </View>
+
       <TicketNudgePanel
         ticketId={ticket.id}
         ticketStatus={ticket.status}
@@ -4420,6 +4499,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 8,
     marginBottom: 8,
+  },
+  proofPacketRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+  },
+  proofPacketLabel: {
+    color: "#1f2937",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  proofPacketDetail: {
+    color: "#4b5563",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    marginTop: 2,
   },
   lineItem: {
     flexDirection: "row",

@@ -267,6 +267,18 @@ type TicketStub = {
   lifecycleState: "pending_arrival" | "en_route" | "on_site" | "off_site" | null;
   arrivedAt: string | null;
   createdAt: string;
+  notes?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  checkInLatitude?: number | null;
+  checkInLongitude?: number | null;
+  checkOutLatitude?: number | null;
+  checkOutLongitude?: number | null;
+  siteLatitude?: number | null;
+  siteLongitude?: number | null;
+  startingMileage?: string | number | null;
+  endingMileage?: string | number | null;
+  approvedAt?: string | null;
   // Task #600 fields read by the screen.
   viewerCanDisperseFunds?: boolean | null;
   paymentDispersedAt?: string | null;
@@ -290,6 +302,18 @@ function makeTicket(overrides: Partial<TicketStub> = {}): TicketStub {
     lifecycleState: "off_site",
     arrivedAt: "2025-01-01T10:00:00Z",
     createdAt: "2025-01-01T09:00:00Z",
+    notes: null,
+    checkInTime: null,
+    checkOutTime: null,
+    checkInLatitude: null,
+    checkInLongitude: null,
+    checkOutLatitude: null,
+    checkOutLongitude: null,
+    siteLatitude: null,
+    siteLongitude: null,
+    startingMileage: null,
+    endingMileage: null,
+    approvedAt: null,
     viewerCanDisperseFunds: true,
     paymentDispersedAt: null,
     paymentMethod: null,
@@ -302,6 +326,8 @@ function makeTicket(overrides: Partial<TicketStub> = {}): TicketStub {
 
 function setupApi(opts: {
   ticket: TicketStub;
+  lineItems?: Array<Record<string, unknown>>;
+  noteLogs?: Array<Record<string, unknown>>;
   disperseResponder?: (body: unknown) => unknown | Promise<unknown>;
 }) {
   apiFetchMock.mockImplementation(
@@ -313,9 +339,9 @@ function setupApi(opts: {
         return Promise.resolve(opts.ticket);
       }
       if (url === `/api/tickets/${TICKET_ID}/line-items`)
-        return Promise.resolve([]);
+        return Promise.resolve(opts.lineItems ?? []);
       if (url === `/api/tickets/${TICKET_ID}/note-logs`)
-        return Promise.resolve([]);
+        return Promise.resolve(opts.noteLogs ?? []);
       if (url === `/api/tickets/${TICKET_ID}/gps-logs`)
         return Promise.resolve([]);
       if (url === `/api/tickets/${TICKET_ID}/unlocks`)
@@ -474,6 +500,52 @@ describe("TicketDetailScreen — Disperse Funds gating (Task #600)", () => {
     expect(
       screen.queryAllByTestId("button-disperse-funds-trigger").length,
     ).toBe(0);
+  });
+});
+
+describe("TicketDetailScreen — proof-to-pay packet", () => {
+  it("renders complete proof readiness from ticket evidence, notes, and line items", async () => {
+    setupApi({
+      ticket: makeTicket({
+        status: "funds_dispersed",
+        notes: "No issues on location.",
+        checkInTime: "2026-08-17T14:00:00.000Z",
+        checkOutTime: "2026-08-17T18:30:00.000Z",
+        checkInLatitude: 31.997,
+        checkInLongitude: -102.077,
+        checkOutLatitude: 31.998,
+        checkOutLongitude: -102.078,
+        siteLatitude: 31.9972,
+        siteLongitude: -102.0772,
+        startingMileage: "10234.1",
+        endingMileage: "10288.6",
+        approvedAt: "2026-08-17T20:00:00.000Z",
+        paymentDispersedAt: "2026-08-18T15:00:00.000Z",
+        paymentReference: "ACH-9911",
+      }),
+      lineItems: [
+        { id: 1, type: "labor_regular", description: "Labor", quantity: "4.5", unitPrice: "125.00" },
+        { id: 2, type: "parts", description: "Parts", quantity: "2", unitPrice: "35.00" },
+      ],
+      noteLogs: [
+        {
+          id: 1,
+          content: "Photo attached",
+          attachments: ["/objects/uploads/photo.jpg"],
+          createdAt: "2026-08-17T18:00:00.000Z",
+        },
+      ],
+    });
+
+    await renderAndWaitForLoad();
+
+    expect(screen.getByTestId("ticket-proof-packet-card")).toBeTruthy();
+    expect(screen.getByTestId("ticket-proof-packet-progress").textContent)
+      .toContain("6 of 6 complete");
+    expect(screen.getByTestId("ticket-proof-packet-section-field_notes").textContent)
+      .toContain("Field Notes");
+    expect(screen.getByTestId("ticket-proof-packet-section-mileage").textContent)
+      .toContain("54.5 mi logged");
   });
 });
 
