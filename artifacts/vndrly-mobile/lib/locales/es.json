@@ -311,6 +311,10 @@
   "ticketDetail": {
     "safetyReport": "Reporte de seguridad",
     "paymentDetails": "Detalles del Pago",
+    "proofPacketTitle": "Paquete de Prueba para Pago",
+    "proofPacketComplete": "La evidencia principal está capturada para revisar el ticket, defender la factura y conservar el historial de pago.",
+    "proofPacketNeedsAttention": "Aún falta evidencia antes de que este ticket esté completamente respaldado.",
+    "proofPacketMissing": "Falta",
     "disperseFunds": "Liberar Fondos",
     "disperseFundsTitle": "Liberar Fondos",
     "disperseFundsHelp": "Registra el pago que cierra este ticket. Se notificará al proveedor cuando los fondos sean liberados.",

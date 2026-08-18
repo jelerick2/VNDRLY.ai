@@ -311,6 +311,10 @@
   "ticketDetail": {
     "safetyReport": "Safety report",
     "paymentDetails": "Payment Details",
+    "proofPacketTitle": "Proof-to-Pay Packet",
+    "proofPacketComplete": "Core evidence is captured for ticket review, invoice defense, and payment history.",
+    "proofPacketNeedsAttention": "Evidence is still missing before this ticket is fully defensible.",
+    "proofPacketMissing": "Missing",
     "disperseFunds": "Disperse Funds",
     "disperseFundsTitle": "Disperse Funds",
     "disperseFundsHelp": "Record the payment that closes this ticket. The vendor will be notified once funds are dispersed.",
