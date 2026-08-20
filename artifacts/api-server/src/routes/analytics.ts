@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { sql, eq, and, inArray } from "drizzle-orm";
+import { sql, eq, and, inArray, type SQL } from "drizzle-orm";
 import { getSessionFromRequest } from "../lib/session";
+import { gpsHaversineKmSql, gpsHasLatLngSql } from "../lib/analytics-gps";
 import {
   queryKickbackTrendByMonth,
   queryRevenuePipeline,
@@ -24,6 +25,44 @@ import {
 } from "@workspace/db";
 
 const router: IRouter = Router();
+
+async function countGpsMismatches(scope: SQL): Promise<number> {
+  try {
+    const rows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(ticketsTable)
+      .innerJoin(
+        siteLocationsTable,
+        eq(ticketsTable.siteLocationId, siteLocationsTable.id),
+      )
+      .where(
+        and(
+          scope,
+          gpsHasLatLngSql(),
+          sql`${gpsHaversineKmSql()} > 0.5`,
+        ),
+      );
+    return Number(rows[0]?.count ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+async function countGpsCheckIns(scope: SQL): Promise<number> {
+  try {
+    const rows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(ticketsTable)
+      .innerJoin(
+        siteLocationsTable,
+        eq(ticketsTable.siteLocationId, siteLocationsTable.id),
+      )
+      .where(and(scope, gpsHasLatLngSql()));
+    return Number(rows[0]?.count ?? 0);
+  } catch {
+    return 0;
+  }
+}
 
 router.get("/analytics/vendor/:vendorId", async (req, res): Promise<void> => {
   const session = getSessionFromRequest(req);
@@ -113,34 +152,9 @@ router.get("/analytics/vendor/:vendorId", async (req, res): Promise<void> => {
     .from(ticketsTable)
     .where(eq(ticketsTable.vendorId, vendorId));
 
-  const gpsMismatchCount = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(ticketsTable)
-    .innerJoin(siteLocationsTable, eq(ticketsTable.siteLocationId, siteLocationsTable.id))
-    .where(
-      and(
-        eq(ticketsTable.vendorId, vendorId),
-        sql`${ticketsTable.checkInLatitude} IS NOT NULL`,
-        sql`${siteLocationsTable.latitude} IS NOT NULL`,
-        sql`(
-          6371 * acos(
-            cos(radians(${siteLocationsTable.latitude})) * cos(radians(${ticketsTable.checkInLatitude}))
-            * cos(radians(${ticketsTable.checkInLongitude}) - radians(${siteLocationsTable.longitude}))
-            + sin(radians(${siteLocationsTable.latitude})) * sin(radians(${ticketsTable.checkInLatitude}))
-          )
-        ) > 0.5`
-      )
-    );
-
-  const [gpsTotal] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(ticketsTable)
-    .where(
-      and(
-        eq(ticketsTable.vendorId, vendorId),
-        sql`${ticketsTable.checkInLatitude} IS NOT NULL`
-      )
-    );
+  const vendorGpsScope = eq(ticketsTable.vendorId, vendorId);
+  const gpsMismatchCount = await countGpsMismatches(vendorGpsScope);
+  const gpsTotalCount = await countGpsCheckIns(vendorGpsScope);
 
   const employeeTicketCounts = await db
     .select({
@@ -223,9 +237,9 @@ router.get("/analytics/vendor/:vendorId", async (req, res): Promise<void> => {
     revenuePipeline,
     kickbackTrendByMonth,
     gpsCompliance: {
-      total: gpsTotal.count,
-      mismatches: gpsMismatchCount[0].count,
-      rate: gpsTotal.count > 0 ? Math.round(((gpsTotal.count - gpsMismatchCount[0].count) / gpsTotal.count) * 100) : 100,
+      total: gpsTotalCount,
+      mismatches: gpsMismatchCount,
+      rate: gpsTotalCount > 0 ? Math.round(((gpsTotalCount - gpsMismatchCount) / gpsTotalCount) * 100) : 100,
     },
     employeePerformance: employeeTicketCounts.map((e) => {
       const revenue = parseFloat(e.revenue);
@@ -393,34 +407,9 @@ router.get("/analytics/partner/:partnerId", async (req, res): Promise<void> => {
     .where(sql`${ticketsTable.siteLocationId} IN (${partnerSites})`)
     .groupBy(ticketLineItemsTable.type);
 
-  const gpsMismatchCount = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(ticketsTable)
-    .innerJoin(siteLocationsTable, eq(ticketsTable.siteLocationId, siteLocationsTable.id))
-    .where(
-      and(
-        sql`${ticketsTable.siteLocationId} IN (${partnerSites})`,
-        sql`${ticketsTable.checkInLatitude} IS NOT NULL`,
-        sql`${siteLocationsTable.latitude} IS NOT NULL`,
-        sql`(
-          6371 * acos(
-            cos(radians(${siteLocationsTable.latitude})) * cos(radians(${ticketsTable.checkInLatitude}))
-            * cos(radians(${ticketsTable.checkInLongitude}) - radians(${siteLocationsTable.longitude}))
-            + sin(radians(${siteLocationsTable.latitude})) * sin(radians(${ticketsTable.checkInLatitude}))
-          )
-        ) > 0.5`
-      )
-    );
-
-  const [gpsTotal] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(ticketsTable)
-    .where(
-      and(
-        sql`${ticketsTable.siteLocationId} IN (${partnerSites})`,
-        sql`${ticketsTable.checkInLatitude} IS NOT NULL`
-      )
-    );
+  const partnerGpsScope = sql`${ticketsTable.siteLocationId} IN (${partnerSites})`;
+  const gpsMismatchCount = await countGpsMismatches(partnerGpsScope);
+  const gpsTotalCount = await countGpsCheckIns(partnerGpsScope);
 
   const topWorkTypes = await db
     .select({
@@ -495,9 +484,9 @@ router.get("/analytics/partner/:partnerId", async (req, res): Promise<void> => {
       costByType.map((t) => ({ type: t.type, total: parseFloat(t.total) })),
     ),
     gpsCompliance: {
-      total: gpsTotal.count,
-      mismatches: gpsMismatchCount[0].count,
-      rate: gpsTotal.count > 0 ? Math.round(((gpsTotal.count - gpsMismatchCount[0].count) / gpsTotal.count) * 100) : 100,
+      total: gpsTotalCount,
+      mismatches: gpsMismatchCount,
+      rate: gpsTotalCount > 0 ? Math.round(((gpsTotalCount - gpsMismatchCount) / gpsTotalCount) * 100) : 100,
     },
     topWorkTypes: topWorkTypes.map(w => ({
       workType: w.workType,
