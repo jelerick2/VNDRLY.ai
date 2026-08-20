@@ -120,7 +120,7 @@ function parseState(
 
 // GET /api/accounting/connections?vendorId=...
 router.get(
-  "/api/accounting/connections",
+  "/accounting/connections",
   async (req: Request, res: Response): Promise<void> => {
     const vendorId = Number(req.query["vendorId"]);
     if (!Number.isInteger(vendorId)) {
@@ -135,7 +135,7 @@ router.get(
 
 // GET /api/accounting/qbo/connect?vendorId=...
 router.get(
-  "/api/accounting/qbo/connect",
+  "/accounting/qbo/connect",
   async (req: Request, res: Response): Promise<void> => {
     const vendorId = Number(req.query["vendorId"]);
     if (!Number.isInteger(vendorId)) {
@@ -171,7 +171,7 @@ router.get(
 // GET /api/accounting/qbo/callback
 //   ?code=...&state=...&realmId=...
 router.get(
-  "/api/accounting/qbo/callback",
+  "/accounting/qbo/callback",
   async (req: Request, res: Response): Promise<void> => {
     const code = String(req.query["code"] ?? "");
     const state = String(req.query["state"] ?? "");
@@ -246,7 +246,7 @@ router.get(
 // an OA OAuth client can still use the legacy long-lived API-key path
 // at POST /api/accounting/oa/connect-api-key (see below).
 router.get(
-  "/api/accounting/oa/connect",
+  "/accounting/oa/connect",
   async (req: Request, res: Response): Promise<void> => {
     const vendorId = Number(req.query["vendorId"]);
     if (!Number.isInteger(vendorId)) {
@@ -278,7 +278,7 @@ router.get(
 
 // GET /api/accounting/oa/callback?code=...&state=...
 router.get(
-  "/api/accounting/oa/callback",
+  "/accounting/oa/callback",
   async (req: Request, res: Response): Promise<void> => {
     const code = String(req.query["code"] ?? "");
     const state = String(req.query["state"] ?? "");
@@ -373,7 +373,7 @@ const oaConnectApiKeySchema = z.object({
 // API key as the connection's access_token with no refresh_token, so
 // existing pushes continue to work unchanged.
 router.post(
-  "/api/accounting/oa/connect-api-key",
+  "/accounting/oa/connect-api-key",
   async (req: Request, res: Response): Promise<void> => {
     const parsed = oaConnectApiKeySchema.safeParse(req.body);
     if (!parsed.success) {
@@ -417,7 +417,7 @@ router.post(
 
 // DELETE /api/accounting/connections/:id?vendorId=...
 router.delete(
-  "/api/accounting/connections/:id",
+  "/accounting/connections/:id",
   async (req: Request, res: Response): Promise<void> => {
     const id = Number(req.params["id"]);
     const vendorId = Number(req.query["vendorId"]);
