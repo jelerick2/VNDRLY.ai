@@ -21,6 +21,7 @@ function findWorkspaceRoot(startDir) {
 
 const workspaceRoot = findWorkspaceRoot(projectRoot);
 const basePath = (process.env.BASE_PATH || "/").replace(/\/+$/, "");
+const pnpmBin = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 function exitWithError(message) {
   console.error(message);
@@ -55,14 +56,7 @@ function stripProtocol(domain) {
 }
 
 function getDeploymentDomain() {
-  if (process.env.EXPO_PUBLIC_DOMAIN) {
-    return stripProtocol(process.env.EXPO_PUBLIC_DOMAIN);
-  }
-
-  console.error(
-    "ERROR: No deployment domain found. Set EXPO_PUBLIC_DOMAIN (e.g. https://vndrly.ai)",
-  );
-  process.exit(1);
+  return stripProtocol(process.env.EXPO_PUBLIC_DOMAIN || "https://vndrly.ai");
 }
 
 function prepareDirectories(timestamp) {
@@ -130,7 +124,7 @@ async function startMetro(expoPublicDomain) {
   };
 
   metroProcess = spawn(
-    "pnpm",
+    pnpmBin,
     [
       "exec",
       "expo",
@@ -144,8 +138,13 @@ async function startMetro(expoPublicDomain) {
       detached: false,
       cwd: projectRoot,
       env,
+      shell: process.platform === "win32",
     },
   );
+
+  metroProcess.on("error", (error) => {
+    exitWithError(`Failed to start Metro: ${error.message}`);
+  });
 
   if (metroProcess.stdout) {
     metroProcess.stdout.on("data", (data) => {

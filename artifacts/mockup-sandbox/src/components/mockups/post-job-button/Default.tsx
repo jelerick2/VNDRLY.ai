@@ -1,10 +1,10 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 
-import btnIdle from "@assets/download_1776968252374.png";
-import btnHoverLeft from "@assets/36_BlueV2_Left_1776383130190.png";
-import btnHoverCenter from "@assets/36_BlueV2_Center_1776383130190.png";
-import btnHoverRight from "@assets/36_BlueV2_Right_1776383130190.png";
+import btnIdle from "@assets/900x229_Grey_Button_1777067254819.png";
+import btnHoverLeft from "@assets/36_BlueV2_Left_R90_1776476149000.png";
+import btnHoverCenter from "@assets/36_BlueV2_Center_R90_1776476149000.png";
+import btnHoverRight from "@assets/36_BlueV2_Right_R90_1776476149000.png";
 
 function PostJobButton({ forceHover = false, dimmed = false }: { forceHover?: boolean; dimmed?: boolean }) {
   const [isHover, setIsHover] = useState(false);

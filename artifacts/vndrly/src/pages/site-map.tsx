@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import SphereBackButton from "@/components/sphere-back-button";
@@ -28,7 +28,11 @@ import {
   getListSiteLocationsQueryKey,
 } from "@workspace/api-client-react";
 import { visitsApi, type VisitorRow } from "@/lib/visits-api";
-import { MapboxMap, type MapboxCircle, type MapboxPoint } from "@/components/mapbox-map";
+import type { MapboxCircle, MapboxPoint } from "@/components/mapbox-map";
+
+const LazyMapboxMap = lazy(() =>
+  import("@/components/mapbox-map").then((mod) => ({ default: mod.MapboxMap })),
+);
 
 const LOW_BATTERY_THRESHOLD = 0.2;
 const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -605,14 +609,22 @@ export default function SiteMapPage() {
             <CardContent className="p-0">
               <div className="relative" style={{ height: 520 }}>
                 {mapCenter ? (
-                  <MapboxMap
-                    points={mapPoints}
-                    circles={mapCircles}
-                    center={[mapCenter[1], mapCenter[0]]}
-                    zoom={viewMode === "all" ? 8 : 15}
-                    styleKind="satellite"
-                    height="100%"
-                  />
+                  <Suspense
+                    fallback={
+                      <div className="flex h-full items-center justify-center bg-muted/40 text-sm text-muted-foreground">
+                        {t("siteMap.loadingMap", "Loading map...")}
+                      </div>
+                    }
+                  >
+                    <LazyMapboxMap
+                      points={mapPoints}
+                      circles={mapCircles}
+                      center={[mapCenter[1], mapCenter[0]]}
+                      zoom={viewMode === "all" ? 8 : 15}
+                      styleKind="satellite"
+                      height="100%"
+                    />
+                  </Suspense>
                 ) : (
                   <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
                     {noSites

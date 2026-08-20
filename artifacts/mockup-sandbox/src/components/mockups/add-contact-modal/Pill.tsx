@@ -1,6 +1,6 @@
-import amberLeft from "@assets/36_Amber_Pill_Left_1776736120526.png";
-import amberCenter from "@assets/36_Amber_Pill_Center_1776736120527.png";
-import amberRight from "@assets/36_Amber_Pill_Right_1776736120527.png";
+import amberLeft from "@assets/36_Amber_Pill_Left_1776771105809.png";
+import amberCenter from "@assets/36_Amber_Pill_Center_1776771105808.png";
+import amberRight from "@assets/36_Amber_Pill_Right_1776771105809.png";
 
 export type PillColor = "amber";
 

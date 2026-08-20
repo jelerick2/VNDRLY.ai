@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Plus, Award, FileText, Copy, ExternalLink, Printer, Trash2 } from "lucide-react";
 
 import btnGrey from "@assets/900x229_Grey_Button_1777067254819.png";
-import btnAmber from "@assets/5eb2ccae-d124-40fb-a518-0e89712eb438_1777067094038.png";
-import btnBlue from "@assets/900x229_Blue_Button_1777067254818.png";
+import btnAmber from "@assets/900x229_Amber_Button.png";
+import btnBlue from "@assets/900x229_Blue_Button.png";
 import btnRed from "@assets/900x229_Red_Button_1777066896414.png";
 
 import statusPillGreen from "@assets/pills/pill_green.png";
@@ -17,7 +17,7 @@ import statusPillOrange from "@assets/pills/pill_orange.png";
 import statusPillPurple from "@assets/pills/pill_purple.png";
 import removePillGrey from "@assets/pills/pill_light_grey_v2r.png";
 import removePillRed from "@assets/pills/pill_red.png";
-import exxonLogo from "@assets/ExxonMobil_Logo_transparent.png";
+import exxonLogo from "@assets/VNDRLY-Logo-v7.png";
 
 function PillBg({ src, opacity = 1 }: { src: string; opacity?: number }) {
   return (

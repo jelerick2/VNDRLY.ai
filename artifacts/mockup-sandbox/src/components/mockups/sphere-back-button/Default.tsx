@@ -1,6 +1,6 @@
-import blankMask from "@assets/VNDRLYai-Button-blank_1777358472636.png";
-import blankMask2 from "@assets/VNDRLYai-Button-blank2_1777358472637.png";
-import backIcon from "@assets/VNDRLYai-Back_1777358472636.png";
+import blankMask from "@assets/VNDRLYai-Button-blank_1777361718577.png";
+import hoverGlossSphere from "@assets/download_1777663665476.png";
+import backIcon from "@assets/Symbol_Arrow_Left_1777371273492.png";
 
 /**
  * Inline copy of artifacts/vndrly/src/components/sphere-back-button.tsx so this
@@ -25,28 +25,26 @@ function SphereBackButton({ size = 48 }: { size?: number }) {
       style={{ width: size, height: size }}
     >
       <span
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        className="absolute inset-0 opacity-100"
         style={{
           ...maskCommon,
           WebkitMaskImage: `url(${blankMask})`,
           maskImage: `url(${blankMask})`,
-          backgroundColor: "#616161",
-        }}
-      />
-      <span
-        className="absolute inset-0 opacity-100 group-hover:opacity-0 transition-opacity duration-200"
-        style={{
-          ...maskCommon,
-          WebkitMaskImage: `url(${blankMask2})`,
-          maskImage: `url(${blankMask2})`,
           backgroundColor: "var(--brand-primary)",
         }}
+      />
+      <img
+        src={hoverGlossSphere}
+        alt=""
+        draggable={false}
+        className="absolute inset-0 w-full h-full pointer-events-none select-none opacity-0 group-hover:opacity-100 transition-opacity duration-200"
       />
       <img
         src={backIcon}
         alt=""
         draggable={false}
-        className="absolute inset-0 w-full h-full opacity-50 pointer-events-none select-none"
+        className="absolute inset-0 w-full h-full pointer-events-none select-none"
+        style={{ mixBlendMode: "screen" }}
       />
     </span>
   );
@@ -88,7 +86,7 @@ function BrandRow({ label, brand }: BrandRowProps) {
             style={{ width: 48, height: 48 }}
           >
             <span
-              className="absolute inset-0 opacity-100"
+              className="absolute inset-0"
               style={{
                 WebkitMaskRepeat: "no-repeat",
                 maskRepeat: "no-repeat",
@@ -96,14 +94,21 @@ function BrandRow({ label, brand }: BrandRowProps) {
                 maskSize: "100% 100%",
                 WebkitMaskImage: `url(${blankMask})`,
                 maskImage: `url(${blankMask})`,
-                backgroundColor: "#616161",
+                backgroundColor: "var(--brand-primary)",
               }}
+            />
+            <img
+              src={hoverGlossSphere}
+              alt=""
+              draggable={false}
+              className="absolute inset-0 w-full h-full pointer-events-none select-none opacity-100"
             />
             <img
               src={backIcon}
               alt=""
               draggable={false}
-              className="absolute inset-0 w-full h-full opacity-50 pointer-events-none select-none"
+              className="absolute inset-0 w-full h-full pointer-events-none select-none"
+              style={{ mixBlendMode: "screen" }}
             />
           </span>
           <div className="text-[10px] uppercase tracking-wide text-gray-500">

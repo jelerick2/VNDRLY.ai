@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import SphereBackButton from "@/components/sphere-back-button";
 import { useTranslation } from "react-i18next";
@@ -20,7 +20,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { RecentTripsCard } from "@/components/map/recent-trips-card";
 import { MapComplianceIssuesCard } from "@/components/map/map-compliance-issues-card";
-import { MapboxMap, type MapboxCircle, type MapboxLine, type MapboxPoint } from "@/components/mapbox-map";
+import type { MapboxCircle, MapboxLine, MapboxPoint } from "@/components/mapbox-map";
+
+const LazyMapboxMap = lazy(() =>
+  import("@/components/mapbox-map").then((mod) => ({ default: mod.MapboxMap })),
+);
 
 const LOW_BATTERY_THRESHOLD = 0.2;
 
@@ -1053,15 +1057,23 @@ export default function CrewMapPage({ portalMode = "default" }: CrewMapPageProps
           <Card className="border-2" style={{ borderColor: "var(--brand-primary)" }}>
             <CardContent className="p-0">
               <div style={{ height: 520, isolation: "isolate" }}>
-                <MapboxMap
-                  points={mapPoints}
-                  lines={mapLines}
-                  circles={mapCircles}
-                  center={[center[1], center[0]]}
-                  zoom={locations.length + visitors.length > 0 ? 8 : 4}
-                  styleKind="street"
-                  height="100%"
-                />
+                <Suspense
+                  fallback={
+                    <div className="flex h-full items-center justify-center bg-muted/40 text-sm text-muted-foreground">
+                      {t("crewMap.loadingMap", "Loading map...")}
+                    </div>
+                  }
+                >
+                  <LazyMapboxMap
+                    points={mapPoints}
+                    lines={mapLines}
+                    circles={mapCircles}
+                    center={[center[1], center[0]]}
+                    zoom={locations.length + visitors.length > 0 ? 8 : 4}
+                    styleKind="street"
+                    height="100%"
+                  />
+                </Suspense>
               </div>
             </CardContent>
           </Card>

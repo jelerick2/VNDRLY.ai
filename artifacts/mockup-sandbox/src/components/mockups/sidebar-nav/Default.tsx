@@ -12,8 +12,8 @@ import {
 } from "lucide-react";
 
 import btnGrey from "@assets/900x229_Grey_Button_1777067254819.png";
-import btnAmber from "@assets/5eb2ccae-d124-40fb-a518-0e89712eb438_1777067094038.png";
-import btnBlue from "@assets/900x229_Blue_Button_1777067254818.png";
+import btnAmber from "@assets/900x229_Amber_Button.png";
+import btnBlue from "@assets/900x229_Blue_Button.png";
 
 type State = "inactive" | "hover" | "active";
 
