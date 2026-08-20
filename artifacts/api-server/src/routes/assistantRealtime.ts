@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, text, type IRouter, type Request, type Response } from "express";
 import {
   usersTable,
   onboardingProgressTable,
@@ -10,11 +10,14 @@ import { logger } from "../lib/logger";
 import { selectDocs, type KnowledgeRole } from "../assistant/knowledge";
 import { buildSystemPrompt } from "../assistant/prompts/system";
 import {
+  DEFAULT_ASKV_REALTIME_MODEL,
+  createAskVRealtimeCall,
   createAskVRealtimeClientSecret,
 } from "../assistant/realtime-session";
 import {
   findAskVTool,
   normalizeAskVRole,
+  toRealtimeToolMetadata,
   toRealtimeTools,
   toolsForRole,
 } from "../assistant/tool-registry";
@@ -23,6 +26,7 @@ import { writeAskVActionAudit, type AskVClientSurface, type AskVInputMode } from
 import { runTool } from "./assistant";
 
 const router: IRouter = Router();
+const parseRealtimeSdp = text({ type: ["application/sdp", "text/plain"], limit: "1mb" });
 
 function requireSession(req: Request, res: Response): SessionPayload | null {
   const session = getSessionFromRequest(req);
@@ -51,12 +55,26 @@ function inputModeFor(surface: AskVClientSurface): AskVInputMode {
 function parseToolArguments(value: unknown): unknown {
   if (typeof value === "string") {
     try {
-      return JSON.parse(value);
+      return stripNullToolArguments(JSON.parse(value));
     } catch {
       return {};
     }
   }
-  return value ?? {};
+  return stripNullToolArguments(value ?? {});
+}
+
+function stripNullToolArguments(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripNullToolArguments(item));
+  }
+  if (!value || typeof value !== "object") return value;
+
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (child === null) continue;
+    cleaned[key] = stripNullToolArguments(child);
+  }
+  return cleaned;
 }
 
 function outputStatus(output: string): "success" | "failure" {
@@ -142,7 +160,7 @@ router.post("/assistant/realtime/client-secret", async (req, res): Promise<void>
     const clientSecret = await createAskVRealtimeClientSecret({
       apiKey,
       userId: session.userId!,
-      model: process.env.ASKV_REALTIME_MODEL?.trim() || "gpt-realtime-2",
+      model: process.env.ASKV_REALTIME_MODEL?.trim() || DEFAULT_ASKV_REALTIME_MODEL,
       voice: process.env.ASKV_REALTIME_VOICE?.trim() || "marin",
       instructions: await buildRealtimeInstructions(session, seedMessage),
       tools: toRealtimeTools(roleTools),
@@ -151,12 +169,54 @@ router.post("/assistant/realtime/client-secret", async (req, res): Promise<void>
     res.json({
       clientSecret,
       toolNames: roleTools.map((tool) => tool.name),
+      toolMetadata: toRealtimeToolMetadata(roleTools),
     });
   } catch (err) {
     logger.error({ err, userId: session.userId }, "AskV Realtime client-secret creation failed");
     res.status(502).json({ error: "Realtime voice is unavailable", code: "assistant.realtime_unavailable" });
   }
 });
+
+router.post(
+  "/assistant/realtime/call",
+  parseRealtimeSdp,
+  async (req, res): Promise<void> => {
+    const session = requireSession(req, res);
+    if (!session) return;
+
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!apiKey) {
+      res.status(503).json({ error: "OpenAI API key is not configured", code: "assistant.openai_missing" });
+      return;
+    }
+
+    const sdp = typeof req.body === "string" ? req.body : "";
+    if (!sdp.trim()) {
+      res.status(400).json({ error: "Missing SDP offer", code: "assistant.realtime_missing_sdp" });
+      return;
+    }
+
+    const role = normalizeAskVRole(session.role);
+    const roleTools = toolsForRole(role);
+    const seedMessage = typeof req.query?.seedMessage === "string" ? req.query.seedMessage : "voice command";
+
+    try {
+      const answer = await createAskVRealtimeCall({
+        apiKey,
+        userId: session.userId!,
+        model: process.env.ASKV_REALTIME_MODEL?.trim() || DEFAULT_ASKV_REALTIME_MODEL,
+        voice: process.env.ASKV_REALTIME_VOICE?.trim() || "marin",
+        instructions: await buildRealtimeInstructions(session, seedMessage),
+        tools: toRealtimeTools(roleTools),
+        sdp,
+      });
+      res.type("application/sdp").send(answer);
+    } catch (err) {
+      logger.error({ err, userId: session.userId }, "AskV Realtime WebRTC call creation failed");
+      res.status(502).json({ error: "Realtime voice is unavailable", code: "assistant.realtime_unavailable" });
+    }
+  },
+);
 
 router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => {
   const session = requireSession(req, res);
@@ -166,6 +226,12 @@ router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => 
   const tool = name ? findAskVTool(name) : null;
   if (!tool) {
     res.status(400).json({ error: "Unknown AskV tool", code: "assistant.unknown_tool" });
+    return;
+  }
+  const role = normalizeAskVRole(session.role);
+  const allowed = tool.roles.includes(role) || tool.roles.includes("any");
+  if (!allowed) {
+    res.status(403).json({ error: "AskV tool is not available to this role", code: "assistant.tool_not_allowed" });
     return;
   }
 

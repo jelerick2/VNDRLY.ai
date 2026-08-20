@@ -18,8 +18,9 @@
     "eas:build:all": "eas build --platform all --profile production",
     "eas:submit:ios": "powershell -ExecutionPolicy Bypass -File ../../scripts/submit-testflight.ps1 -NonInteractive",
     "eas:submit:android": "eas submit --platform android --latest",
-    "eas:update": "eas update --branch production --profile production",
-    "eas:update:preview": "eas update --branch preview --profile preview"
+    "eas:update": "powershell -ExecutionPolicy Bypass -File ../../scripts/mobile-ota-update.ps1 -Channel production -NonInteractive",
+    "eas:update:preview": "powershell -ExecutionPolicy Bypass -File ../../scripts/mobile-ota-update.ps1 -Channel preview -NonInteractive",
+    "release-impact": "node ../../scripts/mobile-release-impact.mjs"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

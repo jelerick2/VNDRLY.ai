@@ -11,12 +11,6 @@ export interface AskVRealtimeClient {
   close(): void;
 }
 
-interface RealtimeClientSecretResponse {
-  clientSecret?: {
-    value?: string;
-  };
-}
-
 function parseEvent(data: string): Record<string, unknown> | null {
   try {
     return JSON.parse(data) as Record<string, unknown>;
@@ -68,17 +62,6 @@ export async function createAskVRealtimeClient(args: {
   onDone?: () => void;
   onError?: (message: string) => void;
 }): Promise<AskVRealtimeClient> {
-  const tokenRes = await fetch(`${BASE}/api/assistant/realtime/client-secret`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ seedMessage: args.seedMessage ?? "voice command" }),
-  });
-  if (!tokenRes.ok) throw new Error("assistant.realtime_unavailable");
-  const tokenJson = (await tokenRes.json()) as RealtimeClientSecretResponse;
-  const ephemeralKey = tokenJson.clientSecret?.value;
-  if (!ephemeralKey) throw new Error("assistant.realtime_missing_client_secret");
-
   const pc = new RTCPeerConnection();
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -119,11 +102,12 @@ export async function createAskVRealtimeClient(args: {
     async connect() {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      const sdpRes = await fetch("https://api.openai.com/v1/realtime/calls", {
+      const params = new URLSearchParams({ seedMessage: args.seedMessage ?? "voice command" });
+      const sdpRes = await fetch(`${BASE}/api/assistant/realtime/call?${params.toString()}`, {
         method: "POST",
         body: offer.sdp ?? "",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${ephemeralKey}`,
           "Content-Type": "application/sdp",
         },
       });

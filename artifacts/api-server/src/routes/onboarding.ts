@@ -27,6 +27,7 @@ import {
   buildPlatformEulaAcceptancePatch,
   isPlatformEulaPayloadAccepted,
 } from "../lib/platform-eula-acceptance";
+import { isLegalConsentPayloadAccepted } from "../lib/legal-consent";
 import { logger } from "../lib/logger";
 import { getAppOrigin } from "../lib/appOrigin";
 import { ObjectStorageService } from "../lib/objectStorage";
@@ -736,6 +737,7 @@ async function issueAndEmailFieldInvite(employeeId: number): Promise<{ token: st
 function validatePartnerPayload(p: Record<string, unknown>): string[] {
   const missing: string[] = [];
   if (!isPlatformEulaPayloadAccepted(p)) missing.push("platformEula");
+  if (!isLegalConsentPayloadAccepted(p)) missing.push("legalConsent");
   // Branding (colors + logos) is optional — partners can finish setup
   // later from the dashboard progress stepper. VNDRLY defaults apply
   // until they upload their own.
@@ -759,6 +761,7 @@ function validatePartnerPayload(p: Record<string, unknown>): string[] {
 function validateVendorPayload(p: Record<string, unknown>): string[] {
   const missing: string[] = [];
   if (!isPlatformEulaPayloadAccepted(p)) missing.push("platformEula");
+  if (!isLegalConsentPayloadAccepted(p)) missing.push("legalConsent");
   const tax = (p.taxIds ?? {}) as Record<string, unknown>;
   if (!trim(tax.federalTaxId)) missing.push("taxIds.federalTaxId");
   if (!trim(tax.stateTaxId)) missing.push("taxIds.stateTaxId");

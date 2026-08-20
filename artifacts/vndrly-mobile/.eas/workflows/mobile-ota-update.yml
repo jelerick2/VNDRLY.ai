@@ -1,0 +1,31 @@
+name: VNDRLY Mobile OTA Update
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        type: choice
+        required: true
+        description: EAS Update channel to publish to.
+        default: preview
+        options:
+          - preview
+          - production
+      message:
+        type: string
+        required: true
+        description: Short release note for the update.
+concurrency:
+  group: ${{ workflow.filename }}-${{ github.ref }}
+  cancel_in_progress: true
+
+jobs:
+  publish_update:
+    name: Publish OTA update
+    type: update
+    environment: ${{ inputs.channel }}
+    params:
+      channel: ${{ inputs.channel }}
+      message: ${{ inputs.message }}
+      platform: all
+      upload_sentry_sourcemaps: false

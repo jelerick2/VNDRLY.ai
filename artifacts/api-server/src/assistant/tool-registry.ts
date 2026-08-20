@@ -29,9 +29,18 @@ export interface OpenAIRealtimeTool {
   name: string;
   description: string;
   parameters: Anthropic.Tool["input_schema"];
+  strict: true;
+}
+
+export interface OpenAIRealtimeToolMetadata {
+  name: string;
+  mutating: boolean;
+  confirmation: AskVConfirmationMode;
+  auditTarget: AskVAuditTarget | null;
 }
 
 type ToolMetadata = Omit<AskVToolDefinition, "name" | "description" | "inputSchema">;
+type JsonSchema = Record<string, unknown>;
 
 const ALL_SIGNED_IN_ROLES: AskVRole[] = ["admin", "partner", "vendor", "field_employee"];
 const OFFICE_ROLES: AskVRole[] = ["admin", "partner", "vendor"];
@@ -125,12 +134,77 @@ export function toAnthropicTools(tools: AskVToolDefinition[]): Anthropic.Tool[] 
   }));
 }
 
+function withNullableType(schema: JsonSchema): JsonSchema {
+  const copy = { ...schema };
+  const type = copy.type;
+  if (Array.isArray(type)) {
+    copy.type = type.includes("null") ? type : [...type, "null"];
+  } else if (typeof type === "string") {
+    copy.type = type === "null" ? type : [type, "null"];
+  } else if (Array.isArray(copy.anyOf)) {
+    const hasNull = copy.anyOf.some((item) => {
+      return item && typeof item === "object" && (item as JsonSchema).type === "null";
+    });
+    copy.anyOf = hasNull ? copy.anyOf : [...copy.anyOf, { type: "null" }];
+  } else {
+    copy.anyOf = [{ ...copy }, { type: "null" }];
+    delete copy.type;
+    delete copy.properties;
+    delete copy.required;
+    delete copy.additionalProperties;
+  }
+  if (Array.isArray(copy.enum) && !copy.enum.includes(null)) {
+    copy.enum = [...copy.enum, null];
+  }
+  return copy;
+}
+
+function toStrictRealtimeSchema(schema: unknown, requiredByParent = true): unknown {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return schema;
+  const source = schema as JsonSchema;
+  const copy: JsonSchema = { ...source };
+
+  if (copy.type === "object") {
+    const properties = copy.properties && typeof copy.properties === "object" && !Array.isArray(copy.properties)
+      ? (copy.properties as Record<string, unknown>)
+      : {};
+    const originalRequired = new Set(Array.isArray(copy.required) ? copy.required.filter((item): item is string => typeof item === "string") : []);
+    const normalizedProperties: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(properties)) {
+      normalizedProperties[key] = toStrictRealtimeSchema(value, originalRequired.has(key));
+    }
+    copy.properties = normalizedProperties;
+    copy.required = Object.keys(properties);
+    copy.additionalProperties = false;
+  } else if (copy.items) {
+    copy.items = toStrictRealtimeSchema(copy.items);
+  }
+
+  for (const key of ["anyOf", "oneOf", "allOf"] as const) {
+    if (Array.isArray(copy[key])) {
+      copy[key] = copy[key].map((item) => toStrictRealtimeSchema(item));
+    }
+  }
+
+  return requiredByParent ? copy : withNullableType(copy);
+}
+
 export function toRealtimeTools(tools: AskVToolDefinition[]): OpenAIRealtimeTool[] {
   return tools.map((tool) => ({
     type: "function",
     name: tool.name,
     description: tool.description,
-    parameters: tool.inputSchema,
+    parameters: toStrictRealtimeSchema(tool.inputSchema) as Anthropic.Tool["input_schema"],
+    strict: true,
+  }));
+}
+
+export function toRealtimeToolMetadata(tools: AskVToolDefinition[]): OpenAIRealtimeToolMetadata[] {
+  return tools.map((tool) => ({
+    name: tool.name,
+    mutating: tool.mutating,
+    confirmation: tool.confirmation,
+    auditTarget: tool.auditTarget ?? null,
   }));
 }
 

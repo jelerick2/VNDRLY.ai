@@ -1,7 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAskVRealtimeClientSecret, hashSafetyIdentifier } from "./realtime-session";
+import {
+  DEFAULT_ASKV_REALTIME_MODEL,
+  createAskVRealtimeCall,
+  createAskVRealtimeClientSecret,
+  hashSafetyIdentifier,
+} from "./realtime-session";
 
 describe("AskV Realtime session", () => {
+  it("defaults to the current OpenAI realtime voice model", () => {
+    expect(DEFAULT_ASKV_REALTIME_MODEL).toBe("gpt-realtime-2.1");
+  });
+
   it("hashes safety identifiers without exposing user ids", () => {
     const one = hashSafetyIdentifier(42);
     const two = hashSafetyIdentifier(42);
@@ -20,7 +29,7 @@ describe("AskV Realtime session", () => {
       model: "gpt-realtime-2",
       voice: "marin",
       instructions: "Use AskV tools.",
-      tools: [{ type: "function", name: "query_tickets", description: "Query tickets", parameters: { type: "object" } }],
+      tools: [{ type: "function", name: "query_tickets", description: "Query tickets", parameters: { type: "object" }, strict: true }],
       fetchImpl,
     });
 
@@ -42,8 +51,47 @@ describe("AskV Realtime session", () => {
         type: "realtime",
         model: "gpt-realtime-2",
         audio: { output: { voice: "marin" } },
+        tool_choice: "auto",
         tools: [{ type: "function", name: "query_tickets" }],
       },
+    });
+  });
+
+  it("creates server-mediated WebRTC calls with SDP and session config", async () => {
+    const fetchImpl = vi.fn(async () => new Response("answer-sdp", { status: 200 }));
+
+    const answer = await createAskVRealtimeCall({
+      apiKey: "sk-test",
+      userId: 42,
+      model: "gpt-realtime-2",
+      voice: "marin",
+      instructions: "Keep it short.",
+      tools: [{ type: "function", name: "query_tickets", description: "Query tickets", parameters: { type: "object" }, strict: true }],
+      sdp: "offer-sdp",
+      fetchImpl,
+    });
+
+    expect(answer).toBe("answer-sdp");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.openai.com/v1/realtime/calls",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-test",
+          "OpenAI-Safety-Identifier": hashSafetyIdentifier(42),
+        }),
+      }),
+    );
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    const body = init.body as FormData;
+    expect(body.get("sdp")).toBe("offer-sdp");
+    expect(JSON.parse(String(body.get("session")))).toMatchObject({
+      type: "realtime",
+      model: "gpt-realtime-2",
+      instructions: "Keep it short.",
+      audio: { output: { voice: "marin" } },
+      tool_choice: "auto",
+      tools: [{ type: "function", name: "query_tickets" }],
     });
   });
 });

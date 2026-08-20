@@ -1,0 +1,38 @@
+name: VNDRLY Mobile TestFlight Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        type: boolean
+        required: false
+        default: true
+        description: Submit the completed iOS production build to App Store Connect.
+      message:
+        type: string
+        required: false
+        default: Native mobile build
+        description: Message attached to the EAS build.
+
+concurrency:
+  group: ${{ workflow.filename }}-${{ github.ref }}
+  cancel_in_progress: true
+
+jobs:
+  build_ios:
+    name: Build iOS production
+    type: build
+    params:
+      platform: ios
+      profile: production
+      message: ${{ inputs.message }}
+
+  submit_ios:
+    name: Submit latest iOS build
+    needs:
+      - build_ios
+    if: ${{ inputs.submit }}
+    type: submit
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production

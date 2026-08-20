@@ -1,0 +1,56 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sendPasswordResetEmail } from "./sendgrid";
+
+const originalEnv = { ...process.env };
+
+beforeEach(() => {
+  process.env.SENDGRID_API_KEY = "SG.test-key";
+  process.env.SENDGRID_FROM_EMAIL = "support@vndrly.ai";
+  process.env.SENDGRID_FROM_NAME = "VNDRLY";
+  process.env.SENDGRID_SANDBOX_MODE = "true";
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      new Response("", {
+        status: 200,
+        headers: { "x-message-id": "msg-123" },
+      }),
+    ),
+  );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  process.env = { ...originalEnv };
+});
+
+describe("sendPasswordResetEmail", () => {
+  it("sends password reset email through SendGrid", async () => {
+    const result = await sendPasswordResetEmail(
+      "user@example.com",
+      "https://vndrly.ai/reset-password?token=abc",
+      "Jane User",
+    );
+
+    expect(result).toEqual({ messageId: "msg-123" });
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.sendgrid.com/v3/mail/send");
+    expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer SG.test-key");
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.from).toEqual({ email: "support@vndrly.ai", name: "VNDRLY" });
+    expect(payload.personalizations[0].to).toEqual([{ email: "user@example.com" }]);
+    expect(payload.subject).toBe("Reset your VNDRLY password");
+    expect(payload.mail_settings.sandbox_mode.enable).toBe(true);
+  });
+
+  it("throws when SendGrid is not configured", async () => {
+    delete process.env.SENDGRID_API_KEY;
+
+    await expect(
+      sendPasswordResetEmail("user@example.com", "https://vndrly.ai/reset-password?token=abc", "Jane User"),
+    ).rejects.toThrow("SendGrid is not configured");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

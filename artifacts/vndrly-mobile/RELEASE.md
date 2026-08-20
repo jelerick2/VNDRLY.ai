@@ -1,7 +1,8 @@
-# Mobile Release Runbook — TestFlight & Google Play Internal Testing
+# Mobile Release Runbook — OTA, TestFlight & Google Play Internal Testing
 
-This document is the step-by-step process for shipping a build of the VNDRLY
-field app to Apple TestFlight and the Google Play Internal Testing track.
+This document is the step-by-step process for shipping the VNDRLY field app.
+Use EAS Update for JavaScript-only fixes, and use TestFlight / Google Play
+builds when native code, config, permissions, SDKs, or runtime versions change.
 
 The project is **already configured** for EAS Build and EAS Submit. Everything
 below has to be run from a machine where you can interactively log in to your
@@ -138,14 +139,13 @@ Bump `expo.version` in `app.json` for user-visible version changes; the
 
 Most fixes are JavaScript-only and don't need a new TestFlight or Play
 submission. EAS Update lets us push those fixes to already-installed devices
-in seconds.
+in seconds, as long as the installed binary has the same compatible
+`runtimeVersion`.
 
 ### One-time setup
 
-1. After running `pnpm eas:init` (step 2), copy the generated
-   `expo.extra.eas.projectId` value and replace
-   `REPLACE_WITH_EAS_PROJECT_ID` in `app.json` under `expo.updates.url` with
-   that id (the URL becomes `https://u.expo.dev/<projectId>`).
+1. Confirm `app.json` has `expo.extra.eas.projectId` and `expo.updates.url`.
+   VNDRLY currently uses project id `2b63b072-00bc-4330-aac5-fafaaa7f7ff5`.
 2. Run `pnpm exec eas update:configure` once from `artifacts/vndrly-mobile/`
    to register the project with the Update service. This only needs to happen
    the first time.
@@ -158,20 +158,42 @@ internal preview builds pull preview updates.
 
 ### Publishing an OTA update
 
-From `artifacts/vndrly-mobile/`:
+From the repo root:
 
-```bash
-pnpm eas:update              # publishes to the production channel
-pnpm eas:update:preview      # publishes to the preview channel for QA first
+```powershell
+pnpm run mobile:update:preview -- -Message "Fix ticket photo retry"
+pnpm run mobile:update:production -- -Message "Fix ticket photo retry"
 ```
 
-You will be prompted for a short message; use the commit subject or a
-human-readable summary. Devices on the matching channel and `runtimeVersion`
-will download the update on next launch.
+The script runs the mobile typecheck, mobile tests, and a native-change guard
+before publishing. Devices on the matching channel and `runtimeVersion` will
+download the update on next launch. For a staged production rollout:
+
+```powershell
+pnpm run mobile:update:production -- -Message "Fix ticket photo retry" -RolloutPercentage 25
+```
+
+Use `pnpm run mobile:release-impact` before release if you want to see why a
+change set is considered OTA-safe or TestFlight-required.
+
+### EAS Workflows
+
+Workflow files live beside this app's `eas.json`:
+
+- `.eas/workflows/mobile-ota-update.yml` publishes a manual EAS Update to the
+  selected `preview` or `production` channel.
+- `.eas/workflows/mobile-testflight.yml` builds iOS production and optionally
+  submits the build to App Store Connect.
+
+Use the OTA workflow for tested JavaScript-only fixes. Use the TestFlight
+workflow when native changes are present or when a new binary must be reviewed.
+For staged rollout percentages, use the local PowerShell OTA script because the
+current EAS Workflow schema requires a literal integer for rollout percentages.
 
 ### When to ship an OTA update vs a new store build
 
-Use **`pnpm eas:update`** (OTA, takes ~30 seconds, no review) when the change
+Use **`pnpm run mobile:update:preview`** and then
+**`pnpm run mobile:update:production`** (OTA, no App Store review) when the change
 is **JavaScript / asset only**:
 
 - Bug fixes in TSX/TS code under `app/`, `components/`, `hooks/`, `lib/`

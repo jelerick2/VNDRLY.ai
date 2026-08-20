@@ -21,7 +21,12 @@ import {
   OnboardingPlatformEulaStep,
   type PlatformEulaAcceptanceValue,
 } from "@/components/onboarding-platform-eula-step";
+import {
+  OnboardingLegalConsentStep,
+  type OnboardingLegalConsentValue,
+} from "@/components/onboarding-legal-consent-step";
 import { PLATFORM_EULA_VERSION } from "@workspace/platform-eula";
+import { LEGAL_POLICY_VERSION } from "@/lib/legal-docs";
 import { brandStyleVars, DEFAULT_BRAND } from "@/hooks/use-brand";
 import { onboardingApi } from "@/lib/onboarding-api";
 import { uploadOnboardingLogo } from "@/lib/onboarding-logo-upload";
@@ -31,6 +36,7 @@ import { Card, CardContent } from "@/components/ui/card";
 type StepKey =
   | "company-basics"
   | "platform-eula"
+  | "legal-consent"
   | "tax-ids"
   | "work-types"
   | "compliance"
@@ -46,6 +52,7 @@ type StepKey =
 const STEPS: (StepperStep & { key: StepKey })[] = [
   { key: "company-basics", label: "Account" },
   { key: "platform-eula", label: "Platform Agreement" },
+  { key: "legal-consent", label: "Privacy & Messaging" },
   { key: "branding", label: "Branding" },
   { key: "tax-ids", label: "Tax IDs" },
   { key: "work-types", label: "Service Area & Work Types" },
@@ -62,7 +69,7 @@ const STEPS: (StepperStep & { key: StepKey })[] = [
 // from the dashboard's Finish-setup widget. Required data is still
 // enforced at /complete time (the user can't actually finalise
 // onboarding without it), but they're free to walk away in between.
-const REQUIRED_STEPS = new Set<StepKey>(["company-basics", "platform-eula"]);
+const REQUIRED_STEPS = new Set<StepKey>(["company-basics", "platform-eula", "legal-consent"]);
 
 interface VendorPayload {
   taxIds?: { federalTaxId?: string; stateTaxId?: string; physicalAddress?: string; billingAddress?: string };
@@ -73,6 +80,7 @@ interface VendorPayload {
   eDeliveryConsent?: boolean;
   branding?: { brandPrimaryColor?: string; logoUrl?: string };
   platformEula?: { accepted?: boolean; version?: string };
+  legalConsent?: { accepted?: boolean; smsOptIn?: boolean; version?: string };
   firstEmployee?: { firstName?: string; lastName?: string; email?: string; phone?: string };
 }
 
@@ -136,6 +144,11 @@ export default function OnboardingVendor() {
   const [platformEula, setPlatformEula] = useState<PlatformEulaAcceptanceValue>({
     accepted: false,
     version: PLATFORM_EULA_VERSION,
+  });
+  const [legalConsent, setLegalConsent] = useState<OnboardingLegalConsentValue>({
+    accepted: false,
+    smsOptIn: false,
+    version: LEGAL_POLICY_VERSION,
   });
   const [firstEmp, setFirstEmp] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [showAccountCreated, setShowAccountCreated] = useState(false);
@@ -219,6 +232,13 @@ export default function OnboardingVendor() {
           setPlatformEula({
             accepted: true,
             version: p.platformEula.version ?? PLATFORM_EULA_VERSION,
+          });
+        }
+        if (p.legalConsent) {
+          setLegalConsent({
+            accepted: p.legalConsent.accepted === true,
+            smsOptIn: p.legalConsent.smsOptIn === true,
+            version: p.legalConsent.version ?? LEGAL_POLICY_VERSION,
           });
         }
         if (p.firstEmployee) {
@@ -459,6 +479,11 @@ export default function OnboardingVendor() {
           return "You must accept the VNDRLY Platform Agreement to continue.";
         }
         return null;
+      case "legal-consent":
+        if (!legalConsent.accepted) {
+          return "You must accept the VNDRLY Privacy Policy and Terms & Conditions to continue.";
+        }
+        return null;
       case "tax-ids":
         if (!taxIds.federalTaxId.trim() || !taxIds.stateTaxId.trim()) return "Federal and state tax IDs are required.";
         if (!taxIds.physicalAddress.trim() || !taxIds.billingAddress.trim()) return "Physical and billing addresses are required.";
@@ -639,13 +664,21 @@ export default function OnboardingVendor() {
               version: PLATFORM_EULA_VERSION,
             },
           };
+        case "legal-consent":
+          return {
+            legalConsent: {
+              accepted: legalConsent.accepted,
+              smsOptIn: legalConsent.smsOptIn,
+              version: LEGAL_POLICY_VERSION,
+            },
+          };
         case "first-employee":
           return { firstEmployee: firstEmp };
         default:
           return {};
       }
     };
-  }, [currentStep.key, taxIds, selectedWtIds, serviceRadius, compliance, rates, eDeliveryConsent, vendorBranding, platformEula, firstEmp]);
+  }, [currentStep.key, taxIds, selectedWtIds, serviceRadius, compliance, rates, eDeliveryConsent, vendorBranding, platformEula, legalConsent, firstEmp]);
 
   // Group work-types by category so the picker is scannable instead of
   // a 60-item flat list.
@@ -994,6 +1027,14 @@ export default function OnboardingVendor() {
             <OnboardingPlatformEulaStep
               value={platformEula}
               onChange={setPlatformEula}
+              disabled={loading}
+            />
+          )}
+
+          {currentStep.key === "legal-consent" && (
+            <OnboardingLegalConsentStep
+              value={legalConsent}
+              onChange={setLegalConsent}
               disabled={loading}
             />
           )}

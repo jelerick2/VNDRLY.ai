@@ -12,19 +12,21 @@
 
 import { PLATFORM_EULA_VERSION } from "@workspace/platform-eula";
 
+const LEGAL_POLICY_VERSION = "2026-08-20";
+
 export type Persona = "partner" | "vendor" | "field_employee";
 
 export const REQUIRED_STEPS: Record<Persona, readonly string[]> = {
-  partner: ["company-basics", "platform-eula", "first-site", "tax-billing"],
-  vendor: ["company-basics", "platform-eula", "tax-ids", "work-types", "compliance", "rates", "first-employee"],
+  partner: ["company-basics", "platform-eula", "legal-consent", "first-site", "tax-billing"],
+  vendor: ["company-basics", "platform-eula", "legal-consent", "tax-ids", "work-types", "compliance", "rates", "first-employee"],
   field_employee: ["personal-info", "photo-certs", "set-password"],
 };
 
 // Full canonical sequence the wizard renders. Mirrors STEP_KEYS in
 // the route. "done" is always the terminal pseudo-step.
 export const STEP_KEYS: Record<Persona, readonly string[]> = {
-  partner: ["company-basics", "platform-eula", "branding", "first-site", "tax-billing", "preferences", "invite-team", "done"],
-  vendor: ["company-basics", "platform-eula", "branding", "tax-ids", "work-types", "compliance", "rates", "first-employee", "done"],
+  partner: ["company-basics", "platform-eula", "legal-consent", "branding", "first-site", "tax-billing", "preferences", "invite-team", "done"],
+  vendor: ["company-basics", "platform-eula", "legal-consent", "branding", "tax-ids", "work-types", "compliance", "rates", "first-employee", "done"],
   field_employee: ["personal-info", "photo-certs", "set-password", "done"],
 };
 
@@ -35,6 +37,7 @@ export const STEP_KEYS: Record<Persona, readonly string[]> = {
 export const STEP_REQUIRED_FIELDS: Record<Persona, Record<string, readonly string[]>> = {
   partner: {
     "platform-eula": ["platformEula.accepted", "platformEula.version"],
+    "legal-consent": ["legalConsent.accepted", "legalConsent.version"],
     "first-site": ["firstSite.name", "firstSite.address", "firstSite.siteCode", "firstSite.siteRadiusMeters"],
     "tax-billing": [
       "taxBilling.federalTaxId",
@@ -46,6 +49,7 @@ export const STEP_REQUIRED_FIELDS: Record<Persona, Record<string, readonly strin
   },
   vendor: {
     "platform-eula": ["platformEula.accepted", "platformEula.version"],
+    "legal-consent": ["legalConsent.accepted", "legalConsent.version"],
     "tax-ids": [
       "taxIds.federalTaxId",
       "taxIds.stateTaxId",
@@ -86,6 +90,7 @@ export const PAYLOAD_TOP_KEYS: Record<Persona, readonly string[]> = {
     "logoUrl",
     "logoSquareUrl",
     "platformEula",
+    "legalConsent",
     "firstSite",
     "taxBilling",
     "preferences",
@@ -93,6 +98,7 @@ export const PAYLOAD_TOP_KEYS: Record<Persona, readonly string[]> = {
   ],
   vendor: [
     "platformEula",
+    "legalConsent",
     "taxIds",
     "serviceArea",
     "workTypeIds",
@@ -266,6 +272,7 @@ function sampleValue(path: string): unknown {
   if (/Hours|Multiplier|Radius|Miles/i.test(leaf)) return 1;
   if (/Consent/i.test(leaf)) return true;
   if (/^workTypeIds$/.test(leaf)) return ["1"];
+  if (/legalConsent\.version$/i.test(path)) return LEGAL_POLICY_VERSION;
   if (/^version$/i.test(leaf)) return PLATFORM_EULA_VERSION;
   return "value";
 }

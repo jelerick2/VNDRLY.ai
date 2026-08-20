@@ -5,7 +5,7 @@
 import { Client } from "ssh2";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { ROOT, godaddyEnvPath, mapboxEnvPath, supabaseEnvPath } from "./secrets-path.mjs";
+import { ROOT, godaddyEnvPath, mapboxEnvPath, sendGridEnvPath, supabaseEnvPath, twilioEnvPath } from "./secrets-path.mjs";
 const LOCAL_CFG = path.join(ROOT, ".local", "godaddy-vps.json");
 const BOOTSTRAP = path.join(ROOT, "scripts/server/bootstrap-vps.sh");
 const NGINX_SITE = path.join(ROOT, "scripts/server/vndrly.ai.nginx.conf");
@@ -153,6 +153,48 @@ async function main() {
     mapboxEnv.mapbox_api_key ??
     mapboxEnv.api ??
     "";
+  const twilioEnv = parseEnvFile(twilioEnvPath());
+  const twilioAccountSid =
+    localEnv.match(/^TWILIO_ACCOUNT_SID=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_ACCOUNT_SID ??
+    "";
+  const twilioApiKey =
+    localEnv.match(/^TWILIO_API_KEY=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_API_KEY ??
+    "";
+  const twilioApiSecret =
+    localEnv.match(/^TWILIO_API_SECRET=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_API_SECRET ??
+    "";
+  const twilioPhoneNumber =
+    localEnv.match(/^TWILIO_PHONE_NUMBER=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_PHONE_NUMBER ??
+    "";
+  const twilioMessagingServiceSid =
+    localEnv.match(/^TWILIO_MESSAGING_SERVICE_SID=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_MESSAGING_SERVICE_SID ??
+    "";
+  const sendGridEnv = parseEnvFile(sendGridEnvPath());
+  const sendGridApiKey =
+    localEnv.match(/^SENDGRID_API_KEY=(.+)$/m)?.[1]?.trim() ??
+    sendGridEnv.SENDGRID_API_KEY ??
+    "";
+  const sendGridFromEmail =
+    localEnv.match(/^SENDGRID_FROM_EMAIL=(.+)$/m)?.[1]?.trim() ??
+    sendGridEnv.SENDGRID_FROM_EMAIL ??
+    "";
+  const sendGridFromName =
+    localEnv.match(/^SENDGRID_FROM_NAME=(.+)$/m)?.[1]?.trim() ??
+    sendGridEnv.SENDGRID_FROM_NAME ??
+    "";
+  const sendGridReplyTo =
+    localEnv.match(/^SENDGRID_REPLY_TO=(.+)$/m)?.[1]?.trim() ??
+    sendGridEnv.SENDGRID_REPLY_TO ??
+    "";
+  const sendGridSandboxMode =
+    localEnv.match(/^SENDGRID_SANDBOX_MODE=(.+)$/m)?.[1]?.trim() ??
+    sendGridEnv.SENDGRID_SANDBOX_MODE ??
+    "";
 
   const supabaseUrl =
     localEnv.match(/^SUPABASE_URL=(.+)$/m)?.[1]?.trim() ||
@@ -182,6 +224,16 @@ async function main() {
     alphaVantageKey ? `ALPHA_VANTAGE_API_KEY=${alphaVantageKey}` : "",
     mapboxAccessToken ? `MAPBOX_ACCESS_TOKEN=${mapboxAccessToken}` : "",
     mapboxAccessToken ? `VITE_MAPBOX_ACCESS_TOKEN=${mapboxAccessToken}` : "",
+    twilioAccountSid ? `TWILIO_ACCOUNT_SID=${twilioAccountSid}` : "",
+    twilioApiKey ? `TWILIO_API_KEY=${twilioApiKey}` : "",
+    twilioApiSecret ? `TWILIO_API_SECRET=${twilioApiSecret}` : "",
+    twilioPhoneNumber ? `TWILIO_PHONE_NUMBER=${twilioPhoneNumber}` : "",
+    twilioMessagingServiceSid ? `TWILIO_MESSAGING_SERVICE_SID=${twilioMessagingServiceSid}` : "",
+    sendGridApiKey ? `SENDGRID_API_KEY=${sendGridApiKey}` : "",
+    sendGridFromEmail ? `SENDGRID_FROM_EMAIL=${sendGridFromEmail}` : "",
+    sendGridFromName ? `SENDGRID_FROM_NAME=${sendGridFromName}` : "",
+    sendGridReplyTo ? `SENDGRID_REPLY_TO=${sendGridReplyTo}` : "",
+    sendGridSandboxMode ? `SENDGRID_SANDBOX_MODE=${sendGridSandboxMode}` : "",
     "OPS_ALERT_EMAIL=admin@vndrly.ai",
     "PUBLIC_APP_URL=https://vndrly.ai",
     "APP_BASE_URL=https://vndrly.ai",

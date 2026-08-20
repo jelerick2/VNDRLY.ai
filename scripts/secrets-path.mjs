@@ -35,3 +35,11 @@ export function githubPatPath() {
 export function mapboxEnvPath() {
   return process.env.MAPBOX_ENV || path.join(SECRETS_DIR, "MAPBOX Account.env");
 }
+
+export function twilioEnvPath() {
+  return process.env.TWILIO_ENV || path.join(SECRETS_DIR, "Twilio_API_Key.env");
+}
+
+export function sendGridEnvPath() {
+  return process.env.SENDGRID_ENV || path.join(SECRETS_DIR, "SendGrid_API_Key.env");
+}

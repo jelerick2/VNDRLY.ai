@@ -1,11 +1,76 @@
-// Outbound email delivery is disabled (not configured yet).
-// Call sites remain so paid-tier email can be wired later without API churn.
+// Most outbound email call sites remain staged for paid-tier rollout.
+// Password reset email is live when SENDGRID_* env vars are configured.
 import { type PushWarning } from "@workspace/api-zod";
 import { logger } from "./logger";
 
 const SKIP = "Outbound email skipped (email delivery disabled)";
+const SENDGRID_MAIL_SEND_URL = "https://api.sendgrid.com/v3/mail/send";
 
 export type EmailLocale = "en" | "es";
+
+function sendGridSandboxEnabled(): boolean {
+  const raw = process.env.SENDGRID_SANDBOX_MODE?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function sendGridConfig() {
+  const apiKey = process.env.SENDGRID_API_KEY?.trim() ?? "";
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL?.trim() ?? "";
+  const fromName = process.env.SENDGRID_FROM_NAME?.trim() || "VNDRLY";
+  const replyTo = process.env.SENDGRID_REPLY_TO?.trim() ?? "";
+  return { apiKey, fromEmail, fromName, replyTo };
+}
+
+async function sendSendGridMail(input: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  categories?: string[];
+  customArgs?: Record<string, string>;
+}): Promise<{ messageId: string | undefined }> {
+  const cfg = sendGridConfig();
+  if (!cfg.apiKey || !cfg.fromEmail) {
+    throw new Error("SendGrid is not configured");
+  }
+
+  const payload: Record<string, unknown> = {
+    personalizations: [
+      {
+        to: [{ email: input.to }],
+        ...(input.customArgs ? { custom_args: input.customArgs } : {}),
+      },
+    ],
+    from: { email: cfg.fromEmail, name: cfg.fromName },
+    subject: input.subject,
+    content: [
+      { type: "text/plain", value: input.text },
+      { type: "text/html", value: input.html },
+    ],
+    ...(cfg.replyTo ? { reply_to: { email: cfg.replyTo } } : {}),
+    ...(input.categories?.length ? { categories: input.categories } : {}),
+    ...(sendGridSandboxEnabled()
+      ? { mail_settings: { sandbox_mode: { enable: true } } }
+      : {}),
+  };
+
+  const res = await fetch(SENDGRID_MAIL_SEND_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${cfg.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    logger.error({ status: res.status, body }, "SendGrid mail send failed");
+    throw new Error(`SendGrid mail send failed with status ${res.status}`);
+  }
+
+  return { messageId: res.headers.get("x-message-id") ?? undefined };
+}
 
 const INVOICE_COPY = {
   en: {
@@ -554,8 +619,40 @@ export async function sendReconciliationWeeklyRecapEmail(
   return { messageId: undefined };
 }
 
-export async function sendPasswordResetEmail(toEmail: string, resetUrl: string, displayName: string) {
-  return;
+export async function sendPasswordResetEmail(
+  toEmail: string,
+  resetUrl: string,
+  displayName: string,
+): Promise<{ messageId: string | undefined }> {
+  const safeName = escapeHtml(displayName || "there");
+  const safeUrl = escapeHtml(resetUrl);
+  return sendSendGridMail({
+    to: toEmail,
+    subject: "Reset your VNDRLY password",
+    categories: ["password_reset"],
+    html: `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111827;">
+        <div style="background:#111827;color:#f59e0b;padding:16px 20px;border-radius:8px 8px 0 0;">
+          <div style="font-weight:700;font-size:18px;">VNDRLY</div>
+          <div style="color:#fef3c7;font-size:12px;">Password reset</div>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-top:0;padding:20px;border-radius:0 0 8px 8px;">
+          <p>Hi ${safeName},</p>
+          <p>We received a request to reset your VNDRLY password. Use the button below to choose a new password.</p>
+          <p style="margin:24px 0;">
+            <a href="${safeUrl}" style="background:#f59e0b;color:#111827;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:6px;display:inline-block;">Reset password</a>
+          </p>
+          <p>If the button does not work, copy and paste this link into your browser:</p>
+          <p style="word-break:break-all;color:#374151;">${safeUrl}</p>
+          <p style="color:#6b7280;font-size:12px;margin-top:24px;">This link expires in 1 hour. If you did not request this, you can ignore this email.</p>
+        </div>
+      </div>`,
+    text:
+      `Hi ${displayName || "there"},\n\n` +
+      "We received a request to reset your VNDRLY password.\n\n" +
+      `Reset your password here: ${resetUrl}\n\n` +
+      "This link expires in 1 hour. If you did not request this, you can ignore this email.",
+  });
 }
 
 // ─── Admin-issued temporary password ─────────────────────────────

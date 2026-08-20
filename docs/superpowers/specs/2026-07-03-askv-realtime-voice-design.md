@@ -83,10 +83,10 @@ If no command follows wake activation, AskV times out and returns to wake-word l
 
 The architecture is server-owned.
 
-1. Client requests a Realtime session from VNDRLY API.
-2. VNDRLY API authenticates the user and creates an ephemeral OpenAI Realtime session.
+1. Client creates a WebRTC offer and sends the SDP to VNDRLY API.
+2. VNDRLY API authenticates the user and creates the OpenAI Realtime call.
 3. VNDRLY API includes session instructions, role context, allowed tool schemas, and a safety/user identifier.
-4. Client connects to OpenAI Realtime using the ephemeral session.
+4. Client receives the answer SDP from VNDRLY API and completes the WebRTC connection.
 5. Realtime receives audio and emits tool calls when actions are needed.
 6. Client forwards Realtime tool-call requests to a VNDRLY API tool-call endpoint.
 7. VNDRLY API executes the existing AskV tool executor under the authenticated session.
@@ -96,7 +96,7 @@ The architecture is server-owned.
 
 The OpenAI API key never ships to iOS or browser clients.
 
-For v1, clients connect directly to OpenAI Realtime with ephemeral sessions and forward requested tool calls back to VNDRLY API for execution. A fully server-side Realtime bridge is out of scope for v1 and should only be added later if direct client sessions create reliability, compliance, or observability problems.
+For web v1, the browser WebRTC SDP exchange is brokered through VNDRLY API (`POST /api/assistant/realtime/call`) so the standard OpenAI API key, safety identifier, model, voice, instructions, and tool schemas remain server-owned. The older ephemeral client-secret endpoint remains available for compatibility. iOS remains on the existing press-to-record transcription/TTS path until a native WebRTC dependency is explicitly approved.
 
 ## Shared Tool Catalog
 

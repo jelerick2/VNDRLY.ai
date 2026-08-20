@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mapboxEnvPath } from "./secrets-path.mjs";
+import { mapboxEnvPath, sendGridEnvPath, twilioEnvPath } from "./secrets-path.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const envPath = resolve(repoRoot, ".env.local");
@@ -46,3 +46,26 @@ const mapboxAccessToken =
 setEnv("MAPBOX_ACCESS_TOKEN", mapboxAccessToken);
 setEnv("VITE_MAPBOX_ACCESS_TOKEN", mapboxAccessToken);
 setEnv("EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN", mapboxAccessToken);
+
+const twilioEnv = parseEnvFile(twilioEnvPath());
+for (const key of [
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_API_KEY",
+  "TWILIO_API_SECRET",
+  "TWILIO_PHONE_NUMBER",
+  "TWILIO_MESSAGING_SERVICE_SID",
+  "TWILIO_SMOKE_TO",
+]) {
+  setEnv(key, twilioEnv[key] || "");
+}
+
+const sendGridEnv = parseEnvFile(sendGridEnvPath());
+for (const key of [
+  "SENDGRID_API_KEY",
+  "SENDGRID_FROM_EMAIL",
+  "SENDGRID_FROM_NAME",
+  "SENDGRID_REPLY_TO",
+  "SENDGRID_SANDBOX_MODE",
+]) {
+  setEnv(key, sendGridEnv[key] || "");
+}

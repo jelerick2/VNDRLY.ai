@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ASK_V_TOOL_REGISTRY, toAnthropicTools, toRealtimeTools, toolsForRole } from "./tool-registry";
+import {
+  ASK_V_TOOL_REGISTRY,
+  toAnthropicTools,
+  toRealtimeToolMetadata,
+  toRealtimeTools,
+  toolsForRole,
+} from "./tool-registry";
 
 describe("AskV tool registry", () => {
   it("keeps existing AskV data and write tools in one registry", () => {
@@ -24,14 +30,41 @@ describe("AskV tool registry", () => {
     expect(schedule?.input_schema.required).toContain("scheduledStartAt");
   });
 
-  it("emits OpenAI Realtime function tools", () => {
+  it("emits strict OpenAI Realtime function tools", () => {
     const tools = toRealtimeTools(ASK_V_TOOL_REGISTRY);
     const schedule = tools.find((tool) => tool.name === "schedule_ticket_crew");
+    const queryTickets = tools.find((tool) => tool.name === "query_tickets");
     expect(schedule).toMatchObject({
       type: "function",
       name: "schedule_ticket_crew",
     });
     expect(schedule?.parameters.type).toBe("object");
+    expect(schedule?.parameters.additionalProperties).toBe(false);
+    expect(schedule?.strict).toBe(true);
+    expect(queryTickets?.parameters.required).toEqual(
+      expect.arrayContaining(["status", "vendorId", "siteId", "sinceDays", "limit", "countOnly"]),
+    );
+    const queryTicketProperties = queryTickets?.parameters.properties as Record<string, unknown> | undefined;
+    expect(queryTicketProperties?.status).toMatchObject({
+      type: ["string", "null"],
+    });
+  });
+
+  it("emits Realtime client metadata for voice confirmation UX", () => {
+    const metadata = toRealtimeToolMetadata(ASK_V_TOOL_REGISTRY);
+    const schedule = metadata.find((tool) => tool.name === "schedule_ticket_crew");
+    const queryTickets = metadata.find((tool) => tool.name === "query_tickets");
+    expect(schedule).toEqual({
+      name: "schedule_ticket_crew",
+      mutating: true,
+      confirmation: "required",
+      auditTarget: "ticket",
+    });
+    expect(queryTickets).toMatchObject({
+      name: "query_tickets",
+      mutating: false,
+      confirmation: "none",
+    });
   });
 
   it("tracks mutating metadata separately from schema", () => {

@@ -24,7 +24,12 @@ import {
   OnboardingPlatformEulaStep,
   type PlatformEulaAcceptanceValue,
 } from "@/components/onboarding-platform-eula-step";
+import {
+  OnboardingLegalConsentStep,
+  type OnboardingLegalConsentValue,
+} from "@/components/onboarding-legal-consent-step";
 import { PLATFORM_EULA_VERSION } from "@workspace/platform-eula";
+import { LEGAL_POLICY_VERSION } from "@/lib/legal-docs";
 import { brandStyleVars, DEFAULT_BRAND } from "@/hooks/use-brand";
 import { onboardingApi } from "@/lib/onboarding-api";
 import { uploadOnboardingLogo } from "@/lib/onboarding-logo-upload";
@@ -34,6 +39,7 @@ import { Card, CardContent } from "@/components/ui/card";
 type StepKey =
   | "company-basics"
   | "platform-eula"
+  | "legal-consent"
   | "branding"
   | "first-site"
   | "tax-billing"
@@ -43,6 +49,7 @@ type StepKey =
 const STEPS: (StepperStep & { key: StepKey })[] = [
   { key: "company-basics", label: "Company Basics" },
   { key: "platform-eula", label: "Platform Agreement" },
+  { key: "legal-consent", label: "Privacy & Messaging" },
   { key: "branding", label: "Branding" },
   { key: "first-site", label: "First Site" },
   { key: "tax-billing", label: "Tax & Billing" },
@@ -58,7 +65,7 @@ const STEPS: (StepperStep & { key: StepKey })[] = [
 // from the dashboard's Finish-setup widget. Required data is still
 // enforced at /complete time (the user can't actually finalise
 // onboarding without it), but they're free to walk away in between.
-const REQUIRED_STEPS = new Set<StepKey>(["company-basics", "platform-eula"]);
+const REQUIRED_STEPS = new Set<StepKey>(["company-basics", "platform-eula", "legal-consent"]);
 
 interface PartnerPayload {
   brandPrimaryColor?: string;
@@ -72,6 +79,7 @@ interface PartnerPayload {
   preferences?: { hoursOfOperation?: string; operatingRadiusMiles?: number };
   inviteEmails?: string[];
   platformEula?: { accepted?: boolean; version?: string };
+  legalConsent?: { accepted?: boolean; smsOptIn?: boolean; version?: string };
 }
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -129,6 +137,11 @@ export default function OnboardingPartner() {
   const [platformEula, setPlatformEula] = useState<PlatformEulaAcceptanceValue>({
     accepted: false,
     version: PLATFORM_EULA_VERSION,
+  });
+  const [legalConsent, setLegalConsent] = useState<OnboardingLegalConsentValue>({
+    accepted: false,
+    smsOptIn: false,
+    version: LEGAL_POLICY_VERSION,
   });
 
   // Step 3 — First site.
@@ -195,6 +208,13 @@ export default function OnboardingPartner() {
           setPlatformEula({
             accepted: true,
             version: p.platformEula.version ?? PLATFORM_EULA_VERSION,
+          });
+        }
+        if (p.legalConsent) {
+          setLegalConsent({
+            accepted: p.legalConsent.accepted === true,
+            smsOptIn: p.legalConsent.smsOptIn === true,
+            version: p.legalConsent.version ?? LEGAL_POLICY_VERSION,
           });
         }
         if (p.firstSite) {
@@ -425,6 +445,11 @@ export default function OnboardingPartner() {
           return "You must accept the VNDRLY Platform Agreement to continue.";
         }
         return null;
+      case "legal-consent":
+        if (!legalConsent.accepted) {
+          return "You must accept the VNDRLY Privacy Policy and Terms & Conditions to continue.";
+        }
+        return null;
       case "first-site":
         if (!firstSite.name.trim() || !firstSite.address.trim() || !firstSite.siteCode.trim()) {
           return "Site name, address, and site code are all required.";
@@ -481,6 +506,12 @@ export default function OnboardingPartner() {
       patch.platformEula = {
         accepted: platformEula.accepted,
         version: PLATFORM_EULA_VERSION,
+      };
+    } else if (currentStep.key === "legal-consent") {
+      patch.legalConsent = {
+        accepted: legalConsent.accepted,
+        smsOptIn: legalConsent.smsOptIn,
+        version: LEGAL_POLICY_VERSION,
       };
     } else if (currentStep.key === "branding") {
       patch.brandPrimaryColor = branding.brandPrimaryColor || undefined;
@@ -737,6 +768,14 @@ export default function OnboardingPartner() {
             <OnboardingPlatformEulaStep
               value={platformEula}
               onChange={setPlatformEula}
+              disabled={loading}
+            />
+          )}
+
+          {currentStep.key === "legal-consent" && (
+            <OnboardingLegalConsentStep
+              value={legalConsent}
+              onChange={setLegalConsent}
               disabled={loading}
             />
           )}
