@@ -16,6 +16,14 @@ import { absoluteUploadUrl } from "../lib/uploadUrl";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+function maxUploadBytes(): number {
+  const configured = Number(process.env.SUPABASE_STORAGE_MAX_UPLOAD_BYTES);
+  return Number.isSafeInteger(configured) && configured > 0
+    ? configured
+    : DEFAULT_MAX_UPLOAD_BYTES;
+}
 
 /**
  * PUT /storage/upload/:id
@@ -26,7 +34,7 @@ const objectStorageService = new ObjectStorageService();
  */
 router.put(
   "/storage/upload/:id",
-  express.raw({ type: "*/*", limit: "25mb" }),
+  express.raw({ type: "*/*", limit: maxUploadBytes() }),
   async (req: Request, res: Response) => {
     const uploadId = String(req.params.id ?? "").trim();
     if (!uploadId || !/^[0-9a-f-]{36}$/i.test(uploadId)) {
@@ -78,6 +86,10 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   const parsed = RequestUploadUrlBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Missing or invalid required fields" });
+    return;
+  }
+  if (parsed.data.size < 0 || parsed.data.size > maxUploadBytes()) {
+    res.status(413).json({ error: "File exceeds the upload size limit" });
     return;
   }
 
