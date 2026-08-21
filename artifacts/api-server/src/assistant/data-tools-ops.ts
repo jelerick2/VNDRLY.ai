@@ -1407,7 +1407,9 @@ async function queryActiveVisitors(args: Record<string, unknown>, session: Sessi
   const filters = [isNull(siteVisitsTable.checkOutTime)];
   if (args.siteId) filters.push(eq(siteVisitsTable.siteLocationId, Number(args.siteId)));
   if (session.role === "partner" && session.partnerId) {
-    filters.push(eq(siteVisitsTable.hostPartnerId, session.partnerId));
+    filters.push(sql`${siteVisitsTable.siteLocationId} IN (SELECT id FROM site_locations WHERE partner_id = ${session.partnerId})`);
+  } else if (session.role === "vendor" && session.vendorId) {
+    filters.push(eq(siteVisitsTable.hostVendorId, session.vendorId));
   }
   const rows = await db
     .select({
@@ -1415,10 +1417,16 @@ async function queryActiveVisitors(args: Record<string, unknown>, session: Sessi
       firstName: siteVisitsTable.firstName,
       lastName: siteVisitsTable.lastName,
       company: siteVisitsTable.company,
+      vehiclePlate: siteVisitsTable.vehiclePlate,
+      platePhotoUrl: siteVisitsTable.platePhotoUrl,
+      vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
+      purpose: siteVisitsTable.purpose,
       siteLocationId: siteVisitsTable.siteLocationId,
+      siteName: siteLocationsTable.name,
       checkInTime: siteVisitsTable.checkInTime,
     })
     .from(siteVisitsTable)
+    .leftJoin(siteLocationsTable, eq(siteLocationsTable.id, siteVisitsTable.siteLocationId))
     .where(and(...filters))
     .orderBy(desc(siteVisitsTable.checkInTime))
     .limit(limit);

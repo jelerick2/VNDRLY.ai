@@ -200,7 +200,7 @@ export const KNOWLEDGE_DOCS: KnowledgeDoc[] = [
     id: "visitors",
     title: "Visitors and the public site portal",
     roles: ["partner", "admin", "vendor"],
-    body: `Visitors check in at /portal/:siteCode (the URL on the QR poster). They sign in (name + company + reason), the visit logs to /visitors, and they appear in the partner's site dashboard. /visitors lists active and completed visits — use it to see who is currently on your sites right now (anyone without a check-out time is still on site).`,
+    body: `Visitors and gate entries check in at /portal/:siteCode (the URL on the QR poster) or through the mobile visitor check-in flow. They sign in with name, company, reason, vehicle plate, GPS, and optional plate/vehicle photos. The visit logs to /visitors, appears in partner site dashboards and maps, and can be printed as a gate report. /visitors lists active and completed visits — use it to see who is currently on your sites right now (anyone without a check-out time is still on site). AskV can use query_active_visitors to answer gate questions about who is on site, company, plate, purpose, and evidence photos.`,
   },
   {
     id: "visitor-qr",

@@ -74,6 +74,9 @@ export type ActiveVisit = {
   hostPartnerName: string | null;
   hostVendorName: string | null;
   purpose: string | null;
+  vehiclePlate: string | null;
+  platePhotoUrl: string | null;
+  vehiclePhotoUrl: string | null;
   expectedDurationMinutes: number | null;
   checkInTime: string;
   expiresAt: string | null;
@@ -91,6 +94,8 @@ export async function visitorCheckIn(input: {
   purpose?: string;
   expectedDurationMinutes?: number;
   vehiclePlate?: string;
+  platePhotoUrl?: string;
+  vehiclePhotoUrl?: string;
   latitude: number;
   longitude: number;
 }): Promise<{ id: number }> {

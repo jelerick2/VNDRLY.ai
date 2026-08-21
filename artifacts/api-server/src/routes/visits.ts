@@ -351,6 +351,8 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
     purpose?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
+    platePhotoUrl?: string;
+    vehiclePhotoUrl?: string;
     latitude?: number;
     longitude?: number;
   };
@@ -449,6 +451,12 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
     ? Math.min(b.expectedDurationMinutes, 24 * 60)
     : null;
   const expiresAt = expectedDuration ? new Date(Date.now() + expectedDuration * 60 * 1000) : null;
+  const platePhotoUrl = typeof b.platePhotoUrl === "string" && b.platePhotoUrl.trim()
+    ? b.platePhotoUrl.trim()
+    : null;
+  const vehiclePhotoUrl = typeof b.vehiclePhotoUrl === "string" && b.vehiclePhotoUrl.trim()
+    ? b.vehiclePhotoUrl.trim()
+    : null;
 
   // Persist updated profile fields onto guest_session for future re-use.
   if (b.purpose || b.vehiclePlate) {
@@ -472,6 +480,8 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
       email: ctx.guest.email,
       company: ctx.guest.company,
       vehiclePlate: b.vehiclePlate ?? ctx.guest.vehiclePlate,
+      platePhotoUrl,
+      vehiclePhotoUrl,
       purpose: b.purpose ?? ctx.guest.lastPurpose ?? null,
       expectedDurationMinutes: expectedDuration,
       hostType: b.hostType,
@@ -509,6 +519,9 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
       firstName: visit.firstName,
       lastName: visit.lastName,
       company: visit.company,
+      vehiclePlate: visit.vehiclePlate,
+      platePhotoUrl: visit.platePhotoUrl,
+      vehiclePhotoUrl: visit.vehiclePhotoUrl,
       purpose: visit.purpose,
       hostType: visit.hostType as "partner" | "vendor",
       hostPartnerId: visit.hostPartnerId,
@@ -677,6 +690,9 @@ router.get("/visits/me/active", async (req, res): Promise<void> => {
       hostPartnerName: partnersTable.name,
       hostVendorName: vendorsTable.name,
       purpose: siteVisitsTable.purpose,
+      vehiclePlate: siteVisitsTable.vehiclePlate,
+      platePhotoUrl: siteVisitsTable.platePhotoUrl,
+      vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
       expectedDurationMinutes: siteVisitsTable.expectedDurationMinutes,
       checkInTime: siteVisitsTable.checkInTime,
       expiresAt: siteVisitsTable.expiresAt,
@@ -735,6 +751,8 @@ router.get("/visits", async (req, res): Promise<void> => {
       phone: siteVisitsTable.phone,
       email: siteVisitsTable.email,
       vehiclePlate: siteVisitsTable.vehiclePlate,
+      platePhotoUrl: siteVisitsTable.platePhotoUrl,
+      vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
       purpose: siteVisitsTable.purpose,
       expectedDurationMinutes: siteVisitsTable.expectedDurationMinutes,
       hostType: siteVisitsTable.hostType,
@@ -786,6 +804,8 @@ router.get("/visits/:id", async (req, res): Promise<void> => {
       phone: siteVisitsTable.phone,
       email: siteVisitsTable.email,
       vehiclePlate: siteVisitsTable.vehiclePlate,
+      platePhotoUrl: siteVisitsTable.platePhotoUrl,
+      vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
       purpose: siteVisitsTable.purpose,
       expectedDurationMinutes: siteVisitsTable.expectedDurationMinutes,
       hostType: siteVisitsTable.hostType,

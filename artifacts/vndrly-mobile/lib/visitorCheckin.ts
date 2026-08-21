@@ -73,6 +73,8 @@ export type SubmitCheckInInput = {
   hostKey: string;
   purpose: string;
   durationStr: string;
+  platePhotoUrl?: string;
+  vehiclePhotoUrl?: string;
 };
 
 export type SubmitCheckInResult =
@@ -111,6 +113,8 @@ export async function submitVisitorCheckIn(
     hostVendorId: host.type === "vendor" ? host.id : undefined,
     purpose: input.purpose.trim() || undefined,
     expectedDurationMinutes: parseDurationMinutes(input.durationStr),
+    ...(input.platePhotoUrl ? { platePhotoUrl: input.platePhotoUrl } : {}),
+    ...(input.vehiclePhotoUrl ? { vehiclePhotoUrl: input.vehiclePhotoUrl } : {}),
     latitude: pos.coords.latitude,
     longitude: pos.coords.longitude,
   });

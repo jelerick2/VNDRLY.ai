@@ -8,6 +8,8 @@ export type VisitorRow = {
   phone: string | null;
   email: string | null;
   vehiclePlate: string | null;
+  platePhotoUrl: string | null;
+  vehiclePhotoUrl: string | null;
   purpose: string | null;
   expectedDurationMinutes: number | null;
   hostType: "partner" | "vendor";
@@ -114,6 +116,8 @@ export const visitsApi = {
     purpose?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
+    platePhotoUrl?: string;
+    vehiclePhotoUrl?: string;
     latitude: number;
     longitude: number;
   }) => jf<VisitorRow>(`/api/visits/check-in`, { method: "POST", body: JSON.stringify(input) }),

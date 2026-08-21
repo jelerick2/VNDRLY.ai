@@ -39,6 +39,8 @@ export const siteVisitsTable = pgTable(
     email: text("email"),
     company: text("company"),
     vehiclePlate: text("vehicle_plate"),
+    platePhotoUrl: text("plate_photo_url"),
+    vehiclePhotoUrl: text("vehicle_photo_url"),
     purpose: text("purpose"),
     expectedDurationMinutes: integer("expected_duration_minutes"),
 

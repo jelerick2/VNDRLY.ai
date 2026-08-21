@@ -15,9 +15,20 @@ const LazyMapboxMap = lazy(() =>
   import("@/components/mapbox-map").then((mod) => ({ default: mod.MapboxMap })),
 );
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 function fmt(ts: string | null) {
   if (!ts) return "—";
   return new Date(ts).toLocaleString();
+}
+
+function resolveVisitPhotoUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/api/storage/")) return `${BASE}${url}`;
+  if (url.startsWith("/objects/")) return `${BASE}/api/storage${url}`;
+  if (url.startsWith("objects/")) return `${BASE}/api/storage/${url}`;
+  return `${BASE}/api/storage${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
 function escapeHtml(value: unknown): string {
@@ -108,6 +119,8 @@ export default function VisitDetailPage({ id }: { id: string }) {
           : []),
       ]
     : [];
+  const platePhoto = resolveVisitPhotoUrl(data.platePhotoUrl);
+  const vehiclePhoto = resolveVisitPhotoUrl(data.vehiclePhotoUrl);
 
   return (
     <div className="p-6 max-w-5xl mx-auto" data-testid="visit-detail">
@@ -192,6 +205,28 @@ export default function VisitDetailPage({ id }: { id: string }) {
           </CardContent>
         </Card>
 
+        {(platePhoto || vehiclePhoto) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-[var(--brand-primary)]" /> {t("visitor.detail.vehicleEvidence")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <EvidencePhoto
+                  label={t("visitor.detail.platePhoto")}
+                  url={platePhoto}
+                />
+                <EvidencePhoto
+                  label={t("visitor.detail.vehiclePhoto")}
+                  url={vehiclePhoto}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -236,5 +271,27 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium text-right">{value}</span>
     </div>
+  );
+}
+
+function EvidencePhoto({ label, url }: { label: string; url: string | null }) {
+  if (!url) {
+    return (
+      <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+        <div className="font-medium text-foreground">{label}</div>
+        <div>—</div>
+      </div>
+    );
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="block rounded-md border overflow-hidden bg-muted/30 hover:border-[var(--brand-primary)]"
+    >
+      <div className="px-3 py-2 text-sm font-medium">{label}</div>
+      <img src={url} alt={label} className="h-48 w-full object-cover" />
+    </a>
   );
 }

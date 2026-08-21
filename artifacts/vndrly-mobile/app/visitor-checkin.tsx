@@ -24,6 +24,7 @@ import VisitorHostPicker from "@/components/VisitorHostPicker";
 import { useColors } from "@/hooks/useColors";
 import { setToken, setUser } from "@/lib/auth";
 import { translateApiError } from "@/lib/apiErrors";
+import { captureAndUploadImage } from "@/lib/photos";
 import {
   fetchActiveVisit,
   fetchSiteContext,
@@ -80,6 +81,8 @@ export default function VisitorCheckInScreen() {
   const [hostKey, setHostKey] = useState<string | null>(null);
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
+  const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
+  const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [camPerm, requestCamPerm] = useCameraPermissions();
@@ -160,6 +163,8 @@ export default function VisitorCheckInScreen() {
     setConfirmedCode(null);
     setSiteCode("");
     setHostKey(null);
+    setPlatePhotoUrl(null);
+    setVehiclePhotoUrl(null);
   };
 
   const onCheckIn = async () => {
@@ -175,6 +180,8 @@ export default function VisitorCheckInScreen() {
         hostKey,
         purpose,
         durationStr: duration,
+        platePhotoUrl: platePhotoUrl ?? undefined,
+        vehiclePhotoUrl: vehiclePhotoUrl ?? undefined,
       });
       if (!result.ok) {
         if (result.reason === "no-host") {
@@ -215,12 +222,31 @@ export default function VisitorCheckInScreen() {
       setSiteCode("");
       setHostKey(null);
       setPurpose("");
+      setPlatePhotoUrl(null);
+      setVehiclePhotoUrl(null);
     } catch (e) {
       if (is401(e)) {
         setSessionExpired(true);
         return;
       }
       Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorCheckOut")));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onCaptureEvidence = async (kind: "plate" | "vehicle") => {
+    setBusy(true);
+    try {
+      const result = await captureAndUploadImage();
+      if (!result) return;
+      if (kind === "plate") {
+        setPlatePhotoUrl(result.objectPath);
+      } else {
+        setVehiclePhotoUrl(result.objectPath);
+      }
+    } catch (e) {
+      Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorAttachPhoto")));
     } finally {
       setBusy(false);
     }
@@ -384,6 +410,10 @@ export default function VisitorCheckInScreen() {
                   duration={duration}
                   onDurationChange={setDuration}
                   busy={busy}
+                  platePhotoAttached={!!platePhotoUrl}
+                  vehiclePhotoAttached={!!vehiclePhotoUrl}
+                  onCapturePlatePhoto={() => onCaptureEvidence("plate")}
+                  onCaptureVehiclePhoto={() => onCaptureEvidence("vehicle")}
                   onSubmit={onCheckIn}
                   onChangeSite={onChangeSite}
                   labels={{
@@ -393,6 +423,10 @@ export default function VisitorCheckInScreen() {
                     purpose: t("visitor.purpose"),
                     purposePlaceholder: t("visitor.purposePlaceholder"),
                     expectedMinutes: t("visitor.expectedMinutes"),
+                    vehicleEvidence: t("visitor.vehicleEvidence"),
+                    capturePlatePhoto: t("visitor.capturePlatePhoto"),
+                    captureVehiclePhoto: t("visitor.captureVehiclePhoto"),
+                    attached: t("visitor.photoAttached"),
                     checkIn: t("visitor.checkIn"),
                     geofenceNote: t("visitor.geofenceNote"),
                   }}

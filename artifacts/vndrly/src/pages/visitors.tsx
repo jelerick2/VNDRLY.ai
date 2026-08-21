@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { ArrowDown, ArrowUp, Clock, History, UserCheck } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, Clock, History, Printer, UserCheck } from "lucide-react";
 import { useListSiteLocations } from "@workspace/api-client-react";
 import { visitsApi, type VisitorRow } from "@/lib/visits-api";
 import { useRateLimitGate } from "@/hooks/use-rate-limit-gate";
@@ -171,6 +171,18 @@ export default function VisitorsPage() {
               </PngPillButton>
             </div>
           </div>
+          <div className="mt-4 flex justify-end print:hidden">
+            <PngPillButton
+              color="blue"
+              onClick={() => window.print()}
+              data-testid="button-print-visitors"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Printer className="h-4 w-4" />
+                {t("visitor.printReport")}
+              </span>
+            </PngPillButton>
+          </div>
         </CardContent>
       </Card>
 
@@ -276,6 +288,7 @@ function BrandedCountPill({
 type VisitSortKey =
   | "visitor"
   | "company"
+  | "vehiclePlate"
   | "site"
   | "host"
   | "purpose"
@@ -303,6 +316,8 @@ function compareVisitRows(
       return visitorName(a).localeCompare(visitorName(b)) * mul;
     case "company":
       return (a.company ?? "").localeCompare(b.company ?? "") * mul;
+    case "vehiclePlate":
+      return (a.vehiclePlate ?? "").localeCompare(b.vehiclePlate ?? "") * mul;
     case "site":
       return (a.siteName ?? "").localeCompare(b.siteName ?? "") * mul;
     case "host":
@@ -399,6 +414,11 @@ function VisitTable({
               testId="th-sort-company"
             />
             <SortableTh
+              column="vehiclePlate"
+              label={t("visitor.table.vehiclePlate")}
+              testId="th-sort-vehicle-plate"
+            />
+            <SortableTh
               column="site"
               label={t("visitor.table.site")}
               testId="th-sort-site"
@@ -446,6 +466,15 @@ function VisitTable({
                 <div className="text-xs text-muted-foreground">{r.phone ?? r.email ?? ""}</div>
               </td>
               <td className="py-2 pr-3">{r.company ?? "—"}</td>
+              <td className="py-2 pr-3">
+                <div className="font-medium">{r.vehiclePlate ?? "—"}</div>
+                {(r.platePhotoUrl || r.vehiclePhotoUrl) && (
+                  <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <Camera className="h-3 w-3" />
+                    {t("visitor.table.evidence")}
+                  </div>
+                )}
+              </td>
               <td className="py-2 pr-3">{r.siteName ?? "—"}</td>
               <td className="py-2 pr-3">
                 {r.hostType === "partner" ? r.hostPartnerName : r.hostVendorName}

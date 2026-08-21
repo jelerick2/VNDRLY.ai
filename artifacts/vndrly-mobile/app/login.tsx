@@ -277,6 +277,16 @@ export default function LoginScreen() {
             >
               {t("visitor.continueAsVisitor")}
             </AmberButton>
+            <TouchableOpacity
+              onPress={() => router.push("/guest-login")}
+              disabled={busy}
+              style={styles.linkButton}
+              testID="button-gate-checkin"
+            >
+              <Text style={[styles.linkText, { color: colors.primary }]}>
+                {t("visitor.gateCheckIn")}
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => router.push("/signup-vendor")}

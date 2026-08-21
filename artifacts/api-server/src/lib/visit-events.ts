@@ -7,6 +7,9 @@ export type VisitorEventPayload = {
   firstName: string;
   lastName: string;
   company: string | null;
+  vehiclePlate: string | null;
+  platePhotoUrl: string | null;
+  vehiclePhotoUrl: string | null;
   purpose: string | null;
   hostType: "partner" | "vendor";
   hostPartnerId: number | null;

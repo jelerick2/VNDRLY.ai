@@ -63,6 +63,8 @@ const tables = {
     "email",
     "company",
     "vehiclePlate",
+    "platePhotoUrl",
+    "vehiclePhotoUrl",
     "purpose",
     "expectedDurationMinutes",
     "hostType",
@@ -656,6 +658,53 @@ describe("POST /api/visits/check-in", () => {
     const [recipients, notif] = notifyUsersMock.mock.calls[0] as any;
     expect(recipients).toEqual([100, 101]);
     expect(notif).toMatchObject({ type: "visitor_checked_in", category: "visitor" });
+  });
+
+  it("stores gate vehicle evidence photos on check-in and returns them to staff", async () => {
+    const { site } = seedScenario();
+    const { token } = await startGuest();
+    const res = await request(app)
+      .post("/api/visits/check-in")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: 1,
+        vehiclePlate: "TRK-778",
+        platePhotoUrl: "/uploads/visits/plate.jpg",
+        vehiclePhotoUrl: "/uploads/visits/truck.jpg",
+        latitude: 40.0,
+        longitude: -74.0,
+      });
+    expectStatus(res, 201);
+    expect(fixtures.siteVisits[0]).toMatchObject({
+      vehiclePlate: "TRK-778",
+      platePhotoUrl: "/uploads/visits/plate.jpg",
+      vehiclePhotoUrl: "/uploads/visits/truck.jpg",
+    });
+
+    fixtures.siteVisits[0].siteName = site.name;
+    fixtures.siteVisits[0].sitePartnerId = site.partnerId;
+    fixtures.siteVisits[0].partnerId = site.partnerId;
+    fixtures.siteVisits[0].hostPartnerName = "Acme Partner";
+    const list = await request(app)
+      .get("/api/visits")
+      .set("Cookie", staffCookie({ role: "partner", partnerId: 1 }));
+    expectStatus(list, 200);
+    expect(list.body[0]).toMatchObject({
+      vehiclePlate: "TRK-778",
+      platePhotoUrl: "/uploads/visits/plate.jpg",
+      vehiclePhotoUrl: "/uploads/visits/truck.jpg",
+    });
+
+    const detail = await request(app)
+      .get(`/api/visits/${res.body.id}`)
+      .set("Cookie", staffCookie({ role: "partner", partnerId: 1 }));
+    expectStatus(detail, 200);
+    expect(detail.body).toMatchObject({
+      platePhotoUrl: "/uploads/visits/plate.jpg",
+      vehiclePhotoUrl: "/uploads/visits/truck.jpg",
+    });
   });
 
   it("happy path (vendor host): inserts visit linked to the assigned vendor", async () => {

@@ -141,6 +141,13 @@ vi.mock("@/lib/guest", () => ({
   visitorCheckIn: (...a: unknown[]) => visitorCheckInMock(...a),
 }));
 
+const { captureAndUploadImageMock } = vi.hoisted(() => ({
+  captureAndUploadImageMock: vi.fn(),
+}));
+vi.mock("@/lib/photos", () => ({
+  captureAndUploadImage: (...a: unknown[]) => captureAndUploadImageMock(...a),
+}));
+
 // AmberButton renders as a plain DOM button so we can assert disabled / press
 // semantics without loading the asset-backed implementation. Mirrors the shim
 // used in the VisitorHostPicker component test.
@@ -367,6 +374,59 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     });
     expect(requestForegroundPermissionsAsyncMock).toHaveBeenCalledTimes(1);
     expect(getCurrentPositionAsyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets gatekeepers attach plate and vehicle photos before check-in", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    requestForegroundPermissionsAsyncMock.mockResolvedValue({
+      status: "granted",
+    });
+    getCurrentPositionAsyncMock.mockResolvedValue({
+      coords: { latitude: 1.23, longitude: 4.56 },
+    });
+    visitorCheckInMock.mockResolvedValue({ id: 999 });
+    captureAndUploadImageMock
+      .mockResolvedValueOnce({ objectPath: "/uploads/visits/plate.jpg" })
+      .mockResolvedValueOnce({ objectPath: "/uploads/visits/truck.jpg" });
+
+    renderScreen();
+
+    const codeInput = await findFirstByTestId("site-code-input");
+    fireEvent.change(codeInput, { target: { value: "acme-hq" } });
+    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("accept-site-btn"));
+    await findFirstByTestId("check-in-btn");
+    tap(firstByTestId("host-option-partner:7"));
+
+    tap(firstByTestId("capture-plate-photo-btn"));
+    await waitFor(() => {
+      expect(captureAndUploadImageMock).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(isDisabled(firstByTestId("capture-vehicle-photo-btn"))).toBe(false);
+    });
+    tap(firstByTestId("capture-vehicle-photo-btn"));
+    await waitFor(() => {
+      expect(captureAndUploadImageMock).toHaveBeenCalledTimes(2);
+    });
+
+    tap(firstByTestId("check-in-btn"));
+
+    await waitFor(() => {
+      expect(visitorCheckInMock).toHaveBeenCalledTimes(1);
+    });
+    expect(visitorCheckInMock).toHaveBeenCalledWith({
+      siteLocationId: 42,
+      hostType: "partner",
+      hostPartnerId: 7,
+      hostVendorId: undefined,
+      purpose: undefined,
+      expectedDurationMinutes: 60,
+      platePhotoUrl: "/uploads/visits/plate.jpg",
+      vehiclePhotoUrl: "/uploads/visits/truck.jpg",
+      latitude: 1.23,
+      longitude: 4.56,
+    });
   });
 
   it("blocks the API call (and surfaces no submit) when the OS denies foreground location after a host is selected", async () => {

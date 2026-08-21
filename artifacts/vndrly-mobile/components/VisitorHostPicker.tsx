@@ -16,6 +16,10 @@ export interface VisitorHostPickerProps {
   duration: string;
   onDurationChange: (v: string) => void;
   busy: boolean;
+  platePhotoAttached?: boolean;
+  vehiclePhotoAttached?: boolean;
+  onCapturePlatePhoto?: () => void;
+  onCaptureVehiclePhoto?: () => void;
   onSubmit: () => void;
   onChangeSite: () => void;
   labels: {
@@ -25,6 +29,10 @@ export interface VisitorHostPickerProps {
     purpose: string;
     purposePlaceholder: string;
     expectedMinutes: string;
+    vehicleEvidence?: string;
+    capturePlatePhoto?: string;
+    captureVehiclePhoto?: string;
+    attached?: string;
     checkIn: string;
     geofenceNote: string;
   };
@@ -39,6 +47,10 @@ export default function VisitorHostPicker({
   duration,
   onDurationChange,
   busy,
+  platePhotoAttached = false,
+  vehiclePhotoAttached = false,
+  onCapturePlatePhoto,
+  onCaptureVehiclePhoto,
   onSubmit,
   onChangeSite,
   labels,
@@ -109,6 +121,52 @@ export default function VisitorHostPicker({
         style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }]}
       />
 
+      {(onCapturePlatePhoto || onCaptureVehiclePhoto) && (
+        <View style={styles.evidenceSection}>
+          <Text style={[styles.label, { color: colors.foreground }]}>
+            {labels.vehicleEvidence ?? "Vehicle evidence"}
+          </Text>
+          <View style={styles.evidenceRow}>
+            {onCapturePlatePhoto ? (
+              <TouchableOpacity
+                testID="capture-plate-photo-btn"
+                onPress={onCapturePlatePhoto}
+                disabled={busy}
+                style={[styles.evidenceButton, { borderColor: colors.border, opacity: busy ? 0.6 : 1 }]}
+              >
+                <Feather
+                  name={platePhotoAttached ? "check-circle" : "camera"}
+                  size={16}
+                  color={platePhotoAttached ? colors.primary : colors.mutedForeground}
+                />
+                <Text style={[styles.evidenceLabel, { color: colors.foreground }]}>
+                  {labels.capturePlatePhoto ?? "Plate photo"}
+                  {platePhotoAttached ? ` ${labels.attached ?? "attached"}` : ""}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {onCaptureVehiclePhoto ? (
+              <TouchableOpacity
+                testID="capture-vehicle-photo-btn"
+                onPress={onCaptureVehiclePhoto}
+                disabled={busy}
+                style={[styles.evidenceButton, { borderColor: colors.border, opacity: busy ? 0.6 : 1 }]}
+              >
+                <Feather
+                  name={vehiclePhotoAttached ? "check-circle" : "truck"}
+                  size={16}
+                  color={vehiclePhotoAttached ? colors.primary : colors.mutedForeground}
+                />
+                <Text style={[styles.evidenceLabel, { color: colors.foreground }]}>
+                  {labels.captureVehiclePhoto ?? "Vehicle photo"}
+                  {vehiclePhotoAttached ? ` ${labels.attached ?? "attached"}` : ""}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      )}
+
       <AmberButton
         testID="check-in-btn"
         onPress={onSubmit}
@@ -133,6 +191,10 @@ const styles = StyleSheet.create({
   hostOption: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 8 },
   hostLabel: { fontFamily: "Inter_500Medium", fontSize: 14 },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontFamily: "Inter_400Regular", fontSize: 16 },
+  evidenceSection: { marginTop: 14 },
+  evidenceRow: { flexDirection: "row", gap: 8 },
+  evidenceButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 12 },
+  evidenceLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
   linkText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   note: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 10, textAlign: "center" },
 });
