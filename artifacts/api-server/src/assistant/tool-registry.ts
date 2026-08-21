@@ -87,6 +87,7 @@ const TOOL_METADATA: Record<string, Partial<ToolMetadata>> = {
   query_site_locations: { auditTarget: "site" },
   lookup_site_detail: { auditTarget: "site" },
   query_notifications: { auditTarget: "notification" },
+  query_attention_briefing: { auditTarget: "ticket" },
   query_live_crew: { roles: OFFICE_ROLES, auditTarget: "crew" },
   lookup_crew_member_status: { roles: OFFICE_ROLES, auditTarget: "crew" },
   query_crew_eta: { roles: OFFICE_ROLES, auditTarget: "crew" },

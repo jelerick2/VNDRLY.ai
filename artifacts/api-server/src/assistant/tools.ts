@@ -474,6 +474,19 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "query_attention_briefing",
+    description:
+      "Returns a role-scoped daily AskV briefing of what needs attention now: unread notifications, open/stale/due tickets, pending review tickets, live crew count, and for office roles open/past-due invoices, open safety events, and expiring crew certifications. Use this for 'what needs my attention today', 'what should I look at first', 'daily briefing', 'loose ends today', or 'what is urgent'. Excludes IRS 1099 filing/registration work.",
+    input_schema: {
+      type: "object",
+      properties: {
+        sinceDays: { type: "number", description: "Window in days for recent operational context. Defaults to 30, max 365." },
+        limit: { type: "number", description: "Rows per ticket bucket, 1-50. Defaults to 8." },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
     name: "query_live_crew",
     description: "Tickets currently en route, on location, or on site — live crew map snapshot.",
     input_schema: {

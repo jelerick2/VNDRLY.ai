@@ -42,6 +42,8 @@ import { ensureDeepLinksInAssistantReply } from "../assistant/deep-link-markdown
 import { parsePageContext } from "../assistant/page-context";
 import { classifyRefusal } from "../assistant/refusal";
 import { TOOLS } from "../assistant/tools";
+import { writeAskVActionAudit, type AskVClientSurface, type AskVInputMode } from "../assistant/action-audit";
+import { findAskVTool } from "../assistant/tool-registry";
 import { isDataTool, runDataTool } from "../assistant/data-tools";
 import { isWriteTool, runWriteTool } from "../assistant/write-tools";
 import {
@@ -993,6 +995,78 @@ export async function runTool(
   }
 }
 
+function inferToolTargetId(input: unknown): string | number | null {
+  if (!input || typeof input !== "object") return null;
+  const args = input as Record<string, unknown>;
+  for (const key of ["ticketId", "notificationId", "siteId", "crewEmployeeId", "vendorId", "partnerId"]) {
+    const value = args[key];
+    if ((typeof value === "number" && Number.isFinite(value)) || (typeof value === "string" && value.trim())) {
+      return value as string | number;
+    }
+  }
+  return null;
+}
+
+function classifyToolResult(output: string, mutating: boolean): "success" | "failure" | "requires_confirmation" {
+  try {
+    const parsed = JSON.parse(output) as { error?: unknown };
+    if (typeof parsed.error === "string" && parsed.error.length > 0) {
+      if (mutating && parsed.error.toLowerCase().includes("confirmation")) return "requires_confirmation";
+      return "failure";
+    }
+  } catch {
+    // Non-JSON tool output is still a completed tool call from the model's perspective.
+  }
+  return "success";
+}
+
+function inferAskVSurface(pageContext: ReturnType<typeof parsePageContext> | undefined): AskVClientSurface {
+  if (pageContext?.path?.startsWith("/mobile/") || pageContext?.currentLocation?.source === "mobile_device") {
+    return "ios";
+  }
+  return "web";
+}
+
+function inferAskVInputMode(pageContext: ReturnType<typeof parsePageContext> | undefined): AskVInputMode {
+  return inferAskVSurface(pageContext) === "ios" ? "ios_text" : "web_text";
+}
+
+async function auditToolCall(args: {
+  session: SessionPayload;
+  pageContext: ReturnType<typeof parsePageContext> | undefined;
+  userMessage: string;
+  toolName: string;
+  toolInput: unknown;
+  toolOutput: string;
+}): Promise<void> {
+  const tool = findAskVTool(args.toolName);
+  try {
+    await writeAskVActionAudit({
+      session: args.session,
+      clientSurface: inferAskVSurface(args.pageContext),
+      inputMode: inferAskVInputMode(args.pageContext),
+      provider: "anthropic",
+      toolName: args.toolName,
+      actionType: tool?.mutating ? "write_tool" : "read_tool",
+      targetType: tool?.auditTarget ?? null,
+      targetId: inferToolTargetId(args.toolInput),
+      transcriptText: args.userMessage,
+      toolInput: args.toolInput,
+      toolOutput: args.toolOutput,
+      gps: args.pageContext?.currentLocation
+        ? {
+            latitude: args.pageContext.currentLocation.latitude,
+            longitude: args.pageContext.currentLocation.longitude,
+            accuracyMeters: args.pageContext.currentLocation.accuracyMeters ?? null,
+          }
+        : null,
+      resultStatus: classifyToolResult(args.toolOutput, tool?.mutating === true),
+    });
+  } catch (err) {
+    logger.warn({ err, toolName: args.toolName, userId: args.session.userId }, "assistant action audit failed");
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Streaming chat endpoint. Body: { message: string }
 //
@@ -1204,6 +1278,14 @@ async function handleConversationMessage(
         const out = await runTool(tu.name, tu.input, session, req.headers.cookie ?? "");
         send("tool", { name: tu.name, status: "end" });
         toolCallTrace.push({ name: tu.name, input: tu.input, output: out });
+        await auditToolCall({
+          session,
+          pageContext,
+          userMessage,
+          toolName: tu.name,
+          toolInput: tu.input,
+          toolOutput: out,
+        });
         results.push({
           type: "tool_result",
           tool_use_id: tu.id,

@@ -13,6 +13,7 @@ describe("AskV tool registry", () => {
     expect(names).toContain("query_tickets");
     expect(names).toContain("query_crew_eta");
     expect(names).toContain("lookup_map_origin");
+    expect(names).toContain("query_attention_briefing");
     expect(names).toContain("query_ticket_route_eta");
     expect(names).toContain("query_ticket_mileage_audit");
     expect(names).toContain("query_ticket_proof_packet");
@@ -54,6 +55,7 @@ describe("AskV tool registry", () => {
     const metadata = toRealtimeToolMetadata(ASK_V_TOOL_REGISTRY);
     const schedule = metadata.find((tool) => tool.name === "schedule_ticket_crew");
     const queryTickets = metadata.find((tool) => tool.name === "query_tickets");
+    const briefing = metadata.find((tool) => tool.name === "query_attention_briefing");
     expect(schedule).toEqual({
       name: "schedule_ticket_crew",
       mutating: true,
@@ -64,6 +66,12 @@ describe("AskV tool registry", () => {
       name: "query_tickets",
       mutating: false,
       confirmation: "none",
+    });
+    expect(briefing).toMatchObject({
+      name: "query_attention_briefing",
+      mutating: false,
+      confirmation: "none",
+      auditTarget: "ticket",
     });
   });
 
@@ -84,6 +92,7 @@ describe("AskV tool registry", () => {
     expect(fieldTools).toContain("query_ticket_route_eta");
     expect(fieldTools).toContain("query_ticket_mileage_audit");
     expect(fieldTools).toContain("lookup_map_origin");
+    expect(fieldTools).toContain("query_attention_briefing");
     expect(fieldTools).toContain("post_ticket_comment");
     expect(fieldTools).not.toContain("query_invoice_summary");
     expect(fieldTools).not.toContain("query_crew_route_summary");

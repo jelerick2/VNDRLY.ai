@@ -20,6 +20,7 @@ import {
   partnerContactsTable,
   ticketFlagsTable,
   siteVisitsTable,
+  invoicesTable,
   accountingConnectionsTable,
   partnersTable,
   vendorsTable,
@@ -46,6 +47,7 @@ export const OPS_DATA_TOOL_NAMES = [
   "query_site_locations",
   "lookup_site_detail",
   "query_notifications",
+  "query_attention_briefing",
   "query_live_crew",
   "lookup_crew_member_status",
   "query_crew_eta",
@@ -238,6 +240,186 @@ async function queryNotifications(args: Record<string, unknown>, session: Sessio
     .orderBy(desc(notificationsTable.createdAt))
     .limit(limit);
   return JSON.stringify({ rows, limit });
+}
+
+async function queryAttentionBriefing(args: Record<string, unknown>, session: SessionPayload) {
+  if (!session.userId || !session.role) return err("Must be signed in.");
+  const sinceDays = clampSinceDays(args.sinceDays ?? 30);
+  const limit = clampLimit(args.limit ?? 8);
+  const now = new Date();
+  const since = sinceDate(sinceDays);
+  const ticketScope = ticketScopeFilters(session);
+  if (ticketScope === null) return err("No org scope on this session.");
+
+  const openTicketFilters = [
+    ...ticketScope,
+    sql`${ticketsTable.status} NOT IN ('cancelled','funds_dispersed','denied','completed','closed')`,
+  ];
+  const staleTicketFilters = [
+    ...openTicketFilters,
+    sql`${ticketsTable.updatedAt} < now() - interval '3 days'`,
+  ];
+  const dueTicketFilters = [
+    ...openTicketFilters,
+    sql`${ticketsTable.scheduledStartAt} IS NOT NULL`,
+    sql`${ticketsTable.scheduledStartAt} <= now() + interval '24 hours'`,
+  ];
+
+  const [
+    unreadNotifications,
+    openTickets,
+    staleTickets,
+    dueTickets,
+    pendingReviewTickets,
+    liveCrewTickets,
+  ] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(notificationsTable)
+      .where(and(eq(notificationsTable.userId, session.userId), eq(notificationsTable.isRead, false))),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(ticketsTable)
+      .where(and(...(openTicketFilters as Parameters<typeof and>))),
+    db
+      .select({
+        id: ticketsTable.id,
+        status: ticketsTable.status,
+        lifecycleState: ticketsTable.lifecycleState,
+        scheduledStartAt: ticketsTable.scheduledStartAt,
+        updatedAt: ticketsTable.updatedAt,
+        siteLocationId: ticketsTable.siteLocationId,
+      })
+      .from(ticketsTable)
+      .where(and(...(staleTicketFilters as Parameters<typeof and>)))
+      .orderBy(asc(ticketsTable.updatedAt))
+      .limit(limit),
+    db
+      .select({
+        id: ticketsTable.id,
+        status: ticketsTable.status,
+        lifecycleState: ticketsTable.lifecycleState,
+        scheduledStartAt: ticketsTable.scheduledStartAt,
+        siteLocationId: ticketsTable.siteLocationId,
+      })
+      .from(ticketsTable)
+      .where(and(...(dueTicketFilters as Parameters<typeof and>)))
+      .orderBy(asc(ticketsTable.scheduledStartAt))
+      .limit(limit),
+    db
+      .select({
+        id: ticketsTable.id,
+        status: ticketsTable.status,
+        lifecycleState: ticketsTable.lifecycleState,
+        updatedAt: ticketsTable.updatedAt,
+        siteLocationId: ticketsTable.siteLocationId,
+      })
+      .from(ticketsTable)
+      .where(and(...(ticketScope as Parameters<typeof and>), eq(ticketsTable.status, "pending_review")))
+      .orderBy(asc(ticketsTable.updatedAt))
+      .limit(limit),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(ticketsTable)
+      .where(
+        and(
+          ...(ticketScope as Parameters<typeof and>),
+          inArray(ticketsTable.lifecycleState, [...LIVE_TRACKED_LIFECYCLE_STATES]),
+          sql`${ticketsTable.status} NOT IN ('cancelled','funds_dispersed','denied')`,
+        ),
+      ),
+  ]);
+
+  const briefing: Record<string, unknown> = {
+    generatedAt: now.toISOString(),
+    sinceDays,
+    role: session.role,
+    unreadNotifications: Number(unreadNotifications[0]?.count ?? 0),
+    tickets: {
+      openCount: Number(openTickets[0]?.count ?? 0),
+      dueNext24h: dueTickets,
+      staleMoreThan3Days: staleTickets,
+      pendingReview: pendingReviewTickets,
+      liveCrewCount: Number(liveCrewTickets[0]?.count ?? 0),
+    },
+    recommendedOrder: [
+      "Unread notifications",
+      "Tickets due in the next 24 hours",
+      "Pending review tickets",
+      "Open tickets stale more than 3 days",
+      "Live crew / active route exceptions",
+    ],
+  };
+
+  if (session.role !== "field_employee") {
+    const invoiceFilters = [
+      sql`${invoicesTable.status} NOT IN ('paid','cancelled')`,
+      gte(invoicesTable.createdAt, since),
+    ];
+    if (session.role === "vendor" && session.vendorId) {
+      invoiceFilters.push(eq(invoicesTable.vendorId, session.vendorId));
+    } else if (session.role === "partner" && session.partnerId) {
+      invoiceFilters.push(eq(invoicesTable.partnerId, session.partnerId));
+    }
+    const safetyScope = (() => {
+      if (session.role === "admin") return [];
+      if (session.role === "partner" && session.partnerId) return [eq(safetyEventsTable.partnerId, session.partnerId)];
+      if (session.role === "vendor" && session.vendorId) return [eq(safetyEventsTable.vendorId, session.vendorId)];
+      return null;
+    })();
+    const [openInvoices, pastDueInvoices, openSafetyEvents, expiringCerts] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invoicesTable)
+        .where(and(...(invoiceFilters as Parameters<typeof and>))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(invoicesTable)
+        .where(
+          and(
+            ...(invoiceFilters as Parameters<typeof and>),
+            sql`${invoicesTable.dueDate} IS NOT NULL`,
+            sql`${invoicesTable.dueDate} < now()`,
+          ),
+        ),
+      safetyScope
+        ? db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(safetyEventsTable)
+            .where(and(...safetyScope, sql`${safetyEventsTable.status} NOT IN ('closed','resolved')`))
+        : Promise.resolve([{ count: 0 }]),
+      session.role === "partner"
+        ? Promise.resolve([{ count: 0 }])
+        : db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(employeeCertificationsTable)
+            .innerJoin(vendorPeopleTable, eq(employeeCertificationsTable.employeeId, vendorPeopleTable.id))
+            .where(
+              and(
+                isNull(employeeCertificationsTable.deletedAt),
+                gte(employeeCertificationsTable.expirationDate, now.toISOString().slice(0, 10)),
+                sql`${employeeCertificationsTable.expirationDate} <= ${(new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 10)}`,
+                session.role === "vendor" && session.vendorId
+                  ? eq(vendorPeopleTable.vendorId, session.vendorId)
+                  : sql`true`,
+              ),
+            ),
+    ]);
+    briefing.office = {
+      openInvoices: Number(openInvoices[0]?.count ?? 0),
+      pastDueInvoices: Number(pastDueInvoices[0]?.count ?? 0),
+      openSafetyEvents: Number(openSafetyEvents[0]?.count ?? 0),
+      certificationsExpiringWithin30Days: Number(expiringCerts[0]?.count ?? 0),
+    };
+    briefing.recommendedOrder = [
+      ...(briefing.recommendedOrder as string[]),
+      "Open safety events",
+      "Past-due invoices",
+      "Expiring crew certifications",
+    ];
+  }
+
+  return JSON.stringify(briefing);
 }
 
 async function queryLiveCrew(args: Record<string, unknown>, session: SessionPayload) {
@@ -1261,6 +1443,8 @@ export async function runOpsDataTool(
       return lookupSiteDetail(args, session);
     case "query_notifications":
       return queryNotifications(args, session);
+    case "query_attention_briefing":
+      return queryAttentionBriefing(args, session);
     case "query_live_crew":
       return queryLiveCrew(args, session);
     case "lookup_crew_member_status":

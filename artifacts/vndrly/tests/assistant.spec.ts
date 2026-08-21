@@ -1178,6 +1178,30 @@ describe("askV page context and metric tools", () => {
   it("data tool catalog includes report-backed metric tools", () => {
     expect(DATA_TOOL_NAMES).toContain("query_sales_tax_by_state");
     expect(DATA_TOOL_NAMES).toContain("query_nec1099_summary");
+    expect(DATA_TOOL_NAMES).toContain("query_attention_briefing");
+  });
+
+  it("buildSystemPrompt routes daily triage questions to the briefing tool", () => {
+    const prompt = buildSystemPrompt({
+      user: {
+        userId: 1,
+        role: "vendor",
+        displayName: "Test",
+        partnerId: null,
+        vendorId: 1,
+        preferredLanguage: "en",
+      },
+      docs: [],
+      onboarding: {
+        active: false,
+        orgType: null,
+        currentStep: null,
+        completedSteps: [],
+        skippedSteps: [],
+      },
+    });
+    expect(prompt).toContain("call query_attention_briefing first");
+    expect(prompt).toContain("keep IRS 1099 registration/filing out of the briefing");
   });
 
   it("write tool catalog includes bounded notification action", () => {
