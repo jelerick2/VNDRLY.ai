@@ -22,6 +22,7 @@ import {
   MessageSquareOff,
   Flag,
   Bot,
+  MailCheck,
 } from "lucide-react";
 import React, { Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -134,6 +135,9 @@ function useNavItems(user: { role: string; vendorId: number | null; partnerId: n
       // client surfaces without exposing raw payloads in the sidebar
       // destination.
       { href: "/admin/askv-audit", label: "AskV audit", icon: Bot, key: "admin-askv-audit" },
+      // Read-only provider readiness for SendGrid, Twilio, Expo push,
+      // and password reset delivery.
+      { href: "/admin/communications-health", label: "Comms health", icon: MailCheck, key: "admin-communications-health" },
       // Edits the singleton fire_transmitter_settings row used as the
       // T-record source on every IRS 1099 FIRE submission. See
       // artifacts/api-server/src/routes/fireTransmitterSettings.ts.

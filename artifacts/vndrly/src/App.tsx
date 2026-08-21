@@ -72,6 +72,7 @@ const AdminVndrly = lazy(() => import("@/pages/admin-vndrly"));
 const AdminRateLimits = lazy(() => import("@/pages/admin-rate-limits"));
 const AdminRemovedComments = lazy(() => import("@/pages/admin-removed-comments"));
 const AdminAskVAudit = lazy(() => import("@/pages/admin-askv-audit"));
+const AdminCommunicationsHealth = lazy(() => import("@/pages/admin-communications-health"));
 const AssistantLauncher = lazy(() =>
   import("@/components/assistant-panel").then((mod) => ({
     default: mod.AssistantLauncher,
@@ -168,6 +169,7 @@ function AdminRoutes() {
         <Route path="/admin/rate-limits" component={AdminRateLimits} />
         <Route path="/admin/removed-comments" component={AdminRemovedComments} />
         <Route path="/admin/askv-audit" component={AdminAskVAudit} />
+        <Route path="/admin/communications-health" component={AdminCommunicationsHealth} />
         <Route path="/admin/1099-transmitter" component={Admin1099Transmitter} />
         <Route component={NotFound} />
         </Switch>

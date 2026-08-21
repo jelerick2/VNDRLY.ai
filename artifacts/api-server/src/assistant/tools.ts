@@ -51,6 +51,7 @@ export const DEEP_LINK_SCREENS = [
   "safety-inbox",
   "safety-event-detail",
   "askv-audit",
+  "communications-health",
 ] as const;
 
 export const TOOLS: Anthropic.Tool[] = [
