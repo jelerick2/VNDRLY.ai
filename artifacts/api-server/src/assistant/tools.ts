@@ -756,7 +756,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "mark_notifications_read",
     description:
-      "Marks one notification or all unread notifications as read for the signed-in user — the same action as the bell inbox Mark all read button. Use when the user asks to clear their notification badge or mark alerts as read. Requires explicit user intent; do not call proactively.",
+      "Marks one notification or all unread notifications as read for the signed-in user — the same action as the bell inbox Mark all read button. Use when the user asks to clear their notification badge or mark alerts as read. Before calling, confirm whether the user wants one notification or all unread notifications marked read. Pass confirmed:true only after confirmation.",
     input_schema: {
       type: "object",
       properties: {
@@ -765,7 +765,9 @@ export const TOOLS: Anthropic.Tool[] = [
           type: "boolean",
           description: "When true (default if notificationId omitted), mark every unread notification read.",
         },
+        confirmed: { type: "boolean", description: "Must be true only after explicit user confirmation of the notification-read action." },
       },
+      required: ["confirmed"],
       additionalProperties: false,
     },
   },

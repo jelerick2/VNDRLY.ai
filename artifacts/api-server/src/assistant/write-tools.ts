@@ -36,6 +36,7 @@ interface MarkNotificationsReadInput {
   notificationId?: number;
   /** When true (default), mark every unread notification for this user. */
   markAll?: boolean;
+  confirmed?: boolean;
 }
 
 interface ScheduleTicketCrewInput {
@@ -239,6 +240,9 @@ async function markNotificationsRead(
 ): Promise<string> {
   if (!session.userId) {
     return err("Must be signed in to update notifications.");
+  }
+  if (input.confirmed !== true) {
+    return err("AskV needs explicit confirmation before marking notifications read.");
   }
   const userId = session.userId;
 

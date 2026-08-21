@@ -81,7 +81,7 @@ describe("AskV tool registry", () => {
     expect(schedule?.mutating).toBe(true);
     expect(schedule?.confirmation).toBe("required");
     expect(markRead?.mutating).toBe(true);
-    expect(markRead?.confirmation).toBe("none");
+    expect(markRead?.confirmation).toBe("required");
   });
 
   it("role-filters office-only tools before a Realtime session is minted", () => {

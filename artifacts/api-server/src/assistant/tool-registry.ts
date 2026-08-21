@@ -106,7 +106,7 @@ const TOOL_METADATA: Record<string, Partial<ToolMetadata>> = {
   lookup_ticket_payment_status: { roles: OFFICE_ROLES, auditTarget: "ticket" },
   lookup_accounting_connection: { roles: ["admin", "vendor"] },
   query_active_visitors: { roles: OFFICE_ROLES },
-  mark_notifications_read: { mutating: true, auditTarget: "notification" },
+  mark_notifications_read: { mutating: true, confirmation: "required", auditTarget: "notification" },
   schedule_ticket_crew: { roles: OFFICE_ROLES, mutating: true, confirmation: "required", auditTarget: "ticket" },
   set_ticket_flag: { mutating: true, confirmation: "required", auditTarget: "ticket" },
   post_ticket_comment: { roles: VENDOR_FIELD_ROLES, mutating: true, confirmation: "required", auditTarget: "message" },

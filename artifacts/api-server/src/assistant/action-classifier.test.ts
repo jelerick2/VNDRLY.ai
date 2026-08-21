@@ -17,6 +17,6 @@ describe("AskV voice confirmation classifier", () => {
 
   it("uses tool metadata for high-impact confirmation", () => {
     expect(requiresVoiceConfirmation("schedule_ticket_crew")).toBe(true);
-    expect(requiresVoiceConfirmation("mark_notifications_read")).toBe(false);
+    expect(requiresVoiceConfirmation("mark_notifications_read")).toBe(true);
   });
 });

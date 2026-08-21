@@ -67,7 +67,7 @@ describe("runWriteTool — mark_notifications_read", () => {
     const out = JSON.parse(
       await runWriteTool(
         "mark_notifications_read",
-        { markAll: true },
+        { markAll: true, confirmed: true },
         { role: "partner", userId: 99 } as never,
       ),
     );
@@ -79,11 +79,23 @@ describe("runWriteTool — mark_notifications_read", () => {
     const out = JSON.parse(
       await runWriteTool(
         "mark_notifications_read",
-        { notificationId: 5 },
+        { notificationId: 5, confirmed: true },
         { role: "vendor", userId: 99 } as never,
       ),
     );
     expect(out).toEqual({ ok: true, marked: 1, notificationId: 5 });
+  });
+
+  it("requires explicit confirmation before marking notifications read", async () => {
+    const out = JSON.parse(
+      await runWriteTool(
+        "mark_notifications_read",
+        { markAll: true },
+        { role: "vendor", userId: 99 } as never,
+      ),
+    );
+    expect(out.error).toMatch(/confirmation/i);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });
 

@@ -6,6 +6,8 @@ import assistantRealtimeRouter from "./assistantRealtime";
 const mocks = vi.hoisted(() => ({
   createCall: vi.fn(async () => "answer-sdp"),
   createSecret: vi.fn(async () => ({ value: "ek_test", expires_at: 123 })),
+  runTool: vi.fn(async () => JSON.stringify({ ok: true })),
+  writeAudit: vi.fn(async () => undefined),
   session: {
     userId: 10,
     role: "vendor",
@@ -57,7 +59,11 @@ vi.mock("../assistant/realtime-session", async () => {
 });
 
 vi.mock("./assistant", () => ({
-  runTool: vi.fn(async () => JSON.stringify({ ok: true })),
+  runTool: mocks.runTool,
+}));
+
+vi.mock("../assistant/action-audit", () => ({
+  writeAskVActionAudit: mocks.writeAudit,
 }));
 
 function app() {
@@ -79,6 +85,9 @@ describe("AskV Realtime routes", () => {
     };
     mocks.createCall.mockClear();
     mocks.createSecret.mockClear();
+    mocks.runTool.mockClear();
+    mocks.runTool.mockResolvedValue(JSON.stringify({ ok: true }));
+    mocks.writeAudit.mockClear();
   });
 
   it("creates a server-mediated Realtime WebRTC call from browser SDP", async () => {
@@ -162,5 +171,58 @@ describe("AskV Realtime routes", () => {
     expect(res.body).toMatchObject({
       code: "assistant.tool_not_allowed",
     });
+  });
+
+  it("requires confirmation before realtime voice write tools execute", async () => {
+    const res = await request(app())
+      .post("/assistant/realtime/tool-call")
+      .send({
+        name: "mark_notifications_read",
+        arguments: { markAll: true },
+        clientSurface: "web",
+      })
+      .expect(200);
+
+    expect(res.body).toMatchObject({
+      ok: false,
+      requiresConfirmation: true,
+    });
+    expect(mocks.runTool).not.toHaveBeenCalled();
+    expect(mocks.writeAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "openai_realtime",
+        toolName: "mark_notifications_read",
+        resultStatus: "requires_confirmation",
+      }),
+    );
+  });
+
+  it("passes confirmed:true into realtime voice write tools after confirmation", async () => {
+    const res = await request(app())
+      .post("/assistant/realtime/tool-call")
+      .send({
+        name: "mark_notifications_read",
+        arguments: { markAll: true },
+        confirmationPhrase: "yes",
+        clientSurface: "ios",
+      })
+      .expect(200);
+
+    expect(res.body).toMatchObject({ ok: true });
+    expect(mocks.runTool).toHaveBeenCalledWith(
+      "mark_notifications_read",
+      { markAll: true, confirmed: true },
+      expect.objectContaining({ userId: 10, role: "vendor" }),
+      expect.any(String),
+    );
+    expect(mocks.writeAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputMode: "ios_voice",
+        toolName: "mark_notifications_read",
+        confirmationPhrase: "yes",
+        toolInput: { markAll: true, confirmed: true },
+        resultStatus: "success",
+      }),
+    );
   });
 });

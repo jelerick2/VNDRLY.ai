@@ -86,6 +86,14 @@ function outputStatus(output: string): "success" | "failure" {
   }
 }
 
+function toolInputWithConfirmation(input: unknown, confirmed: boolean): unknown {
+  if (!confirmed) return input;
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { confirmed: true };
+  }
+  return { ...input, confirmed: true };
+}
+
 async function buildRealtimeInstructions(session: SessionPayload, seedMessage: string): Promise<string> {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId!)).limit(1);
   const role = normalizeRole(session.role);
@@ -290,7 +298,10 @@ router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => 
   }
 
   try {
-    const output = await runTool(name, input, session, req.headers.cookie ?? "");
+    const executableInput = requiresVoiceConfirmation(name)
+      ? toolInputWithConfirmation(input, confirmed)
+      : input;
+    const output = await runTool(name, executableInput, session, req.headers.cookie ?? "");
     const status = outputStatus(output);
     if (tool.mutating) {
       await writeAskVActionAudit({
@@ -302,7 +313,7 @@ router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => 
         targetType: tool.auditTarget ?? null,
         targetId: targetId as string | number | null,
         transcriptText,
-        toolInput: input,
+        toolInput: executableInput,
         toolOutput: output,
         confirmationPhrase,
         resultStatus: status,

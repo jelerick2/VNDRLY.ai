@@ -10,6 +10,7 @@ export function useAskVRealtime() {
   const [error, setError] = useState<string | null>(null);
   const clientRef = useRef<AskVRealtimeClient | null>(null);
   const stateRef = useRef<AskVRealtimeState>("idle");
+  const pendingConfirmationRef = useRef(false);
 
   const setRealtimeState = useCallback((next: AskVRealtimeState) => {
     stateRef.current = next;
@@ -19,6 +20,7 @@ export function useAskVRealtime() {
   const stop = useCallback(() => {
     clientRef.current?.close();
     clientRef.current = null;
+    pendingConfirmationRef.current = false;
     setRealtimeState("idle");
   }, [setRealtimeState]);
 
@@ -41,10 +43,20 @@ export function useAskVRealtime() {
               clientSurface: "web",
             }),
           });
-          const data = (await res.json()) as { output?: string; message?: string; error?: string };
+          const data = (await res.json()) as {
+            output?: string;
+            message?: string;
+            error?: string;
+            requiresConfirmation?: boolean;
+          };
+          pendingConfirmationRef.current = data.requiresConfirmation === true;
           return data.output ?? data.message ?? data.error ?? "";
         },
         onDone: () => {
+          if (pendingConfirmationRef.current) {
+            setRealtimeState("listening");
+            return;
+          }
           clientRef.current?.close();
           clientRef.current = null;
           setRealtimeState("idle");
@@ -53,6 +65,7 @@ export function useAskVRealtime() {
           setError(message);
           clientRef.current?.close();
           clientRef.current = null;
+          pendingConfirmationRef.current = false;
           setRealtimeState("error");
         },
       });
@@ -62,6 +75,7 @@ export function useAskVRealtime() {
     } catch (err) {
       clientRef.current?.close();
       clientRef.current = null;
+      pendingConfirmationRef.current = false;
       setError(err instanceof Error ? err.message : "assistant.realtime_failed");
       setRealtimeState("error");
     }
