@@ -66,13 +66,16 @@ $updateArgs = @(
   "--channel", $Channel,
   "--environment", $Channel,
   "--platform", $Platform,
-  "--message", $Message,
-  "--rollout-percentage", "$RolloutPercentage"
+  "--message", $Message
 )
+if ($RolloutPercentage -lt 100) {
+  $updateArgs += @("--rollout-percentage", "$RolloutPercentage")
+}
 if ($NonInteractive) {
   $updateArgs += "--non-interactive"
 }
 Invoke-Eas $updateArgs
 
 Write-EasStep "Done"
-Write-Host "Published OTA update to channel '$Channel' for platform '$Platform' at $RolloutPercentage% rollout."
+$rolloutLabel = if ($RolloutPercentage -lt 100) { "$RolloutPercentage% rollout" } else { "full rollout" }
+Write-Host "Published OTA update to channel '$Channel' for platform '$Platform' ($rolloutLabel)."
