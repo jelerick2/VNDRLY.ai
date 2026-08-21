@@ -4,6 +4,7 @@ import {
   db,
   assistantConversationsTable,
   assistantMessagesTable,
+  assistantActionAuditTable,
   usersTable,
   onboardingProgressTable,
   invoicesTable,
@@ -43,6 +44,11 @@ import { parsePageContext } from "../assistant/page-context";
 import { classifyRefusal } from "../assistant/refusal";
 import { TOOLS } from "../assistant/tools";
 import { writeAskVActionAudit, type AskVClientSurface, type AskVInputMode } from "../assistant/action-audit";
+import {
+  clampActionAuditLimit,
+  normalizeActionAuditStatus,
+  toActionAuditListRow,
+} from "../assistant/action-audit-query";
 import { classifyToolResult } from "../assistant/tool-result";
 import { findAskVTool } from "../assistant/tool-registry";
 import { isDataTool, runDataTool } from "../assistant/data-tools";
@@ -344,6 +350,77 @@ router.delete("/assistant/conversations/:id", async (req, res) => {
     .returning({ id: assistantConversationsTable.id });
   if (result.length === 0) { res.status(404).json({ error: "Not found", code: "common.not_found" }); return; }
   res.status(204).end();
+});
+
+// ─────────────────────────────────────────────────────────────────
+// Admin telemetry: AskV action audit list.
+// ─────────────────────────────────────────────────────────────────
+// Returns the most recent assistant tool calls with enough metadata to
+// investigate confirmations/failures, while intentionally omitting raw
+// tool payloads and coordinates from the list response.
+router.get("/assistant/action-audit", async (req, res) => {
+  const session = requireSession(req, res);
+  if (!session) return;
+  if (session.role !== "admin") {
+    res.status(403).json({ error: "Admin only", code: "auth.admin_only" });
+    return;
+  }
+
+  const limit = clampActionAuditLimit(req.query.limit);
+  const status = normalizeActionAuditStatus(req.query.status);
+  const toolName =
+    typeof req.query.toolName === "string" && req.query.toolName.trim()
+      ? req.query.toolName.trim()
+      : null;
+  const userId = Number(req.query.userId);
+  const filters = [
+    status ? eq(assistantActionAuditTable.resultStatus, status) : undefined,
+    toolName ? eq(assistantActionAuditTable.toolName, toolName) : undefined,
+    Number.isInteger(userId) && userId > 0
+      ? eq(assistantActionAuditTable.userId, userId)
+      : undefined,
+  ].filter((f): f is NonNullable<typeof f> => Boolean(f));
+
+  const rows = await db
+    .select({
+      id: assistantActionAuditTable.id,
+      createdAt: assistantActionAuditTable.createdAt,
+      userId: assistantActionAuditTable.userId,
+      userDisplayName: usersTable.displayName,
+      userEmail: usersTable.email,
+      actorRole: assistantActionAuditTable.actorRole,
+      actorMembershipRole: assistantActionAuditTable.actorMembershipRole,
+      partnerId: assistantActionAuditTable.partnerId,
+      vendorId: assistantActionAuditTable.vendorId,
+      vendorPeopleId: assistantActionAuditTable.vendorPeopleId,
+      clientSurface: assistantActionAuditTable.clientSurface,
+      inputMode: assistantActionAuditTable.inputMode,
+      provider: assistantActionAuditTable.provider,
+      toolName: assistantActionAuditTable.toolName,
+      actionType: assistantActionAuditTable.actionType,
+      targetType: assistantActionAuditTable.targetType,
+      targetId: assistantActionAuditTable.targetId,
+      confirmationPhrase: assistantActionAuditTable.confirmationPhrase,
+      gpsLatitude: assistantActionAuditTable.gpsLatitude,
+      gpsLongitude: assistantActionAuditTable.gpsLongitude,
+      gpsAccuracyMeters: assistantActionAuditTable.gpsAccuracyMeters,
+      resultStatus: assistantActionAuditTable.resultStatus,
+      errorCode: assistantActionAuditTable.errorCode,
+      errorMessage: assistantActionAuditTable.errorMessage,
+      toolInput: assistantActionAuditTable.toolInput,
+      toolOutput: assistantActionAuditTable.toolOutput,
+    })
+    .from(assistantActionAuditTable)
+    .leftJoin(usersTable, eq(assistantActionAuditTable.userId, usersTable.id))
+    .where(filters.length > 0 ? and(...filters) : sql`true`)
+    .orderBy(desc(assistantActionAuditTable.createdAt))
+    .limit(limit);
+
+  res.json({
+    limit,
+    status,
+    rows: rows.map(toActionAuditListRow),
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────

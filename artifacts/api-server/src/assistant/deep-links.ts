@@ -124,6 +124,7 @@ export const DEEP_LINK_SCREENS: ReadonlyArray<DeepLinkScreenDef> = [
   { screen: "field-home", pattern: "/field" },
   { screen: "safety-inbox", pattern: "/safety" },
   { screen: "safety-event-detail", pattern: "/safety/:id", requiresId: true },
+  { screen: "askv-audit", pattern: "/admin/askv-audit" },
 ];
 
 // Lookup from screen name → definition. Built once at module load.

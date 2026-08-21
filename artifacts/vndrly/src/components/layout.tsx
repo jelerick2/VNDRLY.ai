@@ -21,6 +21,7 @@ import {
   Gauge,
   MessageSquareOff,
   Flag,
+  Bot,
 } from "lucide-react";
 import React, { Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -129,6 +130,10 @@ function useNavItems(user: { role: string; vendorId: number | null; partnerId: n
       // admins see who removed a comment, view the original content,
       // and (from the parent record's comments panel) restore it.
       { href: "/admin/removed-comments", label: "Removed comments", icon: MessageSquareOff, key: "admin-removed-comments" },
+      // AskV tool-call audit trail: confirmations, failures, and
+      // client surfaces without exposing raw payloads in the sidebar
+      // destination.
+      { href: "/admin/askv-audit", label: "AskV audit", icon: Bot, key: "admin-askv-audit" },
       // Edits the singleton fire_transmitter_settings row used as the
       // T-record source on every IRS 1099 FIRE submission. See
       // artifacts/api-server/src/routes/fireTransmitterSettings.ts.
