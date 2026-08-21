@@ -23,6 +23,7 @@ import {
 } from "../assistant/tool-registry";
 import { classifyConfirmation, requiresVoiceConfirmation } from "../assistant/action-classifier";
 import { writeAskVActionAudit, type AskVClientSurface, type AskVInputMode } from "../assistant/action-audit";
+import { classifyToolResult } from "../assistant/tool-result";
 import { runTool } from "./assistant";
 
 const router: IRouter = Router();
@@ -75,15 +76,6 @@ function stripNullToolArguments(value: unknown): unknown {
     cleaned[key] = stripNullToolArguments(child);
   }
   return cleaned;
-}
-
-function outputStatus(output: string): "success" | "failure" {
-  try {
-    const parsed = JSON.parse(output) as { error?: unknown; ok?: unknown };
-    return parsed.error || parsed.ok === false ? "failure" : "success";
-  } catch {
-    return output.toLowerCase().includes("\"error\"") ? "failure" : "success";
-  }
 }
 
 function toolInputWithConfirmation(input: unknown, confirmed: boolean): unknown {
@@ -302,7 +294,7 @@ router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => 
       ? toolInputWithConfirmation(input, confirmed)
       : input;
     const output = await runTool(name, executableInput, session, req.headers.cookie ?? "");
-    const status = outputStatus(output);
+    const status = classifyToolResult(output, tool.mutating);
     if (tool.mutating) {
       await writeAskVActionAudit({
         session,

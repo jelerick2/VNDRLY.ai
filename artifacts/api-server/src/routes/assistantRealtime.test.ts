@@ -225,4 +225,29 @@ describe("AskV Realtime routes", () => {
       }),
     );
   });
+
+  it("audits structured confirmation refusals from realtime tools", async () => {
+    mocks.runTool.mockResolvedValueOnce(JSON.stringify({
+      error: "AskV needs explicit confirmation before marking notifications read.",
+      requiresConfirmation: true,
+    }));
+
+    const res = await request(app())
+      .post("/assistant/realtime/tool-call")
+      .send({
+        name: "mark_notifications_read",
+        arguments: { markAll: true },
+        confirmationPhrase: "yes",
+        clientSurface: "web",
+      })
+      .expect(200);
+
+    expect(res.body).toMatchObject({ ok: false });
+    expect(mocks.writeAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolName: "mark_notifications_read",
+        resultStatus: "requires_confirmation",
+      }),
+    );
+  });
 });
