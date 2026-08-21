@@ -122,6 +122,10 @@ function shQuote(s) {
   return `'${String(s).replace(/'/g, "'\\''")}'`;
 }
 
+function envValue(env, key) {
+  return env[key] ?? env[key.toLowerCase()] ?? "";
+}
+
 async function main() {
   const cfg = loadDeployConfig();
   const localEnv = existsSync(path.join(ROOT, ".env.local"))
@@ -156,60 +160,60 @@ async function main() {
   const twilioEnv = parseEnvFile(twilioEnvPath());
   const twilioAccountSid =
     localEnv.match(/^TWILIO_ACCOUNT_SID=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_ACCOUNT_SID ??
+    envValue(twilioEnv, "TWILIO_ACCOUNT_SID") ??
     "";
   const twilioApiKey =
     localEnv.match(/^TWILIO_API_KEY=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_API_KEY ??
+    envValue(twilioEnv, "TWILIO_API_KEY") ??
     "";
   const twilioApiSecret =
     localEnv.match(/^TWILIO_API_SECRET=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_API_SECRET ??
+    envValue(twilioEnv, "TWILIO_API_SECRET") ??
     "";
   const twilioPhoneNumber =
     localEnv.match(/^TWILIO_PHONE_NUMBER=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_PHONE_NUMBER ??
+    envValue(twilioEnv, "TWILIO_PHONE_NUMBER") ??
     "";
   const twilioMessagingServiceSid =
     localEnv.match(/^TWILIO_MESSAGING_SERVICE_SID=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_MESSAGING_SERVICE_SID ??
+    envValue(twilioEnv, "TWILIO_MESSAGING_SERVICE_SID") ??
     "";
   const twilioSenderRegistrationStatus =
     localEnv.match(/^TWILIO_SENDER_REGISTRATION_STATUS=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_SENDER_REGISTRATION_STATUS ??
+    envValue(twilioEnv, "TWILIO_SENDER_REGISTRATION_STATUS") ??
     "";
   const twilioA2pStatus =
     localEnv.match(/^TWILIO_A2P_STATUS=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_A2P_STATUS ??
+    envValue(twilioEnv, "TWILIO_A2P_STATUS") ??
     "";
   const twilioTollFreeVerificationStatus =
     localEnv.match(/^TWILIO_TOLL_FREE_VERIFICATION_STATUS=(.+)$/m)?.[1]?.trim() ??
-    twilioEnv.TWILIO_TOLL_FREE_VERIFICATION_STATUS ??
+    envValue(twilioEnv, "TWILIO_TOLL_FREE_VERIFICATION_STATUS") ??
     "";
   const sendGridEnv = parseEnvFile(sendGridEnvPath());
   const sendGridApiKey =
     localEnv.match(/^SENDGRID_API_KEY=(.+)$/m)?.[1]?.trim() ??
-    sendGridEnv.SENDGRID_API_KEY ??
+    envValue(sendGridEnv, "SENDGRID_API_KEY") ??
     "";
   const sendGridFromEmail =
     localEnv.match(/^SENDGRID_FROM_EMAIL=(.+)$/m)?.[1]?.trim() ??
-    sendGridEnv.SENDGRID_FROM_EMAIL ??
+    envValue(sendGridEnv, "SENDGRID_FROM_EMAIL") ??
     "";
   const sendGridFromName =
     localEnv.match(/^SENDGRID_FROM_NAME=(.+)$/m)?.[1]?.trim() ??
-    sendGridEnv.SENDGRID_FROM_NAME ??
+    envValue(sendGridEnv, "SENDGRID_FROM_NAME") ??
     "";
   const sendGridReplyTo =
     localEnv.match(/^SENDGRID_REPLY_TO=(.+)$/m)?.[1]?.trim() ??
-    sendGridEnv.SENDGRID_REPLY_TO ??
+    envValue(sendGridEnv, "SENDGRID_REPLY_TO") ??
     "";
   const sendGridSandboxMode =
     localEnv.match(/^SENDGRID_SANDBOX_MODE=(.+)$/m)?.[1]?.trim() ??
-    sendGridEnv.SENDGRID_SANDBOX_MODE ??
+    envValue(sendGridEnv, "SENDGRID_SANDBOX_MODE") ??
     "";
   const sendGridDomainAuthenticated =
     localEnv.match(/^SENDGRID_DOMAIN_AUTHENTICATED=(.+)$/m)?.[1]?.trim() ??
-    sendGridEnv.SENDGRID_DOMAIN_AUTHENTICATED ??
+    envValue(sendGridEnv, "SENDGRID_DOMAIN_AUTHENTICATED") ??
     "";
 
   const supabaseUrl =
