@@ -1535,6 +1535,13 @@
     "transcriptErrorTitle": "Could not export transcript",
     "transcriptShareUnavailable": "Sharing is not available on this device.",
     "transcribeFailed": "Couldn't understand that. Try again or type your question.",
+    "handsFree": {
+      "armed": "Hands-free is armed. Speak when the mic opens.",
+      "listening": "Listening for one AskV command…",
+      "thinking": "AskV is working on that command…",
+      "speaking": "AskV is answering aloud…",
+      "off": "Hands-free is off."
+    },
     "quickActions": {
       "fieldEtaTicket": "ETA to next ticket",
       "fieldNextTicket": "Closest ticket",

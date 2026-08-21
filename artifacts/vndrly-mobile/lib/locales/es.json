@@ -1535,6 +1535,13 @@
     "transcriptErrorTitle": "No se pudo exportar la transcripción",
     "transcriptShareUnavailable": "Compartir no está disponible en este dispositivo.",
     "transcribeFailed": "No pude entender eso. Inténtalo de nuevo o escribe tu pregunta.",
+    "handsFree": {
+      "armed": "Manos libres está listo. Habla cuando se abra el micrófono.",
+      "listening": "Escuchando un comando para AskV…",
+      "thinking": "AskV está trabajando en ese comando…",
+      "speaking": "AskV está respondiendo en voz alta…",
+      "off": "Manos libres está apagado."
+    },
     "quickActions": {
       "fieldEtaTicket": "ETA al próximo ticket",
       "fieldNextTicket": "Ticket más cercano",
