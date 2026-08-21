@@ -206,7 +206,7 @@ async function main() {
   const sendGridReplyTo =
     localEnv.match(/^SENDGRID_REPLY_TO=(.+)$/m)?.[1]?.trim() ??
     envValue(sendGridEnv, "SENDGRID_REPLY_TO") ??
-    "";
+    "support@vndrly.ai";
   const sendGridSandboxMode =
     localEnv.match(/^SENDGRID_SANDBOX_MODE=(.+)$/m)?.[1]?.trim() ??
     envValue(sendGridEnv, "SENDGRID_SANDBOX_MODE") ??

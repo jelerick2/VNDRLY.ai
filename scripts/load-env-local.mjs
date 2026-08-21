@@ -67,9 +67,9 @@ for (const key of [
   "SENDGRID_API_KEY",
   "SENDGRID_FROM_EMAIL",
   "SENDGRID_FROM_NAME",
-  "SENDGRID_REPLY_TO",
   "SENDGRID_SANDBOX_MODE",
   "SENDGRID_DOMAIN_AUTHENTICATED",
 ]) {
   setEnv(key, sendGridEnv[key] || "");
 }
+setEnv("SENDGRID_REPLY_TO", sendGridEnv.SENDGRID_REPLY_TO || "support@vndrly.ai");

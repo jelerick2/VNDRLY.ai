@@ -52,7 +52,7 @@ router.post("/auth/forgot-password", async (req, res) => {
     const resetUrl = buildResetUrl(rawToken);
 
     try {
-      await sendPasswordResetEmail(user.username, resetUrl, user.displayName);
+      await sendPasswordResetEmail(user.email?.trim() || user.username, resetUrl, user.displayName);
     } catch (err) {
       logger.error({ err, userId: user.id }, "Failed to send password reset email");
       return sendApiError(res, 500, "password_reset.send_failed", "Could not send reset email. Please try again or contact your admin.");
