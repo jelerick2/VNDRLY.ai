@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sendPasswordResetEmail } from "./sendgrid";
+import { sendAdminResetPasswordEmail, sendPasswordResetEmail } from "./sendgrid";
 
 const originalEnv = { ...process.env };
 
@@ -52,5 +52,29 @@ describe("sendPasswordResetEmail", () => {
       sendPasswordResetEmail("user@example.com", "https://vndrly.ai/reset-password?token=abc", "Jane User"),
     ).rejects.toThrow("SendGrid is not configured");
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendAdminResetPasswordEmail", () => {
+  it("sends an admin-issued temporary password through SendGrid", async () => {
+    const result = await sendAdminResetPasswordEmail({
+      to: "crew@example.com",
+      displayName: "Crew Member",
+      adminDisplayName: "Vendor Admin",
+      tempPassword: "TempPass123!",
+    });
+
+    expect(result).toEqual({ messageId: "msg-123" });
+    const fetchMock = vi.mocked(fetch);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.sendgrid.com/v3/mail/send");
+    const payload = JSON.parse(String(init?.body));
+    expect(payload.personalizations[0].to).toEqual([{ email: "crew@example.com" }]);
+    expect(payload.subject).toBe("VNDRLY — Your password was reset");
+    expect(payload.categories).toEqual(["admin_password_reset"]);
+    expect(payload.content[0].value).toContain("TempPass123!");
+    expect(payload.content[1].value).toContain("TempPass123!");
+    expect(payload.content[1].value).toContain("Vendor Admin");
   });
 });

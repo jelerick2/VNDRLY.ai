@@ -698,8 +698,32 @@ export interface SendAdminResetPasswordEmailInput {
 export async function sendAdminResetPasswordEmail(
   input: SendAdminResetPasswordEmailInput,
 ): Promise<{ messageId: string | undefined }> {
-  logger.debug({ fn: "sendAdminResetPasswordEmail" }, SKIP);
-  return { messageId: undefined };
+  const c = ADMIN_RESET_COPY[input.locale ?? "en"] ?? ADMIN_RESET_COPY.en;
+  const safeAdmin = escapeHtml(input.adminDisplayName || "an administrator");
+  const safeTempPassword = escapeHtml(input.tempPassword);
+  return sendSendGridMail({
+    to: input.to,
+    subject: c.subject,
+    categories: ["admin_password_reset"],
+    html: `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111827;">
+        <div style="background:#111827;color:#f59e0b;padding:16px 20px;border-radius:8px 8px 0 0;">
+          <div style="font-weight:700;font-size:18px;">VNDRLY</div>
+          <div style="color:#fef3c7;font-size:12px;">${escapeHtml(c.bandSubtitle)}</div>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-top:0;padding:20px;border-radius:0 0 8px 8px;">
+          <p>${escapeHtml(c.greet(input.displayName || "there"))}</p>
+          <p>${c.intro(safeAdmin)}</p>
+          <p style="margin:20px 0;padding:14px 16px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;font-weight:700;letter-spacing:0.04em;">${safeTempPassword}</p>
+          <p style="color:#6b7280;font-size:12px;margin-top:24px;">${escapeHtml(c.note)}</p>
+        </div>
+      </div>`,
+    text:
+      `${c.greet(input.displayName || "there")}\n\n` +
+      `${c.introText(input.adminDisplayName || "an administrator")}\n\n` +
+      `${c.tempLabel}: ${input.tempPassword}\n\n` +
+      c.note,
+  });
 }
 
 // ─── Bulk-action expiry warning email ──────────────────────────

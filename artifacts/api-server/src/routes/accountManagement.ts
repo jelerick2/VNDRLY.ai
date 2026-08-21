@@ -215,6 +215,7 @@ router.post("/users/:id/admin-reset-password", async (req, res) => {
     .select({
       id: usersTable.id,
       username: usersTable.username,
+      email: usersTable.email,
       displayName: usersTable.displayName,
       preferredLanguage: usersTable.preferredLanguage,
     })
@@ -240,7 +241,7 @@ router.post("/users/:id/admin-reset-password", async (req, res) => {
     target.preferredLanguage === "es" ? ("es" as const) : ("en" as const);
   try {
     await sendAdminResetPasswordEmail({
-      to: target.username,
+      to: target.email?.trim() || target.username,
       displayName: target.displayName ?? target.username,
       adminDisplayName: auth.ctx.adminDisplayName,
       tempPassword,
