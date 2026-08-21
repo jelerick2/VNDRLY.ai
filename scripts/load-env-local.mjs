@@ -54,6 +54,9 @@ for (const key of [
   "TWILIO_API_SECRET",
   "TWILIO_PHONE_NUMBER",
   "TWILIO_MESSAGING_SERVICE_SID",
+  "TWILIO_SENDER_REGISTRATION_STATUS",
+  "TWILIO_A2P_STATUS",
+  "TWILIO_TOLL_FREE_VERIFICATION_STATUS",
   "TWILIO_SMOKE_TO",
 ]) {
   setEnv(key, twilioEnv[key] || "");
@@ -66,6 +69,7 @@ for (const key of [
   "SENDGRID_FROM_NAME",
   "SENDGRID_REPLY_TO",
   "SENDGRID_SANDBOX_MODE",
+  "SENDGRID_DOMAIN_AUTHENTICATED",
 ]) {
   setEnv(key, sendGridEnv[key] || "");
 }

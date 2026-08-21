@@ -174,6 +174,18 @@ async function main() {
     localEnv.match(/^TWILIO_MESSAGING_SERVICE_SID=(.+)$/m)?.[1]?.trim() ??
     twilioEnv.TWILIO_MESSAGING_SERVICE_SID ??
     "";
+  const twilioSenderRegistrationStatus =
+    localEnv.match(/^TWILIO_SENDER_REGISTRATION_STATUS=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_SENDER_REGISTRATION_STATUS ??
+    "";
+  const twilioA2pStatus =
+    localEnv.match(/^TWILIO_A2P_STATUS=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_A2P_STATUS ??
+    "";
+  const twilioTollFreeVerificationStatus =
+    localEnv.match(/^TWILIO_TOLL_FREE_VERIFICATION_STATUS=(.+)$/m)?.[1]?.trim() ??
+    twilioEnv.TWILIO_TOLL_FREE_VERIFICATION_STATUS ??
+    "";
   const sendGridEnv = parseEnvFile(sendGridEnvPath());
   const sendGridApiKey =
     localEnv.match(/^SENDGRID_API_KEY=(.+)$/m)?.[1]?.trim() ??
@@ -194,6 +206,10 @@ async function main() {
   const sendGridSandboxMode =
     localEnv.match(/^SENDGRID_SANDBOX_MODE=(.+)$/m)?.[1]?.trim() ??
     sendGridEnv.SENDGRID_SANDBOX_MODE ??
+    "";
+  const sendGridDomainAuthenticated =
+    localEnv.match(/^SENDGRID_DOMAIN_AUTHENTICATED=(.+)$/m)?.[1]?.trim() ??
+    sendGridEnv.SENDGRID_DOMAIN_AUTHENTICATED ??
     "";
 
   const supabaseUrl =
@@ -229,11 +245,15 @@ async function main() {
     twilioApiSecret ? `TWILIO_API_SECRET=${twilioApiSecret}` : "",
     twilioPhoneNumber ? `TWILIO_PHONE_NUMBER=${twilioPhoneNumber}` : "",
     twilioMessagingServiceSid ? `TWILIO_MESSAGING_SERVICE_SID=${twilioMessagingServiceSid}` : "",
+    twilioSenderRegistrationStatus ? `TWILIO_SENDER_REGISTRATION_STATUS=${twilioSenderRegistrationStatus}` : "",
+    twilioA2pStatus ? `TWILIO_A2P_STATUS=${twilioA2pStatus}` : "",
+    twilioTollFreeVerificationStatus ? `TWILIO_TOLL_FREE_VERIFICATION_STATUS=${twilioTollFreeVerificationStatus}` : "",
     sendGridApiKey ? `SENDGRID_API_KEY=${sendGridApiKey}` : "",
     sendGridFromEmail ? `SENDGRID_FROM_EMAIL=${sendGridFromEmail}` : "",
     sendGridFromName ? `SENDGRID_FROM_NAME=${sendGridFromName}` : "",
     sendGridReplyTo ? `SENDGRID_REPLY_TO=${sendGridReplyTo}` : "",
     sendGridSandboxMode ? `SENDGRID_SANDBOX_MODE=${sendGridSandboxMode}` : "",
+    sendGridDomainAuthenticated ? `SENDGRID_DOMAIN_AUTHENTICATED=${sendGridDomainAuthenticated}` : "",
     "OPS_ALERT_EMAIL=admin@vndrly.ai",
     "PUBLIC_APP_URL=https://vndrly.ai",
     "APP_BASE_URL=https://vndrly.ai",

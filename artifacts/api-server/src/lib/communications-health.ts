@@ -21,9 +21,11 @@ export type CommunicationsHealth = {
   services: {
     sendgrid: CommunicationsServiceHealth & {
       sandboxMode: boolean;
+      domainAuthenticated: boolean;
     };
     twilio: CommunicationsServiceHealth & {
       senderMode: "messaging_service" | "phone_number" | "missing";
+      registrationStatus: string;
     };
     expoPush: CommunicationsServiceHealth;
   };
@@ -49,6 +51,19 @@ function sandboxEnabled(env: EnvLike): boolean {
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
+function truthy(env: EnvLike, key: string): boolean {
+  const raw = value(env, key).toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "approved";
+}
+
+function firstValue(env: EnvLike, keys: string[]): string {
+  for (const key of keys) {
+    const found = value(env, key);
+    if (found) return found;
+  }
+  return "";
+}
+
 function isE164Phone(value: string): boolean {
   return /^\+[1-9]\d{1,14}$/.test(value);
 }
@@ -62,6 +77,7 @@ export function buildCommunicationsHealth(
   now: Date = new Date(),
 ): CommunicationsHealth {
   const sendgridSandbox = sandboxEnabled(env);
+  const sendgridDomainAuthenticated = truthy(env, "SENDGRID_DOMAIN_AUTHENTICATED");
   const sendgridChecks: CommunicationsHealthCheck[] = [
     {
       key: "apiKey",
@@ -100,12 +116,27 @@ export function buildCommunicationsHealth(
         ? "SENDGRID_SANDBOX_MODE is enabled, so SendGrid accepts messages without delivering them."
         : "Sandbox mode is off.",
     },
+    {
+      key: "domainAuthentication",
+      label: "SendGrid domain authentication",
+      ok: sendgridDomainAuthenticated,
+      severity: "warning",
+      detail: sendgridDomainAuthenticated
+        ? "Sending domain authentication has been marked verified."
+        : "Authenticate the sending domain in SendGrid and set SENDGRID_DOMAIN_AUTHENTICATED=true after verification.",
+    },
   ];
 
   const twilioMessagingService = envPresent(env, "TWILIO_MESSAGING_SERVICE_SID");
   const twilioPhone = value(env, "TWILIO_PHONE_NUMBER");
   const twilioPhoneReady = twilioPhone ? isE164Phone(twilioPhone) : false;
   const twilioSenderReady = twilioMessagingService || twilioPhoneReady;
+  const twilioRegistrationStatus = firstValue(env, [
+    "TWILIO_SENDER_REGISTRATION_STATUS",
+    "TWILIO_A2P_STATUS",
+    "TWILIO_TOLL_FREE_VERIFICATION_STATUS",
+  ]).toLowerCase();
+  const twilioRegistrationReady = twilioRegistrationStatus === "approved";
   const twilioChecks: CommunicationsHealthCheck[] = [
     {
       key: "accountSid",
@@ -139,6 +170,15 @@ export function buildCommunicationsHealth(
           ? "Phone-number sender must be in E.164 format and SMS-capable."
           : "Set TWILIO_MESSAGING_SERVICE_SID or TWILIO_PHONE_NUMBER.",
     },
+    {
+      key: "senderRegistration",
+      label: "Twilio sender registration",
+      ok: twilioRegistrationReady,
+      severity: "warning",
+      detail: twilioRegistrationReady
+        ? "Twilio sender registration has been marked approved."
+        : "Complete A2P 10DLC or toll-free verification, then set TWILIO_SENDER_REGISTRATION_STATUS=approved.",
+    },
   ];
 
   const expoChecks: CommunicationsHealthCheck[] = [
@@ -159,12 +199,14 @@ export function buildCommunicationsHealth(
   const sendgridConfigured =
     envPresent(env, "SENDGRID_API_KEY") &&
     envPresent(env, "SENDGRID_FROM_EMAIL") &&
-    !sendgridSandbox;
+    !sendgridSandbox &&
+    sendgridDomainAuthenticated;
   const twilioConfigured =
     envPresent(env, "TWILIO_ACCOUNT_SID") &&
     envPresent(env, "TWILIO_API_KEY") &&
     envPresent(env, "TWILIO_API_SECRET") &&
-    twilioSenderReady;
+    twilioSenderReady &&
+    twilioRegistrationReady;
   const overallStatus =
     sendgridStatus === "ready" && twilioStatus === "ready" && expoStatus === "ready"
       ? "ready"
@@ -178,6 +220,7 @@ export function buildCommunicationsHealth(
         status: sendgridStatus,
         configured: sendgridConfigured,
         sandboxMode: sendgridSandbox,
+        domainAuthenticated: sendgridDomainAuthenticated,
         checks: sendgridChecks,
       },
       twilio: {
@@ -188,6 +231,7 @@ export function buildCommunicationsHealth(
           : twilioPhoneReady
             ? "phone_number"
             : "missing",
+        registrationStatus: twilioRegistrationStatus || "not_recorded",
         checks: twilioChecks,
       },
       expoPush: {

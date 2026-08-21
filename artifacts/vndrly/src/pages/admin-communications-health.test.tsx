@@ -35,6 +35,7 @@ const SAMPLE_PAYLOAD = {
       status: "attention",
       configured: false,
       sandboxMode: true,
+      domainAuthenticated: false,
       checks: [
         {
           key: "apiKey",
@@ -56,6 +57,7 @@ const SAMPLE_PAYLOAD = {
       status: "ready",
       configured: true,
       senderMode: "messaging_service",
+      registrationStatus: "approved",
       checks: [
         {
           key: "sender",
@@ -141,6 +143,12 @@ describe("AdminCommunicationsHealth page", () => {
     );
     expect(screen.getByTestId("card-communications-twilio").textContent).toContain(
       "messaging_service",
+    );
+    expect(screen.getByTestId("card-communications-twilio").textContent).toContain(
+      "approved",
+    );
+    expect(screen.getByTestId("card-communications-sendgrid").textContent).toContain(
+      "domain pending",
     );
     expect(screen.getByTestId("feature-password-reset-email").textContent).toContain(
       "Needs attention",

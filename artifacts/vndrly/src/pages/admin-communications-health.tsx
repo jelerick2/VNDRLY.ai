@@ -26,9 +26,13 @@ type CommunicationsHealthResponse = {
   generatedAt: string;
   overallStatus: HealthStatus;
   services: {
-    sendgrid: ServiceHealth & { sandboxMode: boolean };
+    sendgrid: ServiceHealth & {
+      sandboxMode: boolean;
+      domainAuthenticated: boolean;
+    };
     twilio: ServiceHealth & {
       senderMode: "messaging_service" | "phone_number" | "missing";
+      registrationStatus: string;
     };
     expoPush: ServiceHealth;
   };
@@ -238,9 +242,12 @@ export default function AdminCommunicationsHealth() {
               service={data.services.sendgrid}
               testId="card-communications-sendgrid"
             >
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <Badge variant={data.services.sendgrid.sandboxMode ? "destructive" : "secondary"}>
                   {data.services.sendgrid.sandboxMode ? "sandbox on" : "live mode"}
+                </Badge>
+                <Badge variant={data.services.sendgrid.domainAuthenticated ? "default" : "destructive"}>
+                  {data.services.sendgrid.domainAuthenticated ? "domain verified" : "domain pending"}
                 </Badge>
               </div>
             </ServiceCard>
@@ -255,6 +262,10 @@ export default function AdminCommunicationsHealth() {
                 Sender mode:{" "}
                 <code className="rounded bg-muted px-1 py-0.5">
                   {data.services.twilio.senderMode}
+                </code>
+                <span className="mx-2">Registration:</span>
+                <code className="rounded bg-muted px-1 py-0.5">
+                  {data.services.twilio.registrationStatus}
                 </code>
               </div>
             </ServiceCard>
