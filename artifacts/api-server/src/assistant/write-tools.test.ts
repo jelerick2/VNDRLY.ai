@@ -95,6 +95,7 @@ describe("runWriteTool — mark_notifications_read", () => {
       ),
     );
     expect(out.error).toMatch(/confirmation/i);
+    expect(out.requiresConfirmation).toBe(true);
     expect(updateMock).not.toHaveBeenCalled();
   });
 });
@@ -114,6 +115,7 @@ describe("runWriteTool — set_ticket_flag", () => {
       ),
     );
     expect(out.error).toMatch(/confirmation/i);
+    expect(out.requiresConfirmation).toBe(true);
     expect(flagTicketMock).not.toHaveBeenCalled();
   });
 
@@ -159,6 +161,20 @@ describe("runWriteTool — set_ticket_flag", () => {
   });
 });
 
+describe("runWriteTool — schedule_ticket_crew", () => {
+  it("requires explicit confirmation before scheduling crew", async () => {
+    const out = JSON.parse(
+      await runWriteTool(
+        "schedule_ticket_crew",
+        { ticketId: 10959, scheduledStartAt: "2026-08-22T13:00:00.000Z" },
+        { role: "vendor", userId: 99, vendorId: 3 } as never,
+      ),
+    );
+    expect(out.error).toMatch(/confirmation/i);
+    expect(out.requiresConfirmation).toBe(true);
+  });
+});
+
 describe("runWriteTool — post_ticket_comment", () => {
   it("requires explicit confirmation before posting a comment", async () => {
     const out = JSON.parse(
@@ -169,5 +185,6 @@ describe("runWriteTool — post_ticket_comment", () => {
       ),
     );
     expect(out.error).toMatch(/confirmation/i);
+    expect(out.requiresConfirmation).toBe(true);
   });
 });

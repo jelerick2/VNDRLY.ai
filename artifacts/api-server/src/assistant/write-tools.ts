@@ -20,6 +20,10 @@ function err(message: string): string {
   return JSON.stringify({ error: message });
 }
 
+function confirmationErr(message: string): string {
+  return JSON.stringify({ error: message, requiresConfirmation: true });
+}
+
 export const WRITE_TOOL_NAMES = [
   "mark_notifications_read",
   "schedule_ticket_crew",
@@ -154,7 +158,7 @@ async function scheduleTicketCrew(
     return err("Must be signed in to schedule ticket crew.");
   }
   if (input.confirmed !== true) {
-    return err("AskV needs explicit confirmation before scheduling a crew member.");
+    return confirmationErr("AskV needs explicit confirmation before scheduling a crew member.");
   }
 
   const ticketId = Number(input.ticketId);
@@ -242,7 +246,7 @@ async function markNotificationsRead(
     return err("Must be signed in to update notifications.");
   }
   if (input.confirmed !== true) {
-    return err("AskV needs explicit confirmation before marking notifications read.");
+    return confirmationErr("AskV needs explicit confirmation before marking notifications read.");
   }
   const userId = session.userId;
 
@@ -298,7 +302,7 @@ async function setTicketFlag(input: SetTicketFlagInput, session: SessionPayload)
     return err("Must be signed in to flag or unflag a ticket.");
   }
   if (input.confirmed !== true) {
-    return err("AskV needs explicit confirmation before flagging or unflagging a ticket.");
+    return confirmationErr("AskV needs explicit confirmation before flagging or unflagging a ticket.");
   }
 
   const ticketId = Number(input.ticketId);
@@ -373,7 +377,7 @@ async function postTicketComment(input: PostTicketCommentInput, session: Session
     return err("Must be signed in to post a ticket comment.");
   }
   if (input.confirmed !== true) {
-    return err("AskV needs explicit confirmation before posting a ticket comment.");
+    return confirmationErr("AskV needs explicit confirmation before posting a ticket comment.");
   }
 
   const ticketId = Number(input.ticketId);

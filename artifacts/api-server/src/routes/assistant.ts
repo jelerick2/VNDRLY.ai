@@ -43,6 +43,7 @@ import { parsePageContext } from "../assistant/page-context";
 import { classifyRefusal } from "../assistant/refusal";
 import { TOOLS } from "../assistant/tools";
 import { writeAskVActionAudit, type AskVClientSurface, type AskVInputMode } from "../assistant/action-audit";
+import { classifyToolResult } from "../assistant/tool-result";
 import { findAskVTool } from "../assistant/tool-registry";
 import { isDataTool, runDataTool } from "../assistant/data-tools";
 import { isWriteTool, runWriteTool } from "../assistant/write-tools";
@@ -1005,19 +1006,6 @@ function inferToolTargetId(input: unknown): string | number | null {
     }
   }
   return null;
-}
-
-function classifyToolResult(output: string, mutating: boolean): "success" | "failure" | "requires_confirmation" {
-  try {
-    const parsed = JSON.parse(output) as { error?: unknown };
-    if (typeof parsed.error === "string" && parsed.error.length > 0) {
-      if (mutating && parsed.error.toLowerCase().includes("confirmation")) return "requires_confirmation";
-      return "failure";
-    }
-  } catch {
-    // Non-JSON tool output is still a completed tool call from the model's perspective.
-  }
-  return "success";
 }
 
 function inferAskVSurface(pageContext: ReturnType<typeof parsePageContext> | undefined): AskVClientSurface {
