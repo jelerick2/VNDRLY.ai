@@ -71,7 +71,9 @@ export default function EmployeePortalLoginPanel({
   }, [employeeId, defaultEmail]);
 
   const portalPath =
-    vendorRole === "admin" || vendorRole === "office"
+    vendorRole === "gatekeeper"
+      ? "/gate"
+      : vendorRole === "admin" || vendorRole === "office"
       ? "/"
       : vendorRole === "foreman" || vendorRole === "both"
         ? "/foreman"

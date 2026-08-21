@@ -567,6 +567,7 @@ export default function FieldEmployees() {
                       <SelectItem value="field" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="field" /></SelectItem>
                       <SelectItem value="both" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="both" /></SelectItem>
                       <SelectItem value="foreman" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="foreman" /></SelectItem>
+                      <SelectItem value="gatekeeper" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="gatekeeper" /></SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">{t("fieldEmployees.roleHelp")}</p>
@@ -862,6 +863,7 @@ export default function FieldEmployees() {
                   <SelectItem value="field" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="field" /></SelectItem>
                   <SelectItem value="both" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="both" /></SelectItem>
                   <SelectItem value="foreman" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="foreman" /></SelectItem>
+                  <SelectItem value="gatekeeper" className="focus:bg-transparent data-[highlighted]:bg-transparent"><EmployeeRolePill role="gatekeeper" /></SelectItem>
                 </SelectContent>
               </Select>
             </div>

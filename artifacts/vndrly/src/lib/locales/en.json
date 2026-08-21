@@ -4,7 +4,8 @@
     "office": "Office",
     "field": "Field",
     "both": "Both",
-    "foreman": "Foreman"
+    "foreman": "Foreman",
+    "gatekeeper": "Gatekeeper"
   },
   "common": {
     "saveChanges": "Save Changes",

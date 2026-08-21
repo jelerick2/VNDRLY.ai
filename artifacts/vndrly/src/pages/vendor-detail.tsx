@@ -985,6 +985,7 @@ export default function VendorDetail({ id }: { id: number }) {
                       <SelectItem value="field" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="field" /></SelectItem>
                       <SelectItem value="both" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="both" /></SelectItem>
                       <SelectItem value="foreman" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="foreman" /></SelectItem>
+                      <SelectItem value="gatekeeper" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="gatekeeper" /></SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground mt-1">{t("vendors.roleHelp")}</p>
@@ -1246,6 +1247,7 @@ export default function VendorDetail({ id }: { id: number }) {
                   <SelectItem value="field" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="field" /></SelectItem>
                       <SelectItem value="both" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="both" /></SelectItem>
                       <SelectItem value="foreman" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="foreman" /></SelectItem>
+                      <SelectItem value="gatekeeper" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="gatekeeper" /></SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1325,6 +1327,7 @@ export default function VendorDetail({ id }: { id: number }) {
                       <SelectItem value="field" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="field" /></SelectItem>
                       <SelectItem value="both" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="both" /></SelectItem>
                       <SelectItem value="foreman" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="foreman" /></SelectItem>
+                      <SelectItem value="gatekeeper" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="gatekeeper" /></SelectItem>
                 </SelectContent>
               </Select>
             </div>

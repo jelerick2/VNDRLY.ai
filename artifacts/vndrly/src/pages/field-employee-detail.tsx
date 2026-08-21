@@ -386,6 +386,9 @@ export default function FieldEmployeeDetail({ id }: { id: number }) {
                   <SelectItem value="admin" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="admin" /></SelectItem>
                       <SelectItem value="office" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="office" /></SelectItem>
                       <SelectItem value="field" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="field" /></SelectItem>
+                      <SelectItem value="both" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="both" /></SelectItem>
+                      <SelectItem value="foreman" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="foreman" /></SelectItem>
+                      <SelectItem value="gatekeeper" className="focus:bg-transparent data-[highlighted]:bg-transparent"><RoleBadge role="gatekeeper" /></SelectItem>
                 </SelectContent>
               </Select>
             </div>

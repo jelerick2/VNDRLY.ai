@@ -11,6 +11,7 @@ const roleConfig: Record<
   field: { labelKey: "roles.field", fallback: "Field", color: "grey", isRest: true },
   both: { labelKey: "roles.both", fallback: "Both", color: "green" },
   foreman: { labelKey: "roles.foreman", fallback: "Foreman", color: "amber" },
+  gatekeeper: { labelKey: "roles.gatekeeper", fallback: "Gatekeeper", color: "blue" },
   // Org-membership roles (Administrative Team Members card) mapped onto
   // the same PNG palette so the role column reads consistently across
   // every surface — see Employees page for the canonical treatment.

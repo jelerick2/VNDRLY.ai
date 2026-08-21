@@ -47,9 +47,9 @@ interface AuthUser {
   /** vendor_people.id for field_employee sessions — used to pre-select self in foreman scheduling. */
   vendorPeopleId: number | null;
   // For vendor sessions: vendor_people.vendor_role of the active membership
-  // ('field' | 'foreman' | 'office' | 'both' | null). Used by the UI to
+  // ('field' | 'foreman' | 'office' | 'both' | 'gatekeeper' | null). Used by the UI to
   // decide whether to surface office-only affordances like phone intake.
-  vendorRole: "field" | "foreman" | "office" | "both" | null;
+  vendorRole: "field" | "foreman" | "office" | "both" | "gatekeeper" | null;
   preferredLanguage: "en" | "es" | null;
   activeMembershipId: number | null;
   availableMemberships: MembershipSummary[];
@@ -142,7 +142,8 @@ function fromResponse(input: unknown): AuthUser {
     data.vendorRole === "field" ||
     data.vendorRole === "foreman" ||
     data.vendorRole === "office" ||
-    data.vendorRole === "both"
+    data.vendorRole === "both" ||
+    data.vendorRole === "gatekeeper"
       ? data.vendorRole
       : null;
   return {
@@ -331,3 +332,7 @@ export function useAuthStrict(): AuthContextType {
   if (!ctx) throw new Error("useAuthStrict must be used within AuthProvider");
   return ctx;
 }
+
+export const __authTest = {
+  fromResponse,
+};

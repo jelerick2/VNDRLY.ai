@@ -85,7 +85,9 @@ export default function EmployeePortalLoginFields({
   };
 
   const portalPath =
-    vendorRole === "admin" || vendorRole === "office"
+    vendorRole === "gatekeeper"
+      ? "/gate"
+      : vendorRole === "admin" || vendorRole === "office"
       ? "/"
       : vendorRole === "foreman" || vendorRole === "both"
         ? "/foreman"

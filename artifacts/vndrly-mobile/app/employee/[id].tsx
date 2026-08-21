@@ -36,7 +36,7 @@ type Person = {
   pecExpirationDate?: string | null;
 };
 
-const ROLES = ["admin", "office", "field", "both", "foreman"] as const;
+const ROLES = ["admin", "office", "field", "both", "foreman", "gatekeeper"] as const;
 
 function pecIsCurrent(form: { pecCertification?: boolean; pecExpirationDate?: string | null }) {
   if (form.pecExpirationDate) {

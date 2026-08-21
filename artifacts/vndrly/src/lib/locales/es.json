@@ -4,7 +4,8 @@
     "office": "Oficina",
     "field": "Campo",
     "both": "Ambos",
-    "foreman": "Capataz"
+    "foreman": "Capataz",
+    "gatekeeper": "Portero"
   },
   "common": {
     "saveChanges": "Guardar Cambios",
