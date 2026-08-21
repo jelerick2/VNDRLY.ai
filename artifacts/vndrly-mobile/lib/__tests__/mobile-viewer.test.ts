@@ -4,6 +4,7 @@ import {
   homeTabTitleKey,
   isFieldEmployeeUser,
   isForemanEmployeeUser,
+  isGatekeeperUser,
   isOfficeMobileViewer,
   isPartnerOfficeUser,
   isVendorOfficeUser,
@@ -25,6 +26,20 @@ describe("mobile-viewer role helpers", () => {
     expect(isPartnerOfficeUser({ role: "partner" })).toBe(true);
     expect(isOfficeMobileViewer({ role: "partner" })).toBe(true);
     expect(isOfficeMobileViewer({ role: "field_employee" })).toBe(false);
+  });
+
+  it("detects gatekeeper vendor logins and keeps them out of office viewer mode", () => {
+    const gateUser = {
+      role: "vendor",
+      username: "gate@winchester.com",
+      displayName: null,
+      vendorRole: null,
+    };
+    expect(isGatekeeperUser(gateUser)).toBe(true);
+    expect(isOfficeMobileViewer(gateUser)).toBe(false);
+    expect(homeTabTitleKey(gateUser)).toBe("gatekeeper.portal");
+    expect(isGatekeeperUser({ role: "vendor", username: "office@winchester.com", vendorRole: "gatekeeper" })).toBe(true);
+    expect(isGatekeeperUser({ role: "vendor", username: "winchester", vendorRole: null })).toBe(false);
   });
 
   it("picks role-appropriate home tab titles", () => {

@@ -120,7 +120,13 @@ async function requireGuest(req: any, res: any) {
 }
 
 // ---------- Standard (non-guest) session helper for /visits listing endpoints
-type Session = { userId: number; role: string; vendorId: number | null; partnerId: number | null };
+type Session = {
+  userId: number;
+  role: string;
+  vendorId: number | null;
+  partnerId: number | null;
+  vendorRole?: string | null;
+};
 function getStaffSession(req: any): Session | null {
   const cookie = req.cookies?.[COOKIE_NAME];
   if (!cookie) return null;
@@ -134,6 +140,34 @@ function getStaffSession(req: any): Session | null {
   } catch {
     return null;
   }
+}
+
+async function isGatekeeperSession(session: Session | null): Promise<boolean> {
+  if (!session || session.role !== "vendor" || !session.vendorId) return false;
+  const role = (session.vendorRole ?? "").toLowerCase();
+  if (role === "gate" || role === "gatekeeper") return true;
+  const [user] = await db
+    .select({ username: usersTable.username, email: usersTable.email, displayName: usersTable.displayName })
+    .from(usersTable)
+    .where(eq(usersTable.id, session.userId))
+    .limit(1);
+  const login = String(user?.email || user?.username || "").trim().toLowerCase();
+  if (login === "gate" || login.startsWith("gate@") || login.startsWith("gatekeeper@")) return true;
+  const displayName = String(user?.displayName || "").trim().toLowerCase();
+  return displayName === "gate" || displayName.includes("gatekeeper");
+}
+
+async function requireGatekeeperSession(req: any, res: any): Promise<Session | null> {
+  const session = getStaffSession(req);
+  if (!session) {
+    res.status(401).json({ message: "Login required", code: AUTH_REQUIRED });
+    return null;
+  }
+  if (!(await isGatekeeperSession(session))) {
+    res.status(403).json({ message: "Gatekeeper access required", code: VISIT_NO_ACCESS });
+    return null;
+  }
+  return session;
 }
 
 const router: IRouter = Router();
@@ -338,6 +372,219 @@ function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number):
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
+
+// ---------- POST /api/visits/gate/check-in (authenticated gatekeeper) ----------
+router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
+  const session = await requireGatekeeperSession(req, res);
+  if (!session) return;
+  const b = (req.body ?? {}) as {
+    firstName?: string;
+    lastName?: string;
+    company?: string;
+    phone?: string;
+    email?: string;
+    siteLocationId?: number;
+    hostType?: "partner" | "vendor";
+    hostPartnerId?: number;
+    hostVendorId?: number;
+    purpose?: string;
+    expectedDurationMinutes?: number;
+    vehiclePlate?: string;
+    platePhotoUrl?: string;
+    vehiclePhotoUrl?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  const firstName = String(b.firstName ?? "").trim();
+  const lastName = String(b.lastName ?? "").trim();
+  if (!firstName || !lastName) {
+    res.status(400).json({ message: "First name and last name are required", code: GUEST_NAME_REQUIRED });
+    return;
+  }
+  if (!b.siteLocationId || !b.hostType || !["partner", "vendor"].includes(b.hostType)) {
+    res.status(400).json({ message: "siteLocationId and hostType are required", code: VISIT_INVALID_INPUT });
+    return;
+  }
+  const [site] = await db
+    .select()
+    .from(siteLocationsTable)
+    .where(eq(siteLocationsTable.id, b.siteLocationId));
+  if (!site) {
+    res.status(404).json({ message: "Site not found", code: SITE_NOT_FOUND });
+    return;
+  }
+
+  let hostName = "";
+  if (b.hostType === "partner") {
+    if (!b.hostPartnerId || b.hostPartnerId !== site.partnerId) {
+      res.status(400).json({ message: "Partner host does not match this site", code: VISIT_PARTNER_HOST_MISMATCH });
+      return;
+    }
+    const [p] = await db.select({ name: partnersTable.name }).from(partnersTable).where(eq(partnersTable.id, b.hostPartnerId));
+    hostName = p?.name || "the partner";
+  } else {
+    if (!b.hostVendorId) {
+      res.status(400).json({ message: "hostVendorId is required", code: VISIT_HOST_VENDOR_REQUIRED });
+      return;
+    }
+    if (b.hostVendorId !== session.vendorId) {
+      res.status(403).json({ message: "Gatekeepers can only check in visitors for their vendor", code: VISIT_NO_ACCESS });
+      return;
+    }
+    const [assign] = await db
+      .select({ id: siteWorkAssignmentsTable.id })
+      .from(siteWorkAssignmentsTable)
+      .where(and(eq(siteWorkAssignmentsTable.siteLocationId, site.id), eq(siteWorkAssignmentsTable.vendorId, b.hostVendorId)))
+      .limit(1);
+    if (!assign) {
+      res.status(400).json({ message: "Vendor is not assigned to this site", code: VISIT_VENDOR_NOT_ASSIGNED });
+      return;
+    }
+    const [v] = await db.select({ name: vendorsTable.name }).from(vendorsTable).where(eq(vendorsTable.id, b.hostVendorId));
+    hostName = v?.name || "the vendor";
+  }
+
+  const radius = site.siteRadiusMeters ?? 805;
+  if (typeof b.latitude !== "number" || typeof b.longitude !== "number") {
+    res.status(400).json({ message: "Location is required to check in", code: VISIT_LOCATION_REQUIRED });
+    return;
+  }
+  const meters = distanceMeters(b.latitude, b.longitude, site.latitude, site.longitude);
+  if (meters > radius && !isGeofenceBypassActive()) {
+    res.status(400).json({
+      message: `You are too far from the site (${Math.round(meters)}m away, must be within ${radius}m).`,
+      code: OFF_GEOFENCE,
+      distanceMeters: Math.round(meters),
+      radiusMeters: radius,
+    });
+    return;
+  }
+
+  const expectedDuration = typeof b.expectedDurationMinutes === "number" && b.expectedDurationMinutes > 0
+    ? Math.min(b.expectedDurationMinutes, 24 * 60)
+    : null;
+  const expiresAt = expectedDuration ? new Date(Date.now() + expectedDuration * 60 * 1000) : null;
+  const platePhotoUrl = typeof b.platePhotoUrl === "string" && b.platePhotoUrl.trim()
+    ? b.platePhotoUrl.trim()
+    : null;
+  const vehiclePhotoUrl = typeof b.vehiclePhotoUrl === "string" && b.vehiclePhotoUrl.trim()
+    ? b.vehiclePhotoUrl.trim()
+    : null;
+
+  const [visit] = await db
+    .insert(siteVisitsTable)
+    .values({
+      siteLocationId: site.id,
+      guestSessionId: null,
+      firstName,
+      lastName,
+      phone: typeof b.phone === "string" && b.phone.trim() ? b.phone.trim() : null,
+      email: typeof b.email === "string" && b.email.trim() ? b.email.trim() : null,
+      company: typeof b.company === "string" && b.company.trim() ? b.company.trim() : null,
+      vehiclePlate: typeof b.vehiclePlate === "string" && b.vehiclePlate.trim() ? b.vehiclePlate.trim() : null,
+      platePhotoUrl,
+      vehiclePhotoUrl,
+      purpose: typeof b.purpose === "string" && b.purpose.trim() ? b.purpose.trim() : null,
+      expectedDurationMinutes: expectedDuration,
+      hostType: b.hostType,
+      hostPartnerId: b.hostType === "partner" ? b.hostPartnerId! : null,
+      hostVendorId: b.hostType === "vendor" ? b.hostVendorId! : null,
+      checkInLatitude: b.latitude,
+      checkInLongitude: b.longitude,
+      safetyAcknowledgedAt: new Date(),
+      expiresAt,
+    })
+    .returning();
+
+  const recipients =
+    b.hostType === "partner"
+      ? await findPartnerVisitNotifierUserIds(b.hostPartnerId!)
+      : await findVendorVisitNotifierUserIds(b.hostVendorId!);
+  const visitorName = `${visit.firstName} ${visit.lastName}`.trim();
+  const companyPart = visit.company ? ` from ${visit.company}` : "";
+  const purposePart = visit.purpose ? ` for ${visit.purpose}` : "";
+  void notifyUsers(recipients, {
+    type: "visitor_checked_in",
+    category: "visitor",
+    title: "Visitor checked in",
+    body: `${visitorName}${companyPart} just checked in at ${site.name}${purposePart}.`,
+    link: `/visits/${visit.id}`,
+    dedupeKey: `visitor_checked_in:${visit.id}`,
+  });
+
+  publishVisitEvent({
+    type: "visit.checked_in",
+    visit: {
+      id: visit.id,
+      firstName: visit.firstName,
+      lastName: visit.lastName,
+      company: visit.company,
+      vehiclePlate: visit.vehiclePlate,
+      platePhotoUrl: visit.platePhotoUrl,
+      vehiclePhotoUrl: visit.vehiclePhotoUrl,
+      purpose: visit.purpose,
+      hostType: visit.hostType as "partner" | "vendor",
+      hostPartnerId: visit.hostPartnerId,
+      hostVendorId: visit.hostVendorId,
+      hostPartnerName: b.hostType === "partner" ? hostName : null,
+      hostVendorName: b.hostType === "vendor" ? hostName : null,
+      siteLocationId: site.id,
+      sitePartnerId: site.partnerId,
+      siteName: site.name,
+      checkInTime: visit.checkInTime.toISOString(),
+      checkInLatitude: visit.checkInLatitude,
+      checkInLongitude: visit.checkInLongitude,
+    },
+  });
+
+  res.status(201).json({ ...visit, hostName, siteName: site.name });
+});
+
+// ---------- POST /api/visits/gate/:id/check-out (authenticated gatekeeper) ----------
+router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
+  const session = await requireGatekeeperSession(req, res);
+  if (!session) return;
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ message: "Invalid id", code: VISIT_INVALID_ID });
+    return;
+  }
+  const b = (req.body ?? {}) as { latitude?: number; longitude?: number };
+  const [visit] = await db.select().from(siteVisitsTable).where(eq(siteVisitsTable.id, id));
+  if (!visit || visit.hostVendorId !== session.vendorId) {
+    res.status(404).json({ message: "Visit not found", code: VISIT_NOT_FOUND });
+    return;
+  }
+  if (visit.checkOutTime) {
+    res.json(visit);
+    return;
+  }
+  const [updated] = await db
+    .update(siteVisitsTable)
+    .set({
+      checkOutTime: new Date(),
+      checkOutLatitude: typeof b.latitude === "number" ? b.latitude : null,
+      checkOutLongitude: typeof b.longitude === "number" ? b.longitude : null,
+    })
+    .where(eq(siteVisitsTable.id, id))
+    .returning();
+
+  const [siteRow] = await db
+    .select({ partnerId: siteLocationsTable.partnerId })
+    .from(siteLocationsTable)
+    .where(eq(siteLocationsTable.id, updated.siteLocationId));
+  publishVisitEvent({
+    type: "visit.checked_out",
+    visitId: updated.id,
+    siteLocationId: updated.siteLocationId,
+    sitePartnerId: siteRow?.partnerId ?? null,
+    hostVendorId: updated.hostVendorId,
+    checkOutTime: (updated.checkOutTime ?? new Date()).toISOString(),
+    autoCheckedOut: false,
+  });
+
+  res.json(updated);
+});
 
 // ---------- POST /api/visits/check-in (guest) ----------
 router.post("/visits/check-in", async (req, res): Promise<void> => {

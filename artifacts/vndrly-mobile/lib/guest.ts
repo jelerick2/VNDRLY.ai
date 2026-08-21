@@ -67,6 +67,9 @@ export async function fetchSiteContext(siteCode: string): Promise<SiteContext> {
 
 export type ActiveVisit = {
   id: number;
+  firstName?: string | null;
+  lastName?: string | null;
+  company?: string | null;
   siteLocationId: number;
   siteName: string | null;
   siteAddress: string | null;
@@ -79,6 +82,7 @@ export type ActiveVisit = {
   vehiclePhotoUrl: string | null;
   expectedDurationMinutes: number | null;
   checkInTime: string;
+  checkOutTime?: string | null;
   expiresAt: string | null;
 };
 

@@ -25,6 +25,7 @@ import ContextPickerModal from "@/components/ContextPickerModal";
 import { initApi } from "@/lib/api";
 import VndrlyPageBackground from "@/components/VndrlyPageBackground";
 import { getCachedToken, getCachedRole, getToken, isTokenCacheReady, subscribeToken, getUser } from "@/lib/auth";
+import { isGatekeeperUser } from "@/lib/mobile-viewer";
 import { hasActiveConsentForThisDevice, isConsentDeclined } from "@/lib/locationConsent";
 import { startLiveLocationReporter, stopLiveLocationReporter } from "@/lib/liveLocationReporter";
 import { ensureNotificationSoundLifecycle } from "@/lib/notificationSounds";
@@ -128,6 +129,7 @@ function AuthGate() {
 
   useEffect(() => {
     if (!checked) return;
+    let cancelled = false;
     const seg0 = segments[0] as string | undefined;
     const inLogin = seg0 === "login";
     const inGuestLogin = seg0 === "guest-login";
@@ -136,11 +138,25 @@ function AuthGate() {
       if (!inLogin && !inGuestLogin) router.replace("/login");
       return;
     }
-    if (role === "guest") {
-      if (!inGuestStack) router.replace("/visitor-checkin");
-    } else {
-      if (inLogin || inGuestLogin || inGuestStack) router.replace("/(tabs)");
-    }
+    (async () => {
+      const routeUser = await getUser().catch(() => null);
+      if (cancelled) return;
+      const isGatekeeper = isGatekeeperUser(routeUser);
+      const gatekeeperTabs = new Set(["gate", "askv", "profile"]);
+      const inGatekeeperStack = seg0 === "(tabs)" && gatekeeperTabs.has(String(segments[1] ?? ""));
+      if (role === "guest") {
+        if (!inGuestStack) router.replace("/visitor-checkin");
+      } else if (isGatekeeper) {
+        if (inLogin || inGuestLogin || inGuestStack || !inGatekeeperStack) {
+          router.replace("/(tabs)/gate" as never);
+        }
+      } else {
+        if (inLogin || inGuestLogin || inGuestStack) router.replace("/(tabs)");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [checked, hasAuth, role, segments]);
 
   // After the user is authenticated, gate location consent and start the

@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/useColors";
-import { crewMapTabVisible, homeTabTitleKey, isForemanEmployeeUser } from "@/lib/mobile-viewer";
+import { crewMapTabVisible, homeTabTitleKey, isForemanEmployeeUser, isGatekeeperUser } from "@/lib/mobile-viewer";
 import { useTabBadges } from "@/lib/tabBadges";
 
 type TabItem = {
@@ -27,16 +27,24 @@ export default function TabLayout() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const isForemanEmployee = isForemanEmployeeUser(user);
+  const isGatekeeper = isGatekeeperUser(user);
   const showsCrewMap = crewMapTabVisible(user);
 
   const tabs = ([
     { key: "askv", href: "/(tabs)/askv", label: t("tabs.askv"), icon: "zap", visible: true },
     {
+      key: "gate",
+      href: "/(tabs)/gate",
+      label: t("gatekeeper.tab"),
+      icon: "truck",
+      visible: isGatekeeper,
+    },
+    {
       key: "index",
       href: "/(tabs)",
       label: t(homeTabTitleKey(user)),
       icon: "home",
-      visible: true,
+      visible: !isGatekeeper,
       badge: badges.home,
     },
     {
@@ -44,7 +52,7 @@ export default function TabLayout() {
       href: "/(tabs)/schedule",
       label: t("tabs.schedule"),
       icon: "calendar",
-      visible: true,
+      visible: !isGatekeeper,
       badge: badges.schedule,
     },
     {
@@ -52,7 +60,7 @@ export default function TabLayout() {
       href: "/(tabs)/flagged",
       label: t("tabs.flagged"),
       icon: "flag",
-      visible: true,
+      visible: !isGatekeeper,
       badge: badges.flagged,
     },
     {
@@ -77,7 +85,7 @@ export default function TabLayout() {
       visible: isForemanEmployee,
       badge: badges.comms,
     },
-    { key: "scan", href: "/(tabs)/scan", label: t("tabs.scan"), icon: "maximize", visible: true },
+    { key: "scan", href: "/(tabs)/scan", label: t("tabs.scan"), icon: "maximize", visible: !isGatekeeper },
     { key: "profile", href: "/(tabs)/profile", label: t("tabs.profile"), icon: "user", visible: true },
   ] satisfies TabItem[]).filter((tab) => tab.visible);
 

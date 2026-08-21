@@ -62,6 +62,17 @@
     "signOut": "Sign Out",
     "notifications": "Notifications"
   },
+  "gatekeeper": {
+    "tab": "Gate",
+    "portal": "Gate Portal",
+    "subtitle": "Track vehicle and visitor traffic at site locations.",
+    "activeNow": "On site now",
+    "noActive": "No active gate entries.",
+    "newEntry": "New gate entry",
+    "nameRequired": "First name and last name are required.",
+    "checkedInTitle": "Checked in",
+    "checkedInBody": "Gate entry recorded."
+  },
   "login": {
     "title": "Field Employee Portal",
     "emailLabel": "Email",

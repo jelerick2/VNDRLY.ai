@@ -62,6 +62,17 @@
     "signOut": "Cerrar Sesión",
     "notifications": "Notificaciones"
   },
+  "gatekeeper": {
+    "tab": "Entrada",
+    "portal": "Portal de Entrada",
+    "subtitle": "Registra el trafico de vehiculos y visitantes en las ubicaciones.",
+    "activeNow": "En sitio ahora",
+    "noActive": "No hay entradas activas.",
+    "newEntry": "Nueva entrada",
+    "nameRequired": "Nombre y apellido son obligatorios.",
+    "checkedInTitle": "Entrada registrada",
+    "checkedInBody": "Registro de entrada guardado."
+  },
   "login": {
     "title": "Portal de Empleados de Campo",
     "emailLabel": "Correo Electrónico",
