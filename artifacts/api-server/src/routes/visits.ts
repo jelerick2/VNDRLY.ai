@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, isNull, sql, lt, isNotNull } from "drizzle-orm";
+import { eq, and, desc, isNull, sql, lt, isNotNull, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import {
   db,
@@ -9,7 +9,6 @@ import {
   partnersTable,
   vendorsTable,
   siteWorkAssignmentsTable,
-  usersTable,
 } from "@workspace/db";
 import { notifyUsers, findPartnerUserIds, findVendorUserIds, findPartnerVisitNotifierUserIds, findVendorVisitNotifierUserIds } from "./notifications";
 import {
@@ -142,19 +141,9 @@ function getStaffSession(req: any): Session | null {
   }
 }
 
-async function isGatekeeperSession(session: Session | null): Promise<boolean> {
+function isGatekeeperSession(session: Session | null): boolean {
   if (!session || session.role !== "vendor" || !session.vendorId) return false;
-  const role = (session.vendorRole ?? "").toLowerCase();
-  if (role === "gate" || role === "gatekeeper") return true;
-  const [user] = await db
-    .select({ username: usersTable.username, email: usersTable.email, displayName: usersTable.displayName })
-    .from(usersTable)
-    .where(eq(usersTable.id, session.userId))
-    .limit(1);
-  const login = String(user?.email || user?.username || "").trim().toLowerCase();
-  if (login === "gate" || login.startsWith("gate@") || login.startsWith("gatekeeper@")) return true;
-  const displayName = String(user?.displayName || "").trim().toLowerCase();
-  return displayName === "gate" || displayName.includes("gatekeeper");
+  return session.vendorRole === "gatekeeper";
 }
 
 async function requireGatekeeperSession(req: any, res: any): Promise<Session | null> {
@@ -163,7 +152,7 @@ async function requireGatekeeperSession(req: any, res: any): Promise<Session | n
     res.status(401).json({ message: "Login required", code: AUTH_REQUIRED });
     return null;
   }
-  if (!(await isGatekeeperSession(session))) {
+  if (!isGatekeeperSession(session)) {
     res.status(403).json({ message: "Gatekeeper access required", code: VISIT_NO_ACCESS });
     return null;
   }
@@ -413,6 +402,18 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
     res.status(404).json({ message: "Site not found", code: SITE_NOT_FOUND });
     return;
   }
+  const [gateAssignment] = await db
+    .select({ id: siteWorkAssignmentsTable.id })
+    .from(siteWorkAssignmentsTable)
+    .where(and(
+      eq(siteWorkAssignmentsTable.siteLocationId, site.id),
+      eq(siteWorkAssignmentsTable.vendorId, session.vendorId!),
+    ))
+    .limit(1);
+  if (!gateAssignment) {
+    res.status(403).json({ message: "Gatekeeper vendor is not assigned to this site", code: VISIT_NO_ACCESS });
+    return;
+  }
 
   let hostName = "";
   if (b.hostType === "partner") {
@@ -551,7 +552,19 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
   }
   const b = (req.body ?? {}) as { latitude?: number; longitude?: number };
   const [visit] = await db.select().from(siteVisitsTable).where(eq(siteVisitsTable.id, id));
-  if (!visit || visit.hostVendorId !== session.vendorId) {
+  if (!visit) {
+    res.status(404).json({ message: "Visit not found", code: VISIT_NOT_FOUND });
+    return;
+  }
+  const [gateAssignment] = await db
+    .select({ id: siteWorkAssignmentsTable.id })
+    .from(siteWorkAssignmentsTable)
+    .where(and(
+      eq(siteWorkAssignmentsTable.siteLocationId, visit.siteLocationId),
+      eq(siteWorkAssignmentsTable.vendorId, session.vendorId!),
+    ))
+    .limit(1);
+  if (!gateAssignment) {
     res.status(404).json({ message: "Visit not found", code: VISIT_NOT_FOUND });
     return;
   }
@@ -979,7 +992,18 @@ router.get("/visits", async (req, res): Promise<void> => {
   if (toParam && !Number.isNaN(toParam.getTime())) {
     conds.push(sql`${siteVisitsTable.checkInTime} <= ${toParam}`);
   }
-  if (session.role === "vendor" && session.vendorId) {
+  if (isGatekeeperSession(session)) {
+    const assignments = await db
+      .select({ siteLocationId: siteWorkAssignmentsTable.siteLocationId })
+      .from(siteWorkAssignmentsTable)
+      .where(eq(siteWorkAssignmentsTable.vendorId, session.vendorId!));
+    const assignedSiteIds = [...new Set(assignments.map((row) => row.siteLocationId))];
+    if (assignedSiteIds.length === 0) {
+      res.json([]);
+      return;
+    }
+    conds.push(inArray(siteVisitsTable.siteLocationId, assignedSiteIds));
+  } else if (session.role === "vendor" && session.vendorId) {
     conds.push(eq(siteVisitsTable.hostVendorId, session.vendorId));
   } else if (session.role === "partner" && session.partnerId) {
     // Partners see all visits at their sites.

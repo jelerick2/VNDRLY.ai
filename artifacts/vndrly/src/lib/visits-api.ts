@@ -124,4 +124,24 @@ export const visitsApi = {
   myActive: () => jf<VisitorRow | null>(`/api/visits/me/active`),
   checkOut: (id: number, latitude?: number, longitude?: number) =>
     jf<VisitorRow>(`/api/visits/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
+  gateCheckIn: (input: {
+    firstName: string;
+    lastName: string;
+    company?: string;
+    phone?: string;
+    email?: string;
+    siteLocationId: number;
+    hostType: "partner" | "vendor";
+    hostPartnerId?: number;
+    hostVendorId?: number;
+    purpose?: string;
+    expectedDurationMinutes?: number;
+    vehiclePlate?: string;
+    platePhotoUrl?: string;
+    vehiclePhotoUrl?: string;
+    latitude: number;
+    longitude: number;
+  }) => jf<VisitorRow>(`/api/visits/gate/check-in`, { method: "POST", body: JSON.stringify(input) }),
+  gateCheckOut: (id: number, latitude?: number, longitude?: number) =>
+    jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
 };

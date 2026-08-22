@@ -51,6 +51,7 @@ const Portal = lazy(() => import("@/pages/portal"));
 const VisitPublicPage = lazy(() => import("@/pages/visit-public"));
 const VerifyEmployeePage = lazy(() => import("@/pages/verify-employee"));
 const VisitorEntryPage = lazy(() => import("@/pages/visitor-entry"));
+const GatekeeperPage = lazy(() => import("@/pages/gatekeeper"));
 const VisitorsPage = lazy(() => import("@/pages/visitors"));
 const FieldHome = lazy(() => import("@/pages/field-home"));
 const ForemanHome = lazy(() => import("@/pages/foreman-home"));
@@ -215,6 +216,11 @@ function AuthenticatedRouter() {
         <Route path="/onboarding/field/:token" component={OnboardingField} />
         {!user ? (
           <Route path="/*splat" component={Login} />
+        ) : user.role === "vendor" && user.vendorRole === "gatekeeper" ? (
+          <Switch>
+            <Route path="/gate" component={GatekeeperPage} />
+            <Route path="/*splat" component={GatekeeperPage} />
+          </Switch>
         ) : user.role === "field_employee" && isForemanPersona(user) ? (
           <ForemanPortalLayout>
             <Switch>

@@ -21,13 +21,7 @@ export function isForemanEmployeeUser(
 export function isGatekeeperUser(
   user: GatekeeperUserShape | null | undefined,
 ): boolean {
-  if (!user || user.role !== "vendor") return false;
-  const vendorRole = (user.vendorRole ?? "").toLowerCase();
-  if (vendorRole === "gate" || vendorRole === "gatekeeper") return true;
-  const login = (user.username ?? "").trim().toLowerCase();
-  if (login === "gate" || login.startsWith("gate@") || login.startsWith("gatekeeper@")) return true;
-  const name = (user.displayName ?? "").trim().toLowerCase();
-  return name === "gate" || name.includes("gatekeeper");
+  return user?.role === "vendor" && user.vendorRole === "gatekeeper";
 }
 
 export function isVendorOfficeUser(user: Pick<StoredUser, "role"> | null | undefined): boolean {

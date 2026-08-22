@@ -27,6 +27,7 @@ type Pred =
   | { kind: "isNotNull"; col: ColRef }
   | { kind: "lt"; col: ColRef; val: any }
   | { kind: "gte"; col: ColRef; val: any }
+  | { kind: "inArray"; col: ColRef; vals: any[] }
   | { kind: "stalePlus30"; col: ColRef; now: Date }
   | { kind: "tsRange"; col: ColRef; cmp: ">=" | "<="; val: Date }
   | { kind: "and"; preds: Pred[] }
@@ -142,6 +143,8 @@ function evalPred(pred: Pred | undefined, row: Row, now = new Date()): boolean {
       const b = pred.val instanceof Date ? pred.val.getTime() : pred.val;
       return a >= b;
     }
+    case "inArray":
+      return pred.vals.includes(row[pred.col.__col]);
     case "tsRange": {
       const lhs = row[pred.col.__col];
       if (lhs == null) return false;
@@ -306,6 +309,7 @@ vi.mock("drizzle-orm", () => {
     isNull: (col: ColRef) => ({ kind: "isNull", col }),
     isNotNull: (col: ColRef) => ({ kind: "isNotNull", col }),
     lt: (col: ColRef, val: any) => ({ kind: "lt", col, val }),
+    inArray: (col: ColRef, vals: any[]) => ({ kind: "inArray", col, vals }),
     sql: sqlTag,
     desc: passthrough,
   };
@@ -330,6 +334,7 @@ function staffCookie(
     role: string;
     vendorId: number | null;
     partnerId: number | null;
+    vendorRole: string | null;
     exp: number;
   }> = {},
 ) {
@@ -950,6 +955,75 @@ describe("GET /api/visits role-aware filtering", () => {
     // full admin view.
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeLessThan(2);
+  });
+});
+
+describe("gatekeeper visit workflow", () => {
+  it("requires the explicit gatekeeper role", async () => {
+    const { site, vendor } = seedScenario();
+    const response = await request(app)
+      .post("/api/visits/gate/check-in")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: null }))
+      .send({
+        firstName: "Pat",
+        lastName: "Guarded",
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe("visit.no_access");
+  });
+
+  it("keeps partner-hosted visits visible and check-outable at assigned sites", async () => {
+    const { site, vendor } = seedScenario();
+    const cookie = staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" });
+    const checkIn = await request(app)
+      .post("/api/visits/gate/check-in")
+      .set("Cookie", cookie)
+      .send({
+        firstName: "Jamie",
+        lastName: "Visitor",
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+    expectStatus(checkIn, 201);
+
+    fixtures.siteVisits[0].siteName = site.name;
+    const list = await request(app).get("/api/visits").set("Cookie", cookie);
+    expectStatus(list, 200);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0]).toMatchObject({ firstName: "Jamie", hostType: "partner" });
+
+    const checkOut = await request(app)
+      .post(`/api/visits/gate/${checkIn.body.id}/check-out`)
+      .set("Cookie", cookie)
+      .send({ latitude: site.latitude, longitude: site.longitude });
+    expectStatus(checkOut, 200);
+    expect(checkOut.body.checkOutTime).toBeTruthy();
+  });
+
+  it("cannot operate a gate at a site where its vendor is unassigned", async () => {
+    const { otherSite, vendor } = seedScenario();
+    const response = await request(app)
+      .post("/api/visits/gate/check-in")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .send({
+        firstName: "Pat",
+        lastName: "Guarded",
+        siteLocationId: otherSite.id,
+        hostType: "partner",
+        hostPartnerId: otherSite.partnerId,
+        latitude: otherSite.latitude,
+        longitude: otherSite.longitude,
+      });
+    expect(response.status).toBe(403);
+    expect(response.body.code).toBe("visit.no_access");
   });
 });
 

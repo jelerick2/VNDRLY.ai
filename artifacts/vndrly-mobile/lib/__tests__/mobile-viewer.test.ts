@@ -28,17 +28,18 @@ describe("mobile-viewer role helpers", () => {
     expect(isOfficeMobileViewer({ role: "field_employee" })).toBe(false);
   });
 
-  it("detects gatekeeper vendor logins and keeps them out of office viewer mode", () => {
+  it("uses the explicit gatekeeper vendor role and keeps it out of office viewer mode", () => {
     const gateUser = {
       role: "vendor",
       username: "gate@winchester.com",
       displayName: null,
-      vendorRole: null,
+      vendorRole: "gatekeeper",
     };
     expect(isGatekeeperUser(gateUser)).toBe(true);
     expect(isOfficeMobileViewer(gateUser)).toBe(false);
     expect(homeTabTitleKey(gateUser)).toBe("gatekeeper.portal");
     expect(isGatekeeperUser({ role: "vendor", username: "office@winchester.com", vendorRole: "gatekeeper" })).toBe(true);
+    expect(isGatekeeperUser({ role: "vendor", username: "gate@winchester.com", vendorRole: null })).toBe(false);
     expect(isGatekeeperUser({ role: "vendor", username: "winchester", vendorRole: null })).toBe(false);
   });
 
