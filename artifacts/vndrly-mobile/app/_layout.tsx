@@ -143,7 +143,8 @@ function AuthGate() {
       if (cancelled) return;
       const isGatekeeper = isGatekeeperUser(routeUser);
       const gatekeeperTabs = new Set(["gate", "askv", "profile"]);
-      const inGatekeeperStack = seg0 === "(tabs)" && gatekeeperTabs.has(String(segments[1] ?? ""));
+      const routeSegments = segments as readonly string[];
+      const inGatekeeperStack = seg0 === "(tabs)" && gatekeeperTabs.has(routeSegments[1] ?? "");
       if (role === "guest") {
         if (!inGuestStack) router.replace("/visitor-checkin");
       } else if (isGatekeeper) {
