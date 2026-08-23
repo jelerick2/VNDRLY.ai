@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, Loader2, LogOut, RefreshCw, Search } from "lucide-react";
+import { Camera, FileText, Loader2, LogOut, RefreshCw, Search, Sheet } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import AmberButton from "@/components/amber-button";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { exportExcel, exportPdf, exportWord, latestVisitForPlate, toGateLogRows } from "@/lib/gatekeeper-log-export";
 import { visitsApi, type SiteContext } from "@/lib/visits-api";
 import { VNDRLY_LOGO_SQUARE } from "@/lib/vndrly-brand-assets";
 
@@ -90,6 +91,11 @@ export default function GatekeeperPage() {
     retry: false,
   });
   const activeVisits = (visits.data ?? []).filter((visit) => !visit.checkOutTime);
+  const exportRows = useMemo(() => toGateLogRows(visits.data ?? []), [visits.data]);
+  const previousPlateVisit = useMemo(
+    () => latestVisitForPlate(visits.data ?? [], vehiclePlate),
+    [vehiclePlate, visits.data],
+  );
   const hosts = useMemo(() => {
     if (!site.data) return [];
     return [
@@ -102,6 +108,25 @@ export default function GatekeeperPage() {
     setFirstName(""); setLastName(""); setCompany(""); setPhone(""); setEmail("");
     setVehiclePlate(""); setPurpose(""); setDuration("60"); setHostKey("");
     setPlatePhotoUrl(null); setVehiclePhotoUrl(null);
+  };
+
+  const usePreviousPlateDetails = () => {
+    if (!previousPlateVisit) return;
+    setFirstName(previousPlateVisit.firstName);
+    setLastName(previousPlateVisit.lastName);
+    setCompany(previousPlateVisit.company ?? "");
+    setPhone(previousPlateVisit.phone ?? "");
+    setEmail(previousPlateVisit.email ?? "");
+    setPurpose(previousPlateVisit.purpose ?? "");
+    setDuration(previousPlateVisit.expectedDurationMinutes?.toString() ?? "60");
+    if (previousPlateVisit.siteCode) {
+      setSiteCode(previousPlateVisit.siteCode);
+      setConfirmedCode(previousPlateVisit.siteCode);
+    }
+    const hostId = previousPlateVisit.hostType === "partner"
+      ? previousPlateVisit.hostPartnerId
+      : previousPlateVisit.hostVendorId;
+    setHostKey(hostId ? `${previousPlateVisit.hostType}:${hostId}` : "");
   };
 
   const capture = async (file: File | undefined, kind: "plate" | "vehicle") => {
@@ -172,6 +197,14 @@ export default function GatekeeperPage() {
                 <AmberButton onClick={() => void checkOut(visit.id)} disabled={busy}>Check out</AmberButton>
               </div>
             ))}
+            <div className="border-t border-slate-700 pt-3">
+              <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold">Gate log</p><span className="text-xs text-slate-400">{exportRows.length} records</span></div>
+              <div className="grid grid-cols-3 gap-2">
+                <BlueButton onClick={() => void exportPdf(exportRows)} disabled={!exportRows.length}><FileText className="mr-1 h-4 w-4" />PDF</BlueButton>
+                <BlueButton onClick={() => exportExcel(exportRows)} disabled={!exportRows.length}><Sheet className="mr-1 h-4 w-4" />Excel</BlueButton>
+                <BlueButton onClick={() => exportWord(exportRows)} disabled={!exportRows.length}><FileText className="mr-1 h-4 w-4" />Word</BlueButton>
+              </div>
+            </div>
           </CardContent>
         </Card>
         <Card className="border-slate-700 bg-slate-900 text-white">
@@ -179,7 +212,8 @@ export default function GatekeeperPage() {
           <CardContent className="space-y-4">
             {error && <div role="alert" className="rounded-md border border-red-500/50 bg-red-950/50 p-3 text-sm text-red-200">{error}</div>}
             <div className="grid grid-cols-2 gap-3"><div><Label>First name *</Label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div><div><Label>Last name *</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div></div>
-            <div className="grid grid-cols-2 gap-3"><div><Label>Company</Label><Input value={company} onChange={(e) => setCompany(e.target.value)} /></div><div><Label>Vehicle plate</Label><Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())} /></div></div>
+            <div className="grid grid-cols-2 gap-3"><div><Label>Company</Label><Input value={company} onChange={(e) => setCompany(e.target.value)} /></div><div><Label>Vehicle plate</Label><Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())} onBlur={usePreviousPlateDetails} /></div></div>
+            {previousPlateVisit && <div className="flex items-center justify-between gap-3 rounded-md border border-blue-500/40 bg-blue-950/40 p-3 text-sm"><span>Previous visit found for {previousPlateVisit.firstName} {previousPlateVisit.lastName}.</span><BlueButton onClick={usePreviousPlateDetails}>Use details</BlueButton></div>}
             <div className="grid grid-cols-2 gap-3"><div><Label>Phone</Label><Input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></div><div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div></div>
             <div><Label>Site code *</Label><div className="flex gap-2"><Input value={siteCode} onChange={(e) => setSiteCode(e.target.value.toUpperCase())} placeholder="SITE-XXXXXXXX" /><BlueButton onClick={() => { setConfirmedCode(siteCode.trim().toUpperCase() || null); setHostKey(""); }}><Search className="h-4 w-4" /></BlueButton></div></div>
             {site.isLoading && <Loader2 className="animate-spin" />}

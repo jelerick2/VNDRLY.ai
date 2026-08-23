@@ -19,6 +19,7 @@ export type VisitorRow = {
   hostVendorName: string | null;
   siteLocationId: number;
   siteName: string | null;
+  siteCode?: string | null;
   checkInTime: string;
   checkOutTime: string | null;
   autoCheckedOut: boolean;
