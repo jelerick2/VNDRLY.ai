@@ -898,6 +898,9 @@ importers:
       babel-plugin-react-compiler:
         specifier: ^19.0.0-beta-e993439-20250117
         version: 19.0.0-beta-ebf51a3-20250411
+      babel-preset-expo:
+        specifier: ~54.0.9
+        version: 54.0.12(@babel/core@7.29.0)(@babel/runtime@7.29.2)(expo@54.0.37)(react-refresh@0.14.2)
       eas-cli:
         specifier: ^20.1.0
         version: 20.1.0(@types/node@25.3.5)(typescript@5.9.3)

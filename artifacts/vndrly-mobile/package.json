@@ -48,6 +48,7 @@
     "@workspace/visit-error-codes": "workspace:*",
     "@workspace/zod-validation-issues": "workspace:*",
     "babel-plugin-react-compiler": "^19.0.0-beta-e993439-20250117",
+    "babel-preset-expo": "~54.0.9",
     "eas-cli": "^20.1.0",
     "expo": "~54.0.37",
     "expo-constants": "~18.0.14",
