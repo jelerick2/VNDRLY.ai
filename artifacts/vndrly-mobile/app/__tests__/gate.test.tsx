@@ -86,6 +86,34 @@ vi.mock("@/lib/photos", () => ({
   captureAndUploadImage: (...a: unknown[]) => captureAndUploadImageMock(...a),
 }));
 
+vi.mock("@/hooks/use-brand", () => ({
+  useBrand: () => ({
+    isOrgBranded: true,
+    logoSquareUrl: "https://cdn.example.com/vendor.png",
+    logoUrl: null,
+    name: "Acme Vendor",
+    primary: "#f59e0b",
+  }),
+}));
+
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({
+    user: { role: "vendor", vendorRole: "gatekeeper" },
+    activeMembership: { orgLogoUrl: "https://cdn.example.com/vendor.png", orgName: "Acme Vendor" },
+  }),
+}));
+
+vi.mock("@/components/AuthedImage", () => ({
+  default: ({ uri, testID }: { uri?: string | null; testID?: string }) => {
+    const ReactLib = require("react");
+    return ReactLib.createElement("img", {
+      "data-testid": testID ?? "authed-image",
+      src: uri ?? "",
+      alt: "",
+    });
+  },
+}));
+
 vi.mock("@/components/AmberButton", async () => {
   const ReactLib = (await import("react")).default;
   return {
@@ -181,6 +209,14 @@ function isDisabled(el: HTMLElement): boolean {
 }
 
 describe("GatekeeperScreen", () => {
+  it("shows the branded vendor logo in front of Gate Portal", async () => {
+    renderScreen();
+    await findFirstByTestId("gate-first-name");
+    const logo = firstByTestId("gate-brand-logo");
+    expect(logo.getAttribute("src")).toBe("https://cdn.example.com/vendor.png");
+    expect(screen.getByText("gatekeeper.portal")).toBeTruthy();
+  });
+
   it("does not show phone or email fields", async () => {
     renderScreen();
     await findFirstByTestId("gate-first-name");

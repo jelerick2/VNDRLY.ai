@@ -24,6 +24,13 @@ export function isGatekeeperUser(
   return user?.role === "vendor" && user.vendorRole === "gatekeeper";
 }
 
+/** Tab route segments a gatekeeper may stay on without being bounced to Gate. */
+export const GATEKEEPER_TAB_KEYS = ["askv", "gate", "gate-history", "profile"] as const;
+
+export function isGatekeeperTabKey(segment: string | undefined): boolean {
+  return !!segment && (GATEKEEPER_TAB_KEYS as readonly string[]).includes(segment);
+}
+
 export function isVendorOfficeUser(user: Pick<StoredUser, "role"> | null | undefined): boolean {
   return user?.role === "vendor";
 }

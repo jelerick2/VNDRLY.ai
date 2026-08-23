@@ -25,7 +25,7 @@ import ContextPickerModal from "@/components/ContextPickerModal";
 import { initApi } from "@/lib/api";
 import VndrlyPageBackground from "@/components/VndrlyPageBackground";
 import { getCachedToken, getCachedRole, getToken, isTokenCacheReady, subscribeToken, getUser } from "@/lib/auth";
-import { isGatekeeperUser } from "@/lib/mobile-viewer";
+import { isGatekeeperTabKey, isGatekeeperUser } from "@/lib/mobile-viewer";
 import { hasActiveConsentForThisDevice, isConsentDeclined } from "@/lib/locationConsent";
 import { startLiveLocationReporter, stopLiveLocationReporter } from "@/lib/liveLocationReporter";
 import { ensureNotificationSoundLifecycle } from "@/lib/notificationSounds";
@@ -142,9 +142,8 @@ function AuthGate() {
       const routeUser = await getUser().catch(() => null);
       if (cancelled) return;
       const isGatekeeper = isGatekeeperUser(routeUser);
-      const gatekeeperTabs = new Set(["gate", "askv", "profile"]);
       const routeSegments = segments as readonly string[];
-      const inGatekeeperStack = seg0 === "(tabs)" && gatekeeperTabs.has(routeSegments[1] ?? "");
+      const inGatekeeperStack = seg0 === "(tabs)" && isGatekeeperTabKey(routeSegments[1]);
       if (role === "guest") {
         if (!inGuestStack) router.replace("/visitor-checkin");
       } else if (isGatekeeper) {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  GATEKEEPER_TAB_KEYS,
   homeTabTitleKey,
   isFieldEmployeeUser,
   isForemanEmployeeUser,
+  isGatekeeperTabKey,
   isGatekeeperUser,
   isOfficeMobileViewer,
   isPartnerOfficeUser,
@@ -41,6 +43,9 @@ describe("mobile-viewer role helpers", () => {
     expect(isGatekeeperUser({ role: "vendor", username: "office@winchester.com", vendorRole: "gatekeeper" })).toBe(true);
     expect(isGatekeeperUser({ role: "vendor", username: "gate@winchester.com", vendorRole: null })).toBe(false);
     expect(isGatekeeperUser({ role: "vendor", username: "winchester", vendorRole: null })).toBe(false);
+    expect(GATEKEEPER_TAB_KEYS).toEqual(["askv", "gate", "gate-history", "profile"]);
+    expect(isGatekeeperTabKey("gate-history")).toBe(true);
+    expect(isGatekeeperTabKey("index")).toBe(false);
   });
 
   it("picks role-appropriate home tab titles", () => {

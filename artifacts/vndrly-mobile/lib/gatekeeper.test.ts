@@ -52,6 +52,24 @@ beforeEach(() => {
   apiFetchMock.mockResolvedValue({ id: 88 });
 });
 
+describe("fetchGatekeeperHistory", () => {
+  it("lists visits from the last 30 days including checked-out rows", async () => {
+    const { fetchGatekeeperHistory } = await import("./gatekeeper");
+    apiFetchMock.mockResolvedValue([
+      { id: 1, checkOutTime: "2026-08-23T18:00:00.000Z" },
+      { id: 2, checkOutTime: null },
+    ]);
+
+    const from = "2026-07-24T17:00:00.000Z";
+    const rows = await fetchGatekeeperHistory(from);
+
+    expect(apiFetchMock).toHaveBeenCalledWith(
+      `/api/visits?from=${encodeURIComponent(from)}`,
+    );
+    expect(rows).toHaveLength(2);
+  });
+});
+
 describe("submitGatekeeperVisit", () => {
   it("posts tag and vehicle photo URLs and omits phone and email", async () => {
     const { submitGatekeeperVisit } = await import("./gatekeeper");

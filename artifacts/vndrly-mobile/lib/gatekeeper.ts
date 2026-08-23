@@ -26,6 +26,10 @@ export async function fetchGatekeeperVisits(): Promise<ActiveVisit[]> {
   return rows.filter((row) => !row.checkOutTime);
 }
 
+export async function fetchGatekeeperHistory(fromIso: string): Promise<ActiveVisit[]> {
+  return apiFetch(`/api/visits?from=${encodeURIComponent(fromIso)}`);
+}
+
 export async function gatekeeperCheckOut(visitId: number): Promise<void> {
   let latitude: number | undefined;
   let longitude: number | undefined;

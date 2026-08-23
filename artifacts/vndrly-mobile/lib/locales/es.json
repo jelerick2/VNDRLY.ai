@@ -73,7 +73,15 @@
     "checkedInTitle": "Entrada registrada",
     "checkedInBody": "Registro de entrada guardado.",
     "tagPhoto": "Foto de placa",
-    "vehiclePhoto": "Foto del vehículo"
+    "vehiclePhoto": "Foto del vehículo",
+    "historyTitle": "Historial",
+    "historySubtitle": "Entradas y salidas de los últimos 30 días.",
+    "historySearch": "Buscar por nombre, placa, empresa o sitio",
+    "historyEmpty": "No hay visitas en los últimos 30 días.",
+    "historyNoMatch": "Ninguna visita coincide con esa búsqueda.",
+    "historyLoadFailed": "No se pudo cargar el historial.",
+    "historyOnSite": "En el sitio",
+    "historyCheckedOut": "Salió"
   },
   "login": {
     "title": "Portal de Empleados de Campo",
@@ -1588,7 +1596,8 @@
     "crews": "Cuadrillas",
     "comms": "Comunicación",
     "scan": "Escanear",
-    "profile": "Perfil"
+    "profile": "Perfil",
+    "history": "Historial"
   },
   "foremanHome": {
     "portal": "Portal de capataz",

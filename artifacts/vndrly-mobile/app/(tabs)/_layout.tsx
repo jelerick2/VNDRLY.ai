@@ -40,6 +40,13 @@ export default function TabLayout() {
       visible: isGatekeeper,
     },
     {
+      key: "gate-history",
+      href: "/(tabs)/gate-history",
+      label: t("tabs.history"),
+      icon: "clock",
+      visible: isGatekeeper,
+    },
+    {
       key: "index",
       href: "/(tabs)",
       label: t(homeTabTitleKey(user)),

@@ -16,6 +16,7 @@ import {
 } from "react-native";
 
 import AmberButton from "@/components/AmberButton";
+import BrandTitleRow from "@/components/BrandTitleRow";
 import ScreenSafeArea from "@/components/ScreenSafeArea";
 import VisitorHostPicker from "@/components/VisitorHostPicker";
 import { useColors } from "@/hooks/useColors";
@@ -152,8 +153,11 @@ export default function GatekeeperScreen() {
     <ScreenSafeArea style={styles.flex}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.title, { color: colors.foreground }]}>{t("gatekeeper.portal")}</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{t("gatekeeper.subtitle")}</Text>
+          <BrandTitleRow
+            title={t("gatekeeper.portal")}
+            subtitle={t("gatekeeper.subtitle")}
+            logoTestId="gate-brand-logo"
+          />
 
           <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("gatekeeper.activeNow")}</Text>
