@@ -81,7 +81,9 @@
     "historyNoMatch": "No visits match that search.",
     "historyLoadFailed": "Could not load history.",
     "historyOnSite": "On site",
-    "historyCheckedOut": "Checked out"
+    "historyCheckedOut": "Checked out",
+    "currentLocation": "Current location",
+    "siteCode": "Site code"
   },
   "login": {
     "title": "Field Employee Portal",

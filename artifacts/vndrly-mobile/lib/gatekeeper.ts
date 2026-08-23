@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 
 import { apiFetch } from "./api";
+import type { AssignedGateSitesResponse } from "./gate-default-site";
 import type { ActiveVisit, SiteContext } from "./guest";
 import { buildHostOptions, parseDurationMinutes } from "./visitorCheckin";
 
@@ -24,6 +25,10 @@ export type GatekeeperSubmitResult =
 export async function fetchGatekeeperVisits(): Promise<ActiveVisit[]> {
   const rows = await apiFetch<Array<ActiveVisit & { checkOutTime?: string | null }>>("/api/visits");
   return rows.filter((row) => !row.checkOutTime);
+}
+
+export async function fetchAssignedGateSites(): Promise<AssignedGateSitesResponse> {
+  return apiFetch("/api/visits/gate/assigned-sites");
 }
 
 export async function fetchGatekeeperHistory(fromIso: string): Promise<ActiveVisit[]> {

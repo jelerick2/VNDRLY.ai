@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -19,23 +19,34 @@ import AmberButton from "@/components/AmberButton";
 import BrandTitleRow from "@/components/BrandTitleRow";
 import ScreenSafeArea from "@/components/ScreenSafeArea";
 import VisitorHostPicker from "@/components/VisitorHostPicker";
+import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/useColors";
 import { translateApiError } from "@/lib/apiErrors";
-import { captureAndUploadImage } from "@/lib/photos";
-import { FLYWHEEL_SPUR_SITE_CODE } from "@/lib/gate-default-site";
+import {
+  FLYWHEEL_SPUR_SITE_CODE,
+  pickDefaultGateHostKey,
+  pickPreferredGateDefaultSite,
+  resolveAssignedGateSites,
+  shouldApplyDefaultGateSite,
+} from "@/lib/gate-default-site";
 import { fetchSiteContext, type SiteContext } from "@/lib/guest";
 import {
+  fetchAssignedGateSites,
   fetchGatekeeperVisits,
   gatekeeperCheckOut,
   submitGatekeeperVisit,
 } from "@/lib/gatekeeper";
+import { captureAndUploadImage } from "@/lib/photos";
+import { buildHostOptions } from "@/lib/visitorCheckin";
 
 export default function GatekeeperScreen() {
   const colors = useColors();
   const { t } = useTranslation();
+  const { user } = useAuth();
   const qc = useQueryClient();
-  const [siteCode, setSiteCode] = useState(FLYWHEEL_SPUR_SITE_CODE);
-  const [confirmedCode, setConfirmedCode] = useState<string | null>(FLYWHEEL_SPUR_SITE_CODE);
+  const appliedDefault = useRef(false);
+  const [siteCode, setSiteCode] = useState("");
+  const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [hostKey, setHostKey] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -53,12 +64,44 @@ export default function GatekeeperScreen() {
     refetchInterval: 30000,
     retry: false,
   });
+  const assigned = useQuery({
+    queryKey: ["gatekeeper-assigned-sites", user?.vendorId],
+    queryFn: () =>
+      resolveAssignedGateSites({
+        vendorId: user?.vendorId ?? null,
+        listAssigned: fetchAssignedGateSites,
+        getSiteContext: fetchSiteContext,
+      }),
+    retry: false,
+  });
+  const assignedSites = assigned.data?.sites ?? [];
+  const preferredSite = pickPreferredGateDefaultSite(
+    assignedSites,
+    assigned.data?.defaultSite ?? null,
+  );
+  const defaultSiteCode = preferredSite?.siteCode ?? FLYWHEEL_SPUR_SITE_CODE;
   const ctxQuery = useQuery<SiteContext>({
     queryKey: ["gatekeeper-site-context", confirmedCode],
     queryFn: () => fetchSiteContext(confirmedCode!),
     enabled: !!confirmedCode,
     retry: false,
   });
+
+  useEffect(() => {
+    if (appliedDefault.current) return;
+    if (!shouldApplyDefaultGateSite({ confirmedCode, typedCode: siteCode, defaultSiteCode })) return;
+    appliedDefault.current = true;
+    setSiteCode(defaultSiteCode);
+    setConfirmedCode(defaultSiteCode);
+    setHostKey(null);
+  }, [confirmedCode, defaultSiteCode, siteCode]);
+
+  const hosts = useMemo(() => buildHostOptions(ctxQuery.data), [ctxQuery.data]);
+  useEffect(() => {
+    if (hostKey || hosts.length === 0) return;
+    const next = pickDefaultGateHostKey(hosts);
+    if (next) setHostKey(next);
+  }, [hostKey, hosts]);
 
   const inputStyle = [
     styles.input,
@@ -242,7 +285,34 @@ export default function GatekeeperScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.siteCodeLabel")}</Text>
+            <Text style={[styles.label, { color: colors.foreground }]}>{t("gatekeeper.currentLocation")}</Text>
+            {assignedSites.map((site) => {
+              const selected = confirmedCode === site.siteCode;
+              return (
+                <TouchableOpacity
+                  key={site.siteCode}
+                  testID={`gate-site-option-${site.siteCode}`}
+                  onPress={() => {
+                    appliedDefault.current = true;
+                    setSiteCode(site.siteCode);
+                    setConfirmedCode(site.siteCode);
+                    setHostKey(null);
+                  }}
+                  style={[
+                    styles.siteOption,
+                    {
+                      borderColor: selected ? colors.primary : colors.border,
+                      backgroundColor: colors.card,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.siteOptionName, { color: colors.foreground }]}>{site.name}</Text>
+                  <Text style={[styles.muted, { color: colors.mutedForeground }]}>{site.siteCode}</Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            <Text style={[styles.label, { color: colors.foreground }]}>{t("gatekeeper.siteCode")}</Text>
             <View style={styles.lookupRow}>
               <TextInput
                 testID="gate-site-code"
@@ -309,6 +379,8 @@ const styles = StyleSheet.create({
   label: { fontFamily: "Inter_500Medium", fontSize: 13, marginBottom: 6, marginTop: 6 },
   input: { borderRadius: 10, borderWidth: 1, fontFamily: "Inter_400Regular", fontSize: 15, paddingHorizontal: 12, paddingVertical: 10 },
   lookupRow: { alignItems: "center", flexDirection: "row", gap: 8 },
+  siteOption: { borderRadius: 10, borderWidth: 1, gap: 2, paddingHorizontal: 12, paddingVertical: 10 },
+  siteOptionName: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
   iconButton: { alignItems: "center", borderRadius: 10, borderWidth: 1.5, justifyContent: "center", minHeight: 44, minWidth: 44 },
   loading: { marginTop: 10 },
   error: { fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 10 },

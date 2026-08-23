@@ -81,7 +81,9 @@
     "historyNoMatch": "Ninguna visita coincide con esa búsqueda.",
     "historyLoadFailed": "No se pudo cargar el historial.",
     "historyOnSite": "En el sitio",
-    "historyCheckedOut": "Salió"
+    "historyCheckedOut": "Salió",
+    "currentLocation": "Ubicación actual",
+    "siteCode": "Código del sitio"
   },
   "login": {
     "title": "Portal de Empleados de Campo",

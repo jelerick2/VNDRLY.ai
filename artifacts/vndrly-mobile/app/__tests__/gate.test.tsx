@@ -61,12 +61,14 @@ vi.mock("@/lib/auth", () => ({
 const {
   fetchSiteContextMock,
   fetchGatekeeperVisitsMock,
+  fetchAssignedGateSitesMock,
   submitGatekeeperVisitMock,
   gatekeeperCheckOutMock,
   captureAndUploadImageMock,
 } = vi.hoisted(() => ({
   fetchSiteContextMock: vi.fn(),
   fetchGatekeeperVisitsMock: vi.fn(),
+  fetchAssignedGateSitesMock: vi.fn(),
   submitGatekeeperVisitMock: vi.fn(),
   gatekeeperCheckOutMock: vi.fn(),
   captureAndUploadImageMock: vi.fn(),
@@ -78,6 +80,7 @@ vi.mock("@/lib/guest", () => ({
 
 vi.mock("@/lib/gatekeeper", () => ({
   fetchGatekeeperVisits: (...a: unknown[]) => fetchGatekeeperVisitsMock(...a),
+  fetchAssignedGateSites: (...a: unknown[]) => fetchAssignedGateSitesMock(...a),
   submitGatekeeperVisit: (...a: unknown[]) => submitGatekeeperVisitMock(...a),
   gatekeeperCheckOut: (...a: unknown[]) => gatekeeperCheckOutMock(...a),
 }));
@@ -98,7 +101,7 @@ vi.mock("@/hooks/use-brand", () => ({
 
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
-    user: { role: "vendor", vendorRole: "gatekeeper" },
+    user: { role: "vendor", vendorRole: "gatekeeper", vendorId: 1054 },
     activeMembership: { orgLogoUrl: "https://cdn.example.com/vendor.png", orgName: "Acme Vendor" },
   }),
 }));
@@ -156,9 +159,23 @@ afterEach(() => {
   cleanup();
 });
 
+const FLYWHEEL_SITE = {
+  id: 309,
+  name: "Flywheel Energy Spur",
+  address: "34.63951, -97.66194",
+  siteCode: "SITE-B40D77D2",
+  latitude: 34.63951,
+  longitude: -97.66194,
+  assignmentId: 14819,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   fetchGatekeeperVisitsMock.mockResolvedValue([]);
+  fetchAssignedGateSitesMock.mockResolvedValue({
+    sites: [FLYWHEEL_SITE],
+    defaultSite: FLYWHEEL_SITE,
+  });
   vi.spyOn(Alert, "alert").mockImplementation(() => {});
 });
 
@@ -235,10 +252,14 @@ describe("GatekeeperScreen", () => {
     expect(screen.queryByTestId("capture-vehicle-photo-btn")).toBeNull();
   });
 
-  it("defaults the site code to Flywheel Energy Spur and looks it up", async () => {
-    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+  it("defaults the current location to Flywheel Energy Spur like the web booth", async () => {
+    fetchSiteContextMock.mockResolvedValue({
+      ...SITE_CTX,
+      site: { ...SITE_CTX.site, name: "Flywheel Energy Spur", siteCode: "SITE-B40D77D2" },
+    });
     renderScreen();
-    await findFirstByTestId("gate-site-code");
+    expect(await screen.findByTestId("gate-site-option-SITE-B40D77D2")).toBeTruthy();
+    expect(screen.getAllByText("Flywheel Energy Spur").length).toBeGreaterThan(0);
     expect((firstByTestId("gate-site-code") as HTMLInputElement).value).toBe(
       "SITE-B40D77D2",
     );
