@@ -16,7 +16,7 @@ After each save, **local dev is started automatically** if it is not already run
 
 ## One-time setup files (API Keys and Secrets, not in git)
 
-`C:\Users\JohnElerick\DEV\API Keys and Secrets\GoDaddy.env`:
+`C:\Users\john\OneDrive\Documents\DEV\API Keys and Secrets\GoDaddy.env`:
 
 ```
 user your@email.com
@@ -32,7 +32,7 @@ api_key ...
 api_secret ...
 ```
 
-`C:\Users\JohnElerick\DEV\API Keys and Secrets\Supabase.env` — already used for `DATABASE_URL` password.
+`C:\Users\john\OneDrive\Documents\DEV\API Keys and Secrets\Supabase.env` — already used for `DATABASE_URL` password.
 
 ## One-time VPS discovery
 
