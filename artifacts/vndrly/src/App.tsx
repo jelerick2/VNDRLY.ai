@@ -12,6 +12,7 @@ import ContextPickerModal from "@/components/context-picker-modal";
 import ChangePasswordModal from "@/components/change-password-modal";
 import { FieldPortalLayout } from "@/components/field-portal-layout";
 import { ForemanPortalLayout } from "@/components/foreman-portal-layout";
+import { GatePortalLayout } from "@/components/gate-portal-layout";
 import { isForemanPersona } from "@/lib/portal-base";
 
 const Dashboard = lazy(() => import("@/pages/dashboard"));
@@ -52,6 +53,7 @@ const VisitPublicPage = lazy(() => import("@/pages/visit-public"));
 const VerifyEmployeePage = lazy(() => import("@/pages/verify-employee"));
 const VisitorEntryPage = lazy(() => import("@/pages/visitor-entry"));
 const GatekeeperPage = lazy(() => import("@/pages/gatekeeper"));
+const GateHistoryPage = lazy(() => import("@/pages/gate-history"));
 const VisitorsPage = lazy(() => import("@/pages/visitors"));
 const FieldHome = lazy(() => import("@/pages/field-home"));
 const ForemanHome = lazy(() => import("@/pages/foreman-home"));
@@ -217,10 +219,13 @@ function AuthenticatedRouter() {
         {!user ? (
           <Route path="/*splat" component={Login} />
         ) : user.role === "vendor" && user.vendorRole === "gatekeeper" ? (
-          <Switch>
-            <Route path="/gate" component={GatekeeperPage} />
-            <Route path="/*splat" component={GatekeeperPage} />
-          </Switch>
+          <GatePortalLayout>
+            <Switch>
+              <Route path="/gate/history" component={GateHistoryPage} />
+              <Route path="/gate" component={GatekeeperPage} />
+              <Route path="/*splat" component={GatekeeperPage} />
+            </Switch>
+          </GatePortalLayout>
         ) : user.role === "field_employee" && isForemanPersona(user) ? (
           <ForemanPortalLayout>
             <Switch>

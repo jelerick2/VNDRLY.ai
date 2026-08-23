@@ -751,7 +751,8 @@
       "partner_host_mismatch": "That host doesn't work at this site. Pick a different one.",
       "host_vendor_required": "Please pick a vendor host.",
       "vendor_not_assigned": "That vendor isn't assigned to this site. Pick a different one.",
-      "location_required": "We need your location to check you in. Please enable location and try again."
+      "location_required": "We need your location to check you in. Please enable location and try again.",
+      "plate_ocr_unavailable": "Plate reading is not available right now. Type the tag and previous visits will still fill in."
     },
     "invalid_ticket_id": "That ticket id is invalid.",
     "ticket_not_found": "Ticket not found.",

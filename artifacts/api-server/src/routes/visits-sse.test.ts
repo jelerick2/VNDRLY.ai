@@ -29,7 +29,16 @@ vi.mock("@workspace/db", () => {
   const tbl = {} as unknown as Record<string, unknown>;
   return {
     db: {
-      select: () => ({ from: () => Promise.resolve([]) }),
+      select: () => {
+        const rows: unknown[] = [];
+        const chain = {
+          from: () => chain,
+          where: () => chain,
+          then: (resolve: (value: unknown[]) => unknown, reject?: (reason: unknown) => unknown) =>
+            Promise.resolve(rows).then(resolve, reject),
+        };
+        return chain;
+      },
       insert: () => ({ values: () => ({ returning: async () => [] }) }),
       update: () => ({ set: () => ({ where: () => Promise.resolve([]) }) }),
     },
@@ -56,6 +65,7 @@ vi.mock("drizzle-orm", () => {
     isNotNull: passthrough,
     lt: passthrough,
     desc: passthrough,
+    inArray: passthrough,
     sql: sqlTag,
   };
 });

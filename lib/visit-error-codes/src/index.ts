@@ -71,6 +71,7 @@ export const VISIT_LOCATION_REQUIRED = "visit.location_required" as const;
 export const VISIT_INVALID_ID = "visit.invalid_id" as const;
 export const VISIT_NOT_FOUND = "visit.not_found" as const;
 export const VISIT_NO_ACCESS = "visit.no_access" as const;
+export const VISIT_PLATE_OCR_UNAVAILABLE = "visit.plate_ocr_unavailable" as const;
 
 // Visit-flow geofence rejection. Emitted by `POST /visits/check-in`
 // when the supplied lat/lng is further from the site than the site's
@@ -110,6 +111,7 @@ export const VISIT_ERROR_CODES = [
   VISIT_INVALID_ID,
   VISIT_NOT_FOUND,
   VISIT_NO_ACCESS,
+  VISIT_PLATE_OCR_UNAVAILABLE,
 ] as const;
 
 export type VisitErrorCode = (typeof VISIT_ERROR_CODES)[number];

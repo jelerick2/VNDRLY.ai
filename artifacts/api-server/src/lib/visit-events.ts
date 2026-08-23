@@ -37,6 +37,12 @@ export type VisitEvent =
       hostVendorId: number | null;
       checkOutTime: string;
       autoCheckedOut: boolean;
+      firstName?: string;
+      lastName?: string;
+      company?: string | null;
+      vehiclePlate?: string | null;
+      platePhotoUrl?: string | null;
+      siteName?: string | null;
     };
 
 // Subscribers receive events with a monotonically increasing `seq` attached

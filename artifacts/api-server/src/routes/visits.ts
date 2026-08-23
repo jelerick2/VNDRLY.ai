@@ -17,6 +17,16 @@ import {
   subscribeVisitEvents,
   type PublishedVisitEvent,
 } from "../lib/visit-events";
+import { visitEventVisibleToSession } from "../lib/visit-event-visibility";
+import {
+  assembleAssignedGateSites,
+  pickDefaultAssignedSite,
+} from "../lib/gate-assigned-sites";
+import {
+  PlateOcrFailedError,
+  PlateOcrUnavailableError,
+  readPlateFromImage,
+} from "../lib/plate-ocr";
 
 import { SESSION_SECRET } from "../lib/session";
 import { enforceVisitsRateLimit } from "../lib/visits-rate-limit";
@@ -36,6 +46,7 @@ import {
   VISIT_INVALID_ID,
   VISIT_NOT_FOUND,
   VISIT_NO_ACCESS,
+  VISIT_PLATE_OCR_UNAVAILABLE,
   OFF_GEOFENCE,
 } from "@workspace/visit-error-codes";
 
@@ -362,6 +373,66 @@ function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number):
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// ---------- GET /api/visits/gate/assigned-sites (gatekeeper current location) ----------
+router.get("/visits/gate/assigned-sites", async (req, res): Promise<void> => {
+  const session = await requireGatekeeperSession(req, res);
+  if (!session) return;
+  const assignments = await db
+    .select({
+      id: siteWorkAssignmentsTable.id,
+      siteLocationId: siteWorkAssignmentsTable.siteLocationId,
+    })
+    .from(siteWorkAssignmentsTable)
+    .where(eq(siteWorkAssignmentsTable.vendorId, session.vendorId!));
+  const siteIds = [...new Set(assignments.map((row) => row.siteLocationId))];
+  if (siteIds.length === 0) {
+    res.json({ sites: [], defaultSite: null });
+    return;
+  }
+  const sites = await db
+    .select({
+      id: siteLocationsTable.id,
+      name: siteLocationsTable.name,
+      address: siteLocationsTable.address,
+      siteCode: siteLocationsTable.siteCode,
+      latitude: siteLocationsTable.latitude,
+      longitude: siteLocationsTable.longitude,
+      hidden: siteLocationsTable.hidden,
+      isActive: siteLocationsTable.isActive,
+    })
+    .from(siteLocationsTable)
+    .where(inArray(siteLocationsTable.id, siteIds));
+  const assembled = assembleAssignedGateSites(assignments, sites);
+  res.json({
+    sites: assembled,
+    defaultSite: pickDefaultAssignedSite(assembled),
+  });
+});
+
+// ---------- POST /api/visits/gate/read-plate (gatekeeper plate OCR) ----------
+router.post("/visits/gate/read-plate", async (req, res): Promise<void> => {
+  const session = await requireGatekeeperSession(req, res);
+  if (!session) return;
+  const b = (req.body ?? {}) as { imageBase64?: string; mimeType?: string };
+  const imageBase64 = typeof b.imageBase64 === "string" ? b.imageBase64.trim() : "";
+  const mimeType = typeof b.mimeType === "string" && b.mimeType.trim() ? b.mimeType.trim() : "image/jpeg";
+  if (!imageBase64) {
+    res.status(400).json({ message: "Plate photo is required", code: VISIT_INVALID_INPUT });
+    return;
+  }
+  try {
+    const plate = await readPlateFromImage({ imageBase64, mimeType });
+    res.json({ plate });
+  } catch (reason) {
+    if (reason instanceof PlateOcrUnavailableError) {
+      res.status(503).json({ message: reason.message, code: VISIT_PLATE_OCR_UNAVAILABLE });
+      return;
+    }
+    const message = reason instanceof PlateOcrFailedError ? reason.message : "Plate reading failed.";
+    res.status(400).json({ message, code: VISIT_INVALID_INPUT });
+  }
+});
+
 // ---------- POST /api/visits/gate/check-in (authenticated gatekeeper) ----------
 router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
   const session = await requireGatekeeperSession(req, res);
@@ -583,7 +654,7 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
     .returning();
 
   const [siteRow] = await db
-    .select({ partnerId: siteLocationsTable.partnerId })
+    .select({ partnerId: siteLocationsTable.partnerId, name: siteLocationsTable.name })
     .from(siteLocationsTable)
     .where(eq(siteLocationsTable.id, updated.siteLocationId));
   publishVisitEvent({
@@ -594,6 +665,12 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
     hostVendorId: updated.hostVendorId,
     checkOutTime: (updated.checkOutTime ?? new Date()).toISOString(),
     autoCheckedOut: false,
+    firstName: updated.firstName,
+    lastName: updated.lastName,
+    company: updated.company,
+    vehiclePlate: updated.vehiclePlate,
+    platePhotoUrl: updated.platePhotoUrl,
+    siteName: siteRow?.name ?? null,
   });
 
   res.json(updated);
@@ -860,18 +937,17 @@ router.get("/visits/events", async (req, res): Promise<void> => {
   // fallback does.
   if (!await enforceVisitsRateLimit(req, res, session)) return;
 
-  const visible = (ev: PublishedVisitEvent): boolean => {
-    if (session.role === "admin") return true;
-    if (session.role === "vendor" && session.vendorId) {
-      const vid = ev.type === "visit.checked_in" ? ev.visit.hostVendorId : ev.hostVendorId;
-      return vid === session.vendorId;
-    }
-    if (session.role === "partner" && session.partnerId) {
-      const pid = ev.type === "visit.checked_in" ? ev.visit.sitePartnerId : ev.sitePartnerId;
-      return pid === session.partnerId;
-    }
-    return false;
-  };
+  let assignedSiteIds: Set<number> | null = null;
+  if (isGatekeeperSession(session) && session.vendorId) {
+    const assignments = await db
+      .select({ siteLocationId: siteWorkAssignmentsTable.siteLocationId })
+      .from(siteWorkAssignmentsTable)
+      .where(eq(siteWorkAssignmentsTable.vendorId, session.vendorId));
+    assignedSiteIds = new Set(assignments.map((row) => row.siteLocationId));
+  }
+
+  const visible = (ev: PublishedVisitEvent): boolean =>
+    visitEventVisibleToSession(session, ev, assignedSiteIds);
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");

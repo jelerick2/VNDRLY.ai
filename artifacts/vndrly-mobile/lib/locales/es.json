@@ -751,7 +751,8 @@
       "partner_host_mismatch": "Ese contacto no trabaja en este sitio. Elige otro.",
       "host_vendor_required": "Selecciona un proveedor anfitrión.",
       "vendor_not_assigned": "Ese proveedor no está asignado a este sitio. Elige otro.",
-      "location_required": "Necesitamos tu ubicación para registrar tu entrada. Activa la ubicación e inténtalo de nuevo."
+      "location_required": "Necesitamos tu ubicación para registrar tu entrada. Activa la ubicación e inténtalo de nuevo.",
+      "plate_ocr_unavailable": "No se puede leer la placa ahora. Escribe la placa y las visitas anteriores seguirán completando el formulario."
     },
     "invalid_ticket_id": "El ID del ticket no es válido.",
     "ticket_not_found": "No se encontró el ticket.",

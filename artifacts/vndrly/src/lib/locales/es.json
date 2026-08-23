@@ -3780,6 +3780,11 @@
     },
     "certification": {
       "cert_number_required": "Se requiere el número de certificado.",
+      "invalid_document_url": "Ese enlace de documento no es válido.",
+      "not_found": "No se encontró esa certificación.",
+      "save_failed": "No se pudo guardar la certificación. Inténtalo de nuevo.",
+      "delete_failed": "No se pudo eliminar la certificación. Inténtalo de nuevo.",
+      "upload_failed": "No se pudo subir el documento de la certificación. Inténtalo de nuevo.",
       "verify_forbidden": "Solo el administrador del proveedor puede verificar certificaciones."
     },
     "crew": {
@@ -4062,15 +4067,6 @@
       "already_provisioned": "Ese contacto del socio ya fue dado de alta.",
       "not_found": "No encontramos ese contacto del socio."
     },
-    "certification": {
-      "cert_number_required": "Se requiere el número de certificado.",
-      "invalid_document_url": "Ese enlace de documento no es válido.",
-      "not_found": "No se encontró esa certificación.",
-      "save_failed": "No se pudo guardar la certificación. Inténtalo de nuevo.",
-      "delete_failed": "No se pudo eliminar la certificación. Inténtalo de nuevo.",
-      "upload_failed": "No se pudo subir el documento de la certificación. Inténtalo de nuevo.",
-      "verify_forbidden": "Solo el administrador del proveedor puede verificar certificaciones."
-    },
     "common": {
       "not_found": "No encontramos ese registro."
     },
@@ -4291,7 +4287,8 @@
       "location_required": "Necesitamos tu ubicación para registrar tu entrada. Activa la ubicación e inténtalo de nuevo.",
       "invalid_id": "Esa visita no es válida.",
       "not_found": "No encontramos esa visita.",
-      "no_access": "No tienes acceso a esta visita."
+      "no_access": "No tienes acceso a esta visita.",
+      "plate_ocr_unavailable": "No se puede leer la placa ahora. Escriba la placa y las visitas anteriores seguirán completando el formulario."
     },
     "field_ticket": {
       "site_not_found": "No encontramos ese sitio.",
@@ -4489,8 +4486,7 @@
     "noSiteData": "Aún no hay actividad por sitio",
     "noCrewData": "Aún no hay actividad de cuadrilla",
     "crewPerformance": "Desempeño de cuadrilla",
-    "employee": "Empleado",
-    "kickedBack": "Rechazados"
+    "employee": "Empleado"
   },
   "foremanCrews": {
     "title": "Cuadrillas",
@@ -4718,5 +4714,73 @@
     "activeOrg": "Organización Activa",
     "partner": "Socio",
     "vendor": "Proveedor"
+  },
+  "gateNav": {
+    "gate": "Portería",
+    "history": "Historial",
+    "aria": "Navegación del portal de portería"
+  },
+  "gatekeeper": {
+    "portal": "Portal de portería",
+    "title": "Portería",
+    "subtitle": "Registre la entrada y salida de visitantes en el sitio actual.",
+    "onSiteNow": "En el sitio ahora",
+    "noActive": "No hay entradas activas.",
+    "gateLog": "Registro de portería",
+    "records": "{{count}} registros",
+    "newEntry": "Nueva entrada",
+    "currentLocation": "Ubicación actual",
+    "selectSite": "Seleccione el sitio asignado",
+    "siteNotFound": "Sitio no encontrado o no disponible.",
+    "host": "Anfitrión",
+    "selectHost": "Seleccione socio o proveedor",
+    "checkInVisitor": "Registrar visitante",
+    "working": "Trabajando…",
+    "locationRequired": "Se requiere permiso de ubicación para el registro.",
+    "handsFreeHint": "Diga “Ask V” para registrar entradas y salidas a manos libres.",
+    "previousVisit": "Visita anterior encontrada para {{firstName}} {{lastName}}.",
+    "useDetails": "Usar datos",
+    "memoryHint": "El formulario recuerda visitantes anteriores. Escriba un nombre, empresa, placa, teléfono o correo, o tome una foto de la placa, y se completan los datos coincidentes. Cambie el nombre si conduce otra persona.",
+    "memorySuggestions": "Coincidencias anteriores",
+    "lastDriverHint": "Último conductor de esta placa: {{firstName}} {{lastName}}{{company}}. Cambie el nombre si conduce otra persona.",
+    "plateReading": "Leyendo placa…",
+    "plateRead": "Se leyó {{plate}} de la foto.",
+    "plateUnreadable": "No se pudo leer esa placa. Escriba la placa y las visitas anteriores seguirán completando el formulario.",
+    "checkOut": "Salida",
+    "platePhoto": "Foto de placa",
+    "plateAttached": "Placa adjunta",
+    "vehiclePhoto": "Foto del vehículo",
+    "vehicleAttached": "Vehículo adjunto",
+    "expectedMinutes": "Minutos esperados",
+    "purpose": "Propósito",
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "company": "Empresa",
+    "vehiclePlate": "Placa",
+    "phone": "Teléfono",
+    "email": "Correo",
+    "siteCode": "Código del sitio",
+    "locationUnavailable": "Se requiere ubicación para el registro en portería.",
+    "locationDenied": "Permita el acceso a la ubicación para registrar esta entrada.",
+    "selectImage": "Seleccione un archivo de imagen.",
+    "photoPrepareFailed": "No se pudo preparar la carga de la foto.",
+    "photoTooLarge": "Esa foto es demasiado grande.",
+    "photoUploadFailed": "La carga de la foto falló.",
+    "photoFinalizeFailed": "No se pudo finalizar la carga de la foto.",
+    "requiredFields": "Se requieren nombre, apellido, sitio y anfitrión.",
+    "checkInFailed": "El registro de entrada falló.",
+    "checkOutFailed": "El registro de salida falló.",
+    "liveCheckedIn": "{{name}} acaba de entrar",
+    "liveCheckedOut": "{{name}} acaba de salir",
+    "history": "Historial",
+    "historyTitle": "Historial de portería",
+    "historySubtitle": "Entradas y salidas de los últimos 30 días, las más recientes primero.",
+    "historySearch": "Buscar por nombre, placa, empresa o sitio",
+    "historyEmpty": "No hay visitas en los últimos 30 días.",
+    "historyNoMatch": "Ninguna visita coincide con esa búsqueda.",
+    "historyLoadFailed": "No se pudo cargar el historial.",
+    "historyOnSite": "En el sitio",
+    "historyCheckedOut": "Salió",
+    "backToGate": "Volver a portería"
   }
 }

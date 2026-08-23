@@ -3780,6 +3780,11 @@
     },
     "certification": {
       "cert_number_required": "Certificate number is required.",
+      "invalid_document_url": "That document link isn't valid.",
+      "not_found": "That certification wasn't found.",
+      "save_failed": "Couldn't save the certification. Please try again.",
+      "delete_failed": "Couldn't remove the certification. Please try again.",
+      "upload_failed": "Couldn't upload the certification document. Please try again.",
       "verify_forbidden": "Only vendor admin can verify certifications."
     },
     "crew": {
@@ -4062,15 +4067,6 @@
       "already_provisioned": "That partner contact has already been provisioned.",
       "not_found": "We couldn't find that partner contact."
     },
-    "certification": {
-      "cert_number_required": "Certificate number is required.",
-      "invalid_document_url": "That document link isn't valid.",
-      "not_found": "That certification wasn't found.",
-      "save_failed": "Couldn't save the certification. Please try again.",
-      "delete_failed": "Couldn't remove the certification. Please try again.",
-      "upload_failed": "Couldn't upload the certification document. Please try again.",
-      "verify_forbidden": "Only vendor admin can verify certifications."
-    },
     "common": {
       "not_found": "We couldn't find that record."
     },
@@ -4291,7 +4287,8 @@
       "location_required": "We need your location to check you in. Please enable location and try again.",
       "invalid_id": "That visit isn't valid.",
       "not_found": "We couldn't find that visit.",
-      "no_access": "You don't have access to this visit."
+      "no_access": "You don't have access to this visit.",
+      "plate_ocr_unavailable": "Plate reading is not available right now. Type the tag and previous visits will still fill in."
     },
     "field_ticket": {
       "site_not_found": "We couldn't find that site.",
@@ -4489,8 +4486,7 @@
     "noSiteData": "No site activity yet",
     "noCrewData": "No crew ticket activity yet",
     "crewPerformance": "Crew performance",
-    "employee": "Employee",
-    "kickedBack": "Kicked back"
+    "employee": "Employee"
   },
   "foremanCrews": {
     "title": "Crews",
@@ -4718,5 +4714,73 @@
     "activeOrg": "Active Organization",
     "partner": "Partner",
     "vendor": "Vendor"
+  },
+  "gateNav": {
+    "gate": "Gate",
+    "history": "History",
+    "aria": "Gate portal navigation"
+  },
+  "gatekeeper": {
+    "portal": "Gate portal",
+    "title": "Gate",
+    "subtitle": "Check visitors in and out at the current site.",
+    "onSiteNow": "On site now",
+    "noActive": "No active gate entries.",
+    "gateLog": "Gate log",
+    "records": "{{count}} records",
+    "newEntry": "New gate entry",
+    "currentLocation": "Current location",
+    "selectSite": "Select assigned site",
+    "siteNotFound": "Site not found or unavailable.",
+    "host": "Host",
+    "selectHost": "Select partner or vendor",
+    "checkInVisitor": "Check in visitor",
+    "working": "Working…",
+    "locationRequired": "Location permission is required for check-in.",
+    "handsFreeHint": "Say “Ask V” for hands-free check-in and check-out.",
+    "previousVisit": "Previous visit found for {{firstName}} {{lastName}}.",
+    "useDetails": "Use details",
+    "memoryHint": "The form remembers previous visitors. Type a name, company, plate, phone, or email, or take a plate photo, and matching details fill in. Change the name if a different driver is in the truck.",
+    "memorySuggestions": "Previous matches",
+    "lastDriverHint": "Last driver for this tag: {{firstName}} {{lastName}}{{company}}. Change the name if someone else is driving.",
+    "plateReading": "Reading plate…",
+    "plateRead": "Read {{plate}} from the photo.",
+    "plateUnreadable": "Couldn't read that plate. Type the tag and previous visits will still fill in.",
+    "checkOut": "Check out",
+    "platePhoto": "Plate photo",
+    "plateAttached": "Plate attached",
+    "vehiclePhoto": "Vehicle photo",
+    "vehicleAttached": "Vehicle attached",
+    "expectedMinutes": "Expected minutes",
+    "purpose": "Purpose",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "company": "Company",
+    "vehiclePlate": "Vehicle plate",
+    "phone": "Phone",
+    "email": "Email",
+    "siteCode": "Site code",
+    "locationUnavailable": "Location is required for gate check-in.",
+    "locationDenied": "Allow location access to record this gate entry.",
+    "selectImage": "Select an image file.",
+    "photoPrepareFailed": "Could not prepare the photo upload.",
+    "photoTooLarge": "That photo is too large.",
+    "photoUploadFailed": "Photo upload failed.",
+    "photoFinalizeFailed": "Photo upload could not be finalized.",
+    "requiredFields": "First name, last name, site, and host are required.",
+    "checkInFailed": "Gate check-in failed.",
+    "checkOutFailed": "Gate check-out failed.",
+    "liveCheckedIn": "{{name}} just checked in",
+    "liveCheckedOut": "{{name}} just checked out",
+    "history": "History",
+    "historyTitle": "Gate history",
+    "historySubtitle": "Check-ins and check-outs from the last 30 days, newest first.",
+    "historySearch": "Search by name, plate, company, or site",
+    "historyEmpty": "No visits in the last 30 days.",
+    "historyNoMatch": "No visits match that search.",
+    "historyLoadFailed": "Could not load history.",
+    "historyOnSite": "On site",
+    "historyCheckedOut": "Checked out",
+    "backToGate": "Back to gate"
   }
 }

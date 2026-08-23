@@ -27,6 +27,21 @@ export type VisitorRow = {
   checkInLongitude: number | null;
 };
 
+export type AssignedGateSite = {
+  id: number;
+  name: string;
+  address: string;
+  siteCode: string;
+  latitude: number;
+  longitude: number;
+  assignmentId: number;
+};
+
+export type AssignedGateSitesResponse = {
+  sites: AssignedGateSite[];
+  defaultSite: AssignedGateSite | null;
+};
+
 export type PublicSite = {
   id: number;
   name: string;
@@ -96,6 +111,7 @@ export const visitsApi = {
   },
   get: (id: number) => jf<VisitorDetail>(`/api/visits/${id}`),
   getSiteContext: (siteCode: string) => jf<SiteContext>(`/api/visits/site-context/${encodeURIComponent(siteCode)}`),
+  listAssignedGateSites: () => jf<AssignedGateSitesResponse>(`/api/visits/gate/assigned-sites`),
   listPublicSites: () => jf<PublicSite[]>(`/api/visits/public-sites`),
   startGuestSession: (input: {
     firstName: string;
@@ -145,4 +161,6 @@ export const visitsApi = {
   }) => jf<VisitorRow>(`/api/visits/gate/check-in`, { method: "POST", body: JSON.stringify(input) }),
   gateCheckOut: (id: number, latitude?: number, longitude?: number) =>
     jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
+  readPlate: (input: { imageBase64: string; mimeType: string }) =>
+    jf<{ plate: string | null }>(`/api/visits/gate/read-plate`, { method: "POST", body: JSON.stringify(input) }),
 };

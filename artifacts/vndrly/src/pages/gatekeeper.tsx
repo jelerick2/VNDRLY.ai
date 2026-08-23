@@ -1,67 +1,88 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Camera, FileText, Loader2, LogOut, RefreshCw, Search, Sheet } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
+import { Camera, FileText, History, Loader2, RefreshCw, Search, Sheet, Shield } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import AmberButton from "@/components/amber-button";
 import BlueButton from "@/components/blue-button";
-import RedButton from "@/components/red-button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LiveConnectionPill } from "@/components/live-connection-pill";
+import { GateMemoryInput } from "@/components/gate-memory-input";
+import { Card, CardContent, CardHeader, CardTitle, CARD_INNER_TILE_CLASS, CARD_TITLE_ICON_CLASS } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
+import { useBrand } from "@/hooks/use-brand";
+import { useGateLiveMonitor } from "@/hooks/use-gate-live-monitor";
+import { FIELD_OPS_PAGE_CLASS } from "@/lib/field-ops-content-pane";
 import { exportExcel, exportPdf, exportWord, latestVisitForPlate, toGateLogRows } from "@/lib/gatekeeper-log-export";
+import { pickDefaultGateHostKey, resolveAssignedGateSites, shouldApplyDefaultGateSite } from "@/lib/gate-default-site";
+import {
+  draftsEqual,
+  evaluateGateMemory,
+  mergeGateFill,
+  pickSuggestionFill,
+  type GateEntryDraft,
+  type GateMemoryField,
+  type GateMemorySuggestion,
+} from "@/lib/gate-entry-memory";
+import { readPlateFromPhoto } from "@/lib/gate-plate-ocr";
 import { visitsApi, type SiteContext } from "@/lib/visits-api";
-import { VNDRLY_LOGO_SQUARE } from "@/lib/vndrly-brand-assets";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Coordinates = { latitude: number; longitude: number };
+type Translate = (key: string) => string;
 
-function currentPosition(required: boolean): Promise<Coordinates | undefined> {
+function currentPosition(required: boolean, t: Translate): Promise<Coordinates | undefined> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      if (required) reject(new Error("Location is required for gate check-in."));
+      if (required) reject(new Error(t("gatekeeper.locationUnavailable")));
       else resolve(undefined);
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-      () => required ? reject(new Error("Allow location access to record this gate entry.")) : resolve(undefined),
+      () => required ? reject(new Error(t("gatekeeper.locationDenied"))) : resolve(undefined),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   });
 }
 
-async function uploadEvidence(file: File): Promise<string> {
-  if (!file.type.startsWith("image/")) throw new Error("Select an image file.");
+async function uploadEvidence(file: File, t: Translate): Promise<string> {
+  if (!file.type.startsWith("image/")) throw new Error(t("gatekeeper.selectImage"));
   const request = await fetch(`${BASE}/api/storage/uploads/request-url`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: file.name || `gate-photo-${Date.now()}.jpg`, size: file.size, contentType: file.type || "image/jpeg" }),
   });
-  if (!request.ok) throw new Error("Could not prepare the photo upload.");
+  if (!request.ok) throw new Error(t("gatekeeper.photoPrepareFailed"));
   const descriptor = await request.json() as { uploadURL: string; objectPath: string };
   const uploadUrl = /^https?:\/\//i.test(descriptor.uploadURL) ? descriptor.uploadURL : `${BASE}${descriptor.uploadURL}`;
   const upload = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type || "image/jpeg" }, body: file });
-  if (!upload.ok) throw new Error(upload.status === 413 ? "That photo is too large." : "Photo upload failed.");
+  if (!upload.ok) throw new Error(upload.status === 413 ? t("gatekeeper.photoTooLarge") : t("gatekeeper.photoUploadFailed"));
   const finalize = await fetch(`${BASE}/api/storage/uploads/finalize`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ objectURL: descriptor.uploadURL, visibility: "public" }),
   });
-  if (!finalize.ok) throw new Error("Photo upload could not be finalized.");
+  if (!finalize.ok) throw new Error(t("gatekeeper.photoFinalizeFailed"));
   return descriptor.objectPath;
 }
 
 export default function GatekeeperPage() {
-  const { user, logout } = useAuth();
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const brand = useBrand();
+  const iconStyle = { color: brand.isOrgBranded ? brand.primary : "#f59e0b" };
   const queryClient = useQueryClient();
   const plateInput = useRef<HTMLInputElement>(null);
   const vehicleInput = useRef<HTMLInputElement>(null);
+  const appliedDefault = useRef(false);
   const [siteCode, setSiteCode] = useState("");
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [hostKey, setHostKey] = useState("");
@@ -77,11 +98,25 @@ export default function GatekeeperPage() {
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeMemoryField, setActiveMemoryField] = useState<GateMemoryField | null>(null);
+  const [memoryDeleting, setMemoryDeleting] = useState(false);
+  const [plateOcrStatus, setPlateOcrStatus] = useState<"idle" | "reading" | "read" | "unreadable">("idle");
+  const [ocrPlate, setOcrPlate] = useState<string | null>(null);
 
   const visits = useQuery({
     queryKey: ["gatekeeper-visits"],
     queryFn: () => visitsApi.list(),
     refetchInterval: 30000,
+    retry: false,
+  });
+  const assigned = useQuery({
+    queryKey: ["gatekeeper-assigned-sites", user?.vendorId],
+    queryFn: () =>
+      resolveAssignedGateSites({
+        vendorId: user?.vendorId ?? null,
+        listAssigned: () => visitsApi.listAssignedGateSites(),
+        getSiteContext: (code) => visitsApi.getSiteContext(code),
+      }),
     retry: false,
   });
   const site = useQuery<SiteContext>({
@@ -91,114 +126,311 @@ export default function GatekeeperPage() {
     retry: false,
   });
   const activeVisits = (visits.data ?? []).filter((visit) => !visit.checkOutTime);
+  const live = useGateLiveMonitor({
+    enabled: Boolean(user),
+    siteLocationId: site.data?.site.id ?? null,
+    visits: (visits.data ?? []).map((visit) => ({
+      id: visit.id,
+      firstName: visit.firstName,
+      lastName: visit.lastName,
+      company: visit.company,
+      vehiclePlate: visit.vehiclePlate,
+      platePhotoUrl: visit.platePhotoUrl,
+      siteName: visit.siteName,
+      siteLocationId: visit.siteLocationId,
+    })),
+    queryKey: ["gatekeeper-visits"],
+  });
   const exportRows = useMemo(() => toGateLogRows(visits.data ?? []), [visits.data]);
   const previousPlateVisit = useMemo(
     () => latestVisitForPlate(visits.data ?? [], vehiclePlate),
     [vehiclePlate, visits.data],
   );
+  const entryDraft = useMemo<GateEntryDraft>(() => ({
+    firstName,
+    lastName,
+    company,
+    phone,
+    email,
+    vehiclePlate,
+    purpose,
+    expectedDuration: duration,
+  }), [company, duration, email, firstName, lastName, phone, purpose, vehiclePlate]);
+  const memory = useMemo(
+    () => evaluateGateMemory({
+      visits: visits.data ?? [],
+      draft: entryDraft,
+      activeField: activeMemoryField,
+      isDeleting: memoryDeleting,
+    }),
+    [activeMemoryField, entryDraft, memoryDeleting, visits.data],
+  );
+
+  const applyEntryDraft = (next: GateEntryDraft) => {
+    setFirstName(next.firstName);
+    setLastName(next.lastName);
+    setCompany(next.company);
+    setPhone(next.phone);
+    setEmail(next.email);
+    setVehiclePlate(next.vehiclePlate.toUpperCase());
+    setPurpose(next.purpose);
+    if (next.expectedDuration) setDuration(next.expectedDuration);
+  };
+  const onMemoryFieldChange = (field: GateMemoryField, value: string) => {
+    const nextValue = field === "vehiclePlate" ? value.toUpperCase() : value;
+    setMemoryDeleting(nextValue.length < entryDraft[field].length);
+    setActiveMemoryField(field);
+    if (field === "firstName") setFirstName(nextValue);
+    else if (field === "lastName") setLastName(nextValue);
+    else if (field === "company") setCompany(nextValue);
+    else if (field === "phone") setPhone(nextValue);
+    else if (field === "email") setEmail(nextValue);
+    else setVehiclePlate(nextValue);
+  };
+  const onMemoryPick = (suggestion: GateMemorySuggestion) => {
+    setMemoryDeleting(false);
+    applyEntryDraft(mergeGateFill(entryDraft, pickSuggestionFill(suggestion)));
+  };
+
   const hosts = useMemo(() => {
     if (!site.data) return [];
     return [
-      ...(site.data.partner ? [{ key: `partner:${site.data.partner.id}`, id: site.data.partner.id, type: "partner" as const, label: site.data.partner.name }] : []),
-      ...site.data.vendors.map((vendor) => ({ key: `vendor:${vendor.id}`, id: vendor.id, type: "vendor" as const, label: vendor.name })),
+      ...(site.data.partner
+        ? [{ key: `partner:${site.data.partner.id}`, id: site.data.partner.id, type: "partner" as const, label: site.data.partner.name }]
+        : []),
+      ...site.data.vendors.map((vendor) => ({
+        key: `vendor:${vendor.id}`,
+        id: vendor.id,
+        type: "vendor" as const,
+        label: vendor.name,
+      })),
     ];
   }, [site.data]);
+  const assignedSites = assigned.data?.sites ?? [];
+  const defaultSiteCode = assigned.data?.defaultSite?.siteCode;
+  const showPreviousBanner = Boolean(
+    previousPlateVisit
+    && (!firstName.trim() || !lastName.trim()
+      || firstName !== previousPlateVisit.firstName
+      || lastName !== previousPlateVisit.lastName),
+  );
+
+  useEffect(() => {
+    if (appliedDefault.current) return;
+    if (!shouldApplyDefaultGateSite({ confirmedCode, typedCode: siteCode, defaultSiteCode })) return;
+    appliedDefault.current = true;
+    setSiteCode(defaultSiteCode!);
+    setConfirmedCode(defaultSiteCode!);
+    setHostKey("");
+  }, [confirmedCode, defaultSiteCode, siteCode]);
+
+  useEffect(() => {
+    if (hostKey || hosts.length === 0) return;
+    const next = pickDefaultGateHostKey(hosts);
+    if (next) setHostKey(next);
+  }, [hostKey, hosts]);
+
+  useEffect(() => {
+    if (!memory.fill) return;
+    const next = mergeGateFill(entryDraft, memory.fill);
+    if (draftsEqual(next, entryDraft)) return;
+    setMemoryDeleting(false);
+    applyEntryDraft(next);
+  }, [entryDraft, memory.fill]);
 
   const resetEntry = () => {
     setFirstName(""); setLastName(""); setCompany(""); setPhone(""); setEmail("");
     setVehiclePlate(""); setPurpose(""); setDuration("60"); setHostKey("");
     setPlatePhotoUrl(null); setVehiclePhotoUrl(null);
+    setActiveMemoryField(null);
+    setMemoryDeleting(false);
+    setPlateOcrStatus("idle");
+    setOcrPlate(null);
   };
 
   const usePreviousPlateDetails = () => {
     if (!previousPlateVisit) return;
-    setFirstName(previousPlateVisit.firstName);
-    setLastName(previousPlateVisit.lastName);
-    setCompany(previousPlateVisit.company ?? "");
-    setPhone(previousPlateVisit.phone ?? "");
-    setEmail(previousPlateVisit.email ?? "");
-    setPurpose(previousPlateVisit.purpose ?? "");
-    setDuration(previousPlateVisit.expectedDurationMinutes?.toString() ?? "60");
-    if (previousPlateVisit.siteCode) {
-      setSiteCode(previousPlateVisit.siteCode);
-      setConfirmedCode(previousPlateVisit.siteCode);
-    }
-    const hostId = previousPlateVisit.hostType === "partner"
-      ? previousPlateVisit.hostPartnerId
-      : previousPlateVisit.hostVendorId;
-    setHostKey(hostId ? `${previousPlateVisit.hostType}:${hostId}` : "");
+    setMemoryDeleting(false);
+    applyEntryDraft(mergeGateFill(entryDraft, {
+      firstName: previousPlateVisit.firstName,
+      lastName: previousPlateVisit.lastName,
+      company: previousPlateVisit.company ?? "",
+      phone: previousPlateVisit.phone ?? "",
+      email: previousPlateVisit.email ?? "",
+      vehiclePlate: previousPlateVisit.vehiclePlate ?? "",
+      purpose: previousPlateVisit.purpose ?? "",
+      expectedDuration: previousPlateVisit.expectedDurationMinutes?.toString() ?? "60",
+    }));
   };
 
   const capture = async (file: File | undefined, kind: "plate" | "vehicle") => {
     if (!file) return;
     setBusy(true); setError(null);
+    if (kind === "plate") setPlateOcrStatus("reading");
     try {
-      const objectPath = await uploadEvidence(file);
-      if (kind === "plate") setPlatePhotoUrl(objectPath); else setVehiclePhotoUrl(objectPath);
+      if (kind === "vehicle") {
+        setVehiclePhotoUrl(await uploadEvidence(file, t));
+        return;
+      }
+      const [objectPath, plate] = await Promise.all([
+        uploadEvidence(file, t),
+        readPlateFromPhoto(file, (input) => visitsApi.readPlate(input)).catch(() => null),
+      ]);
+      setPlatePhotoUrl(objectPath);
+      if (plate) {
+        setMemoryDeleting(false);
+        setActiveMemoryField("vehiclePlate");
+        setVehiclePlate(plate);
+        setOcrPlate(plate);
+        setPlateOcrStatus("read");
+      } else {
+        setPlateOcrStatus("unreadable");
+      }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Photo upload failed.");
-    } finally { setBusy(false); }
+      setError(reason instanceof Error ? reason.message : t("gatekeeper.photoUploadFailed"));
+      if (kind === "plate") setPlateOcrStatus("unreadable");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const checkIn = async () => {
     const context = site.data;
     const host = hosts.find((candidate) => candidate.key === hostKey);
     if (!context || !host || !firstName.trim() || !lastName.trim()) {
-      setError("First name, last name, site, and host are required.");
+      setError(t("gatekeeper.requiredFields"));
       return;
     }
     setBusy(true); setError(null);
     try {
-      const coords = await currentPosition(true);
+      const coords = await currentPosition(true, t);
       const minutes = Number.parseInt(duration, 10);
       await visitsApi.gateCheckIn({
-        firstName: firstName.trim(), lastName: lastName.trim(), company: company.trim() || undefined,
-        phone: phone.trim() || undefined, email: email.trim() || undefined, vehiclePlate: vehiclePlate.trim() || undefined,
-        purpose: purpose.trim() || undefined, expectedDurationMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
-        siteLocationId: context.site.id, hostType: host.type,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        company: company.trim() || undefined,
+        phone: phone.trim() || undefined,
+        email: email.trim() || undefined,
+        vehiclePlate: vehiclePlate.trim() || undefined,
+        purpose: purpose.trim() || undefined,
+        expectedDurationMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
+        siteLocationId: context.site.id,
+        hostType: host.type,
         hostPartnerId: host.type === "partner" ? host.id : undefined,
         hostVendorId: host.type === "vendor" ? host.id : undefined,
-        platePhotoUrl: platePhotoUrl ?? undefined, vehiclePhotoUrl: vehiclePhotoUrl ?? undefined,
-        latitude: coords!.latitude, longitude: coords!.longitude,
+        platePhotoUrl: platePhotoUrl ?? undefined,
+        vehiclePhotoUrl: vehiclePhotoUrl ?? undefined,
+        latitude: coords!.latitude,
+        longitude: coords!.longitude,
       });
       resetEntry();
       await queryClient.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Gate check-in failed.");
-    } finally { setBusy(false); }
+      setError(reason instanceof Error ? reason.message : t("gatekeeper.checkInFailed"));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const checkOut = async (id: number) => {
     setBusy(true); setError(null);
     try {
-      const coords = await currentPosition(false);
+      const coords = await currentPosition(false, t);
       await visitsApi.gateCheckOut(id, coords?.latitude, coords?.longitude);
       await queryClient.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Gate check-out failed.");
-    } finally { setBusy(false); }
+      setError(reason instanceof Error ? reason.message : t("gatekeeper.checkOutFailed"));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 bg-slate-900/95 px-4 py-3">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="flex items-center gap-3"><img src={VNDRLY_LOGO_SQUARE} alt="VNDRLY" className="h-10 w-10" /><div><h1 className="font-bold">VNDRLY Gate</h1><p className="text-xs text-slate-400">{user?.displayName}</p></div></div>
-          <RedButton onClick={() => void logout()} disabled={busy}><LogOut className="mr-2 h-4 w-4" />Sign out</RedButton>
+    <div className={FIELD_OPS_PAGE_CLASS} data-testid="gatekeeper-page">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("gatekeeper.title")}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.subtitle")}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.handsFreeHint")}</p>
         </div>
-      </header>
-      <main className="mx-auto grid max-w-5xl gap-4 p-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <Card className="border-slate-700 bg-slate-900 text-white">
-          <CardHeader className="flex-row items-center justify-between"><CardTitle>On site now</CardTitle><BlueButton onClick={() => void visits.refetch()} disabled={visits.isFetching}><RefreshCw className="h-4 w-4" /></BlueButton></CardHeader>
+        <Link
+          href="/gate/history"
+          className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground underline-offset-4 hover:underline"
+          data-testid="link-gate-history"
+        >
+          <History className="h-4 w-4" />
+          {t("gatekeeper.history")}
+        </Link>
+      </div>
+
+      {live.flash && (
+        <div
+          className="flex items-center gap-4 rounded-xl border-2 border-amber-500 bg-amber-50 p-4 text-foreground shadow-md dark:bg-amber-100/80"
+          data-testid="gate-live-flash"
+          role="status"
+        >
+          {live.flash.platePhotoUrl ? (
+            <img src={live.flash.platePhotoUrl} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" />
+          ) : (
+            <Shield className="h-10 w-10 shrink-0" style={iconStyle} />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-bold leading-tight">
+              {live.flash.kind === "checked_in"
+                ? t("gatekeeper.liveCheckedIn", { name: `${live.flash.firstName} ${live.flash.lastName}`.trim() })
+                : t("gatekeeper.liveCheckedOut", { name: `${live.flash.firstName} ${live.flash.lastName}`.trim() })}
+            </p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+              {[live.flash.company, live.flash.vehiclePlate, live.flash.siteName].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          <LiveConnectionPill status={live.liveStatus} compact onRefresh={() => void visits.refetch()} />
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="flex items-center gap-2">
+              <Shield className={CARD_TITLE_ICON_CLASS} style={iconStyle} />
+              {t("gatekeeper.onSiteNow")}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {!live.flash && (
+                <LiveConnectionPill status={live.liveStatus} compact onRefresh={() => void visits.refetch()} />
+              )}
+              <BlueButton onClick={() => void visits.refetch()} disabled={visits.isFetching} data-testid="button-gate-refresh">
+                <RefreshCw className="h-4 w-4" />
+              </BlueButton>
+            </div>
+          </CardHeader>
           <CardContent className="space-y-3">
-            {visits.isLoading ? <Loader2 className="animate-spin" /> : activeVisits.length === 0 ? <p className="text-sm text-slate-400">No active gate entries.</p> : activeVisits.map((visit) => (
-              <div key={visit.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 p-3">
-                <div className="min-w-0"><p className="font-semibold">{visit.firstName} {visit.lastName}</p><p className="truncate text-xs text-slate-400">{[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" · ")}</p><p className="text-xs text-slate-500">{new Date(visit.checkInTime).toLocaleString()}</p></div>
-                <AmberButton onClick={() => void checkOut(visit.id)} disabled={busy}>Check out</AmberButton>
+            {visits.isLoading ? (
+              <Loader2 className="animate-spin text-muted-foreground" />
+            ) : activeVisits.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("gatekeeper.noActive")}</p>
+            ) : (
+              activeVisits.map((visit) => (
+                <div
+                  key={visit.id}
+                  className={`${CARD_INNER_TILE_CLASS} flex items-center justify-between gap-3 ${live.flash?.visitId === visit.id ? "ring-2 ring-amber-500" : ""}`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground">{visit.firstName} {visit.lastName}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" · ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{new Date(visit.checkInTime).toLocaleString()}</p>
+                  </div>
+                  <AmberButton onClick={() => void checkOut(visit.id)} disabled={busy}>{t("gatekeeper.checkOut")}</AmberButton>
+                </div>
+              ))
+            )}
+            <div className="border-t-2 border-gray-300 pt-3 dark:border-gray-400">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">{t("gatekeeper.gateLog")}</p>
+                <span className="text-xs text-muted-foreground">{t("gatekeeper.records", { count: exportRows.length })}</span>
               </div>
-            ))}
-            <div className="border-t border-slate-700 pt-3">
-              <div className="mb-2 flex items-center justify-between gap-3"><p className="text-sm font-semibold">Gate log</p><span className="text-xs text-slate-400">{exportRows.length} records</span></div>
               <div className="grid grid-cols-3 gap-2">
                 <BlueButton onClick={() => void exportPdf(exportRows)} disabled={!exportRows.length}><FileText className="mr-1 h-4 w-4" />PDF</BlueButton>
                 <BlueButton onClick={() => exportExcel(exportRows)} disabled={!exportRows.length}><Sheet className="mr-1 h-4 w-4" />Excel</BlueButton>
@@ -207,28 +439,177 @@ export default function GatekeeperPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-slate-700 bg-slate-900 text-white">
-          <CardHeader><CardTitle>New gate entry</CardTitle></CardHeader>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("gatekeeper.newEntry")}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t("gatekeeper.memoryHint")}</p>
+          </CardHeader>
           <CardContent className="space-y-4">
-            {error && <div role="alert" className="rounded-md border border-red-500/50 bg-red-950/50 p-3 text-sm text-red-200">{error}</div>}
-            <div className="grid grid-cols-2 gap-3"><div><Label>First name *</Label><Input value={firstName} onChange={(e) => setFirstName(e.target.value)} /></div><div><Label>Last name *</Label><Input value={lastName} onChange={(e) => setLastName(e.target.value)} /></div></div>
-            <div className="grid grid-cols-2 gap-3"><div><Label>Company</Label><Input value={company} onChange={(e) => setCompany(e.target.value)} /></div><div><Label>Vehicle plate</Label><Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())} onBlur={usePreviousPlateDetails} /></div></div>
-            {previousPlateVisit && <div className="flex items-center justify-between gap-3 rounded-md border border-blue-500/40 bg-blue-950/40 p-3 text-sm"><span>Previous visit found for {previousPlateVisit.firstName} {previousPlateVisit.lastName}.</span><BlueButton onClick={usePreviousPlateDetails}>Use details</BlueButton></div>}
-            <div className="grid grid-cols-2 gap-3"><div><Label>Phone</Label><Input inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></div><div><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div></div>
-            <div><Label>Site code *</Label><div className="flex gap-2"><Input value={siteCode} onChange={(e) => setSiteCode(e.target.value.toUpperCase())} placeholder="SITE-XXXXXXXX" /><BlueButton onClick={() => { setConfirmedCode(siteCode.trim().toUpperCase() || null); setHostKey(""); }}><Search className="h-4 w-4" /></BlueButton></div></div>
-            {site.isLoading && <Loader2 className="animate-spin" />}
-            {site.error && <p className="text-sm text-red-300">Site not found or unavailable.</p>}
-            {site.data && <><p className="rounded-md bg-slate-800 p-3 text-sm"><strong>{site.data.site.name}</strong><br /><span className="text-slate-400">{site.data.site.address}</span></p><div><Label>Host *</Label><Select value={hostKey} onValueChange={setHostKey}><SelectTrigger><SelectValue placeholder="Select partner or vendor" /></SelectTrigger><SelectContent>{hosts.map((host) => <SelectItem key={host.key} value={host.key}>{host.label} ({host.type})</SelectItem>)}</SelectContent></Select></div></>}
-            <div><Label>Purpose</Label><Textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} /></div>
-            <div><Label>Expected minutes</Label><Input inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
-            <div className="grid grid-cols-2 gap-3"><BlueButton onClick={() => plateInput.current?.click()} disabled={busy}><Camera className="mr-2 h-4 w-4" />{platePhotoUrl ? "Plate attached" : "Plate photo"}</BlueButton><BlueButton onClick={() => vehicleInput.current?.click()} disabled={busy}><Camera className="mr-2 h-4 w-4" />{vehiclePhotoUrl ? "Vehicle attached" : "Vehicle photo"}</BlueButton></div>
+            {error && <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>{t("gatekeeper.firstName")} *</Label>
+                <GateMemoryInput
+                  value={firstName}
+                  suggestions={activeMemoryField === "firstName" ? memory.suggestions : []}
+                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
+                  onPick={onMemoryPick}
+                  onChange={(event) => onMemoryFieldChange("firstName", event.target.value)}
+                  onFocus={() => setActiveMemoryField("firstName")}
+                  data-testid="input-gate-first-name"
+                />
+              </div>
+              <div>
+                <Label>{t("gatekeeper.lastName")} *</Label>
+                <GateMemoryInput
+                  value={lastName}
+                  suggestions={activeMemoryField === "lastName" ? memory.suggestions : []}
+                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
+                  onPick={onMemoryPick}
+                  onChange={(event) => onMemoryFieldChange("lastName", event.target.value)}
+                  onFocus={() => setActiveMemoryField("lastName")}
+                  data-testid="input-gate-last-name"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>{t("gatekeeper.company")}</Label>
+                <GateMemoryInput
+                  value={company}
+                  suggestions={activeMemoryField === "company" ? memory.suggestions : []}
+                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
+                  onPick={onMemoryPick}
+                  onChange={(event) => onMemoryFieldChange("company", event.target.value)}
+                  onFocus={() => setActiveMemoryField("company")}
+                  data-testid="input-gate-company"
+                />
+              </div>
+              <div>
+                <Label>{t("gatekeeper.vehiclePlate")}</Label>
+                <GateMemoryInput
+                  value={vehiclePlate}
+                  suggestions={activeMemoryField === "vehiclePlate" ? memory.suggestions : []}
+                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
+                  onPick={onMemoryPick}
+                  onChange={(event) => onMemoryFieldChange("vehiclePlate", event.target.value)}
+                  onFocus={() => setActiveMemoryField("vehiclePlate")}
+                  data-testid="input-gate-plate"
+                />
+              </div>
+            </div>
+            {showPreviousBanner && previousPlateVisit && (
+              <div className={`${CARD_INNER_TILE_CLASS} flex items-center justify-between gap-3 text-sm`}>
+                <span>{t("gatekeeper.previousVisit", { firstName: previousPlateVisit.firstName, lastName: previousPlateVisit.lastName })}</span>
+                <BlueButton onClick={usePreviousPlateDetails}>{t("gatekeeper.useDetails")}</BlueButton>
+              </div>
+            )}
+            {previousPlateVisit && firstName.trim() && lastName.trim() && (
+              <p className="text-sm text-muted-foreground" data-testid="gate-last-driver-hint">
+                {t("gatekeeper.lastDriverHint", {
+                  firstName: previousPlateVisit.firstName,
+                  lastName: previousPlateVisit.lastName,
+                  company: previousPlateVisit.company ? ` · ${previousPlateVisit.company}` : "",
+                })}
+              </p>
+            )}
+            {plateOcrStatus === "reading" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateReading")}</p>}
+            {plateOcrStatus === "read" && ocrPlate && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateRead", { plate: ocrPlate })}</p>}
+            {plateOcrStatus === "unreadable" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateUnreadable")}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>{t("gatekeeper.phone")}</Label>
+                <GateMemoryInput
+                  inputMode="tel"
+                  value={phone}
+                  suggestions={activeMemoryField === "phone" ? memory.suggestions : []}
+                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
+                  onPick={onMemoryPick}
+                  onChange={(event) => onMemoryFieldChange("phone", event.target.value)}
+                  onFocus={() => setActiveMemoryField("phone")}
+                  data-testid="input-gate-phone"
+                />
+              </div>
+              <div>
+                <Label>{t("gatekeeper.email")}</Label>
+                <GateMemoryInput
+                  type="email"
+                  value={email}
+                  suggestions={activeMemoryField === "email" ? memory.suggestions : []}
+                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
+                  onPick={onMemoryPick}
+                  onChange={(event) => onMemoryFieldChange("email", event.target.value)}
+                  onFocus={() => setActiveMemoryField("email")}
+                  data-testid="input-gate-email"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>{t("gatekeeper.currentLocation")} *</Label>
+              {assignedSites.length > 0 ? (
+                <Select
+                  value={assignedSites.some((row) => row.siteCode === confirmedCode) ? confirmedCode! : undefined}
+                  onValueChange={(code) => {
+                    setSiteCode(code);
+                    setConfirmedCode(code);
+                    setHostKey("");
+                  }}
+                >
+                  <SelectTrigger data-testid="select-gate-current-location"><SelectValue placeholder={t("gatekeeper.selectSite")} /></SelectTrigger>
+                  <SelectContent>
+                    {assignedSites.map((row) => (
+                      <SelectItem key={row.siteCode} value={row.siteCode}>{row.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+              <div className="mt-2 flex gap-2">
+                <Input value={siteCode} onChange={(e) => setSiteCode(e.target.value.toUpperCase())} placeholder="SITE-XXXXXXXX" aria-label={t("gatekeeper.siteCode")} />
+                <BlueButton onClick={() => { setConfirmedCode(siteCode.trim().toUpperCase() || null); setHostKey(""); }}><Search className="h-4 w-4" /></BlueButton>
+              </div>
+            </div>
+            {site.isLoading && <Loader2 className="animate-spin text-muted-foreground" />}
+            {site.error && <p className="text-sm text-destructive">{t("gatekeeper.siteNotFound")}</p>}
+            {site.data && (
+              <>
+                <p className={`${CARD_INNER_TILE_CLASS} text-sm`}>
+                  <strong>{site.data.site.name}</strong>
+                  <br />
+                  <span className="text-muted-foreground">{site.data.site.address}</span>
+                </p>
+                <div>
+                  <Label>{t("gatekeeper.host")} *</Label>
+                  <Select value={hostKey} onValueChange={setHostKey}>
+                    <SelectTrigger><SelectValue placeholder={t("gatekeeper.selectHost")} /></SelectTrigger>
+                    <SelectContent>
+                      {hosts.map((host) => (
+                        <SelectItem key={host.key} value={host.key}>{host.label} ({host.type})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+            <div><Label>{t("gatekeeper.purpose")}</Label><Textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} /></div>
+            <div><Label>{t("gatekeeper.expectedMinutes")}</Label><Input inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <BlueButton onClick={() => plateInput.current?.click()} disabled={busy}>
+                <Camera className="mr-2 h-4 w-4" />{platePhotoUrl ? t("gatekeeper.plateAttached") : t("gatekeeper.platePhoto")}
+              </BlueButton>
+              <BlueButton onClick={() => vehicleInput.current?.click()} disabled={busy}>
+                <Camera className="mr-2 h-4 w-4" />{vehiclePhotoUrl ? t("gatekeeper.vehicleAttached") : t("gatekeeper.vehiclePhoto")}
+              </BlueButton>
+            </div>
             <input ref={plateInput} className="hidden" type="file" accept="image/*" capture="environment" onChange={(e) => void capture(e.target.files?.[0], "plate")} />
             <input ref={vehicleInput} className="hidden" type="file" accept="image/*" capture="environment" onChange={(e) => void capture(e.target.files?.[0], "vehicle")} />
-            <AmberButton className="w-full" onClick={() => void checkIn()} disabled={busy || !site.data}>{busy ? "Working…" : "Check in visitor"}</AmberButton>
-            <p className="text-center text-xs text-slate-500">Location permission is required for check-in.</p>
+            <AmberButton className="w-full" onClick={() => void checkIn()} disabled={busy || !site.data}>
+              {busy ? t("gatekeeper.working") : t("gatekeeper.checkInVisitor")}
+            </AmberButton>
+            <p className="text-center text-xs text-muted-foreground">{t("gatekeeper.locationRequired")}</p>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   );
 }
