@@ -281,6 +281,10 @@ if [ ! -d "$APP_DIR/.git" ]; then
   echo ${JSON.stringify(bootstrapB64)} | base64 -d | sudo bash
 fi
 cd "$APP_DIR"
+existing_session_secret=""
+if [ -f .env.production ]; then
+  existing_session_secret="$(sudo sed -n 's/^SESSION_SECRET=//p' .env.production | head -n 1)"
+fi
 echo ${JSON.stringify(prodEnvB64)} | base64 -d | sudo tee .env.production.new >/dev/null
 if [ -f .env.production ]; then
   while IFS= read -r line; do
@@ -293,6 +297,12 @@ if [ -f .env.production ]; then
       printf '%s\n' "$line" | sudo tee -a .env.production.new >/dev/null
     fi
   done < .env.production
+fi
+if ! sudo grep -q '^SESSION_SECRET=.' .env.production.new; then
+  if [ -z "\${existing_session_secret}" ]; then
+    existing_session_secret="$(openssl rand -hex 48)"
+  fi
+  printf 'SESSION_SECRET=%s\n' "\${existing_session_secret}" | sudo tee -a .env.production.new >/dev/null
 fi
 sudo mv .env.production.new .env.production
 sudo chown vndrly:vndrly .env.production
