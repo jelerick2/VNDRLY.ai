@@ -132,7 +132,7 @@ async function main() {
     ? readFileSync(path.join(ROOT, ".env.local"), "utf8")
     : "";
 
-  let sessionSecret = "vndrly-prod-session-change-me";
+  let sessionSecret = process.env.SESSION_SECRET?.trim() ?? "";
   const secMatch = localEnv.match(/^SESSION_SECRET=(.+)$/m);
   if (secMatch && !secMatch[1].includes("local-dev")) {
     sessionSecret = secMatch[1].trim();
@@ -220,6 +220,8 @@ async function main() {
     localEnv.match(/^SUPABASE_URL=(.+)$/m)?.[1]?.trim() ||
     "https://bihjmgbdzbhcnsuhzzwo.supabase.co";
   const supabaseServiceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
     localEnv.match(/^SUPABASE_SERVICE_ROLE_KEY=(.+)$/m)?.[1]?.trim() ||
     localEnv.match(/^SUPABASE_SERVICE_KEY=(.+)$/m)?.[1]?.trim() ||
     "";
@@ -279,7 +281,20 @@ if [ ! -d "$APP_DIR/.git" ]; then
   echo ${JSON.stringify(bootstrapB64)} | base64 -d | sudo bash
 fi
 cd "$APP_DIR"
-echo ${JSON.stringify(prodEnvB64)} | base64 -d | sudo tee .env.production >/dev/null
+echo ${JSON.stringify(prodEnvB64)} | base64 -d | sudo tee .env.production.new >/dev/null
+if [ -f .env.production ]; then
+  while IFS= read -r line; do
+    case "$line" in
+      ""|'#'*) continue ;;
+      *=*) key="\${line%%=*}" ;;
+      *) continue ;;
+    esac
+    if ! sudo grep -Fq "\${key}=" .env.production.new; then
+      printf '%s\n' "$line" | sudo tee -a .env.production.new >/dev/null
+    fi
+  done < .env.production
+fi
+sudo mv .env.production.new .env.production
 sudo chown vndrly:vndrly .env.production
 sudo chmod 600 .env.production
 sudo -u vndrly git remote set-url origin https://github.com/vndrly/VNDRLY.ai.git
