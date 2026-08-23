@@ -22,6 +22,7 @@ import VisitorHostPicker from "@/components/VisitorHostPicker";
 import { useColors } from "@/hooks/useColors";
 import { translateApiError } from "@/lib/apiErrors";
 import { captureAndUploadImage } from "@/lib/photos";
+import { FLYWHEEL_SPUR_SITE_CODE } from "@/lib/gate-default-site";
 import { fetchSiteContext, type SiteContext } from "@/lib/guest";
 import {
   fetchGatekeeperVisits,
@@ -33,8 +34,8 @@ export default function GatekeeperScreen() {
   const colors = useColors();
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const [siteCode, setSiteCode] = useState("");
-  const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
+  const [siteCode, setSiteCode] = useState(FLYWHEEL_SPUR_SITE_CODE);
+  const [confirmedCode, setConfirmedCode] = useState<string | null>(FLYWHEEL_SPUR_SITE_CODE);
   const [hostKey, setHostKey] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");

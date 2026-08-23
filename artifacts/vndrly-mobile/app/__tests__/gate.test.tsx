@@ -235,6 +235,18 @@ describe("GatekeeperScreen", () => {
     expect(screen.queryByTestId("capture-vehicle-photo-btn")).toBeNull();
   });
 
+  it("defaults the site code to Flywheel Energy Spur and looks it up", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    renderScreen();
+    await findFirstByTestId("gate-site-code");
+    expect((firstByTestId("gate-site-code") as HTMLInputElement).value).toBe(
+      "SITE-B40D77D2",
+    );
+    await waitFor(() => {
+      expect(fetchSiteContextMock).toHaveBeenCalledWith("SITE-B40D77D2");
+    });
+  });
+
   it("sends captured tag and vehicle photos with check-in and omits phone/email", async () => {
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
     captureAndUploadImageMock
