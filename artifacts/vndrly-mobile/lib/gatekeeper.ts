@@ -10,8 +10,6 @@ export type GatekeeperVisitInput = {
   firstName: string;
   lastName: string;
   company: string;
-  phone: string;
-  email: string;
   vehiclePlate: string;
   purpose: string;
   durationStr: string;
@@ -66,8 +64,6 @@ export async function submitGatekeeperVisit(
       firstName: input.firstName.trim(),
       lastName: input.lastName.trim(),
       company: input.company.trim() || undefined,
-      phone: input.phone.trim() || undefined,
-      email: input.email.trim() || undefined,
       siteLocationId: input.ctx.site.id,
       hostType: host.type,
       hostPartnerId: host.type === "partner" ? host.id : undefined,

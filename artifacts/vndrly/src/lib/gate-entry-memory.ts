@@ -9,16 +9,12 @@ export type GateMemoryField =
   | "firstName"
   | "lastName"
   | "company"
-  | "phone"
-  | "email"
   | "vehiclePlate";
 
 export type GateEntryDraft = {
   firstName: string;
   lastName: string;
   company: string;
-  phone: string;
-  email: string;
   vehiclePlate: string;
   purpose: string;
   expectedDuration: string;
@@ -41,8 +37,6 @@ const DRAFT_KEYS: (keyof GateEntryDraft)[] = [
   "firstName",
   "lastName",
   "company",
-  "phone",
-  "email",
   "vehiclePlate",
   "purpose",
   "expectedDuration",
@@ -53,8 +47,6 @@ export function emptyGateDraft(): GateEntryDraft {
     firstName: "",
     lastName: "",
     company: "",
-    phone: "",
-    email: "",
     vehiclePlate: "",
     purpose: "",
     expectedDuration: "60",
@@ -66,8 +58,6 @@ export function fillFromVisit(visit: VisitorRow): GateEntryDraft {
     firstName: visit.firstName,
     lastName: visit.lastName,
     company: visit.company ?? "",
-    phone: visit.phone ?? "",
-    email: visit.email ?? "",
     vehiclePlate: (visit.vehiclePlate ?? "").toUpperCase(),
     purpose: visit.purpose ?? "",
     expectedDuration:
@@ -83,9 +73,6 @@ function norm(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
-function digits(value: string | null | undefined): string {
-  return (value ?? "").replace(/\D/g, "");
-}
 
 function prefixMatch(value: string | null | undefined, query: string): boolean {
   if (!query.trim()) return true;
@@ -98,11 +85,6 @@ function platePrefix(value: string | null | undefined, query: string): boolean {
   return normalizePlate(value).startsWith(needle);
 }
 
-function phonePrefix(value: string | null | undefined, query: string): boolean {
-  const needle = digits(query);
-  if (!needle) return prefixMatch(value, query);
-  return digits(value).startsWith(needle);
-}
 
 function identityKey(visit: VisitorRow): string {
   return `${norm(visit.firstName)}|${norm(visit.lastName)}|${norm(visit.company)}`;
@@ -119,15 +101,12 @@ function visitMatchesDraft(visit: VisitorRow, draft: GateEntryDraft): boolean {
   if (draft.firstName.trim() && !prefixMatch(visit.firstName, draft.firstName)) return false;
   if (draft.lastName.trim() && !prefixMatch(visit.lastName, draft.lastName)) return false;
   if (draft.company.trim() && !prefixMatch(visit.company, draft.company)) return false;
-  if (draft.phone.trim() && !phonePrefix(visit.phone, draft.phone)) return false;
-  if (draft.email.trim() && !prefixMatch(visit.email, draft.email)) return false;
   if (draft.vehiclePlate.trim() && !platePrefix(visit.vehiclePlate, draft.vehiclePlate)) return false;
   return true;
 }
 
 function queryLength(field: GateMemoryField, value: string): number {
   if (field === "vehiclePlate") return normalizePlate(value).length;
-  if (field === "phone") return digits(value).length || value.trim().length;
   return value.trim().length;
 }
 
@@ -226,14 +205,10 @@ function sharedFill(matches: VisitorRow[]): Partial<GateEntryDraft> {
   const firstName = sameNormalized((visit) => visit.firstName, norm, matches);
   const lastName = sameNormalized((visit) => visit.lastName, norm, matches);
   const company = sameNormalized((visit) => visit.company ?? "", norm, matches);
-  const phone = sameNormalized((visit) => visit.phone ?? "", digits, matches);
-  const email = sameNormalized((visit) => visit.email ?? "", norm, matches);
   const vehiclePlate = sameNormalized((visit) => visit.vehiclePlate ?? "", normalizePlate, matches);
   if (firstName) fill.firstName = firstName;
   if (lastName) fill.lastName = lastName;
   if (company) fill.company = company;
-  if (phone) fill.phone = phone;
-  if (email) fill.email = email;
   if (vehiclePlate) fill.vehiclePlate = vehiclePlate;
   return fill;
 }
@@ -251,12 +226,6 @@ export function shouldApplyField(
     const suggestedPlate = normalizePlate(suggested);
     return suggestedPlate.startsWith(currentPlate) || currentPlate.startsWith(suggestedPlate);
   }
-  if (key === "phone") {
-    const currentDigits = digits(trimmed);
-    const suggestedDigits = digits(suggested);
-    if (currentDigits) return suggestedDigits.startsWith(currentDigits);
-    return suggested.toLowerCase().startsWith(trimmed.toLowerCase());
-  }
   if (key === "expectedDuration") {
     return trimmed === "60" || trimmed === suggested;
   }
@@ -268,8 +237,7 @@ function effectivelyEqual(key: keyof GateEntryDraft, current: string, suggested:
   if (key === "vehiclePlate") {
     return Boolean(normalizePlate(current)) && normalizePlate(current) === normalizePlate(suggested);
   }
-  if (key === "phone") return Boolean(digits(current)) && digits(current) === digits(suggested);
-  if (key === "email" || key === "company" || key === "firstName" || key === "lastName") {
+  if (key === "company" || key === "firstName" || key === "lastName") {
     return Boolean(norm(current)) && norm(current) === norm(suggested);
   }
   return false;

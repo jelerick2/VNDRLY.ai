@@ -71,7 +71,9 @@
     "newEntry": "Nueva entrada",
     "nameRequired": "Nombre y apellido son obligatorios.",
     "checkedInTitle": "Entrada registrada",
-    "checkedInBody": "Registro de entrada guardado."
+    "checkedInBody": "Registro de entrada guardado.",
+    "tagPhoto": "Foto de placa",
+    "vehiclePhoto": "Foto del vehículo"
   },
   "login": {
     "title": "Portal de Empleados de Campo",
@@ -576,6 +578,8 @@
     },
     "certification": {
       "cert_number_required": "Se requiere el número de certificado.",
+      "invalid_document_url": "Esa URL del documento de certificación no es válida.",
+      "not_found": "Esa certificación no se encontró.",
       "verify_forbidden": "Solo el administrador del proveedor puede verificar certificaciones."
     },
     "crew": {
@@ -896,12 +900,6 @@
       "transcribe_unavailable": "La transcripción de voz no está disponible ahora.",
       "tts_failed": "No se pudo reproducir la respuesta de voz. Inténtalo de nuevo.",
       "tts_unavailable": "La respuesta de voz no está disponible ahora."
-    },
-    "certification": {
-      "cert_number_required": "Se requiere el número de certificado.",
-      "invalid_document_url": "Esa URL del documento de certificación no es válida.",
-      "not_found": "Esa certificación no se encontró.",
-      "verify_forbidden": "Solo el administrador del proveedor puede verificar certificaciones."
     },
     "common": {
       "not_found": "No pudimos encontrar ese registro."

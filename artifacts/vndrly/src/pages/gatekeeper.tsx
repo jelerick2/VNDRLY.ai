@@ -89,8 +89,6 @@ export default function GatekeeperPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
@@ -150,12 +148,10 @@ export default function GatekeeperPage() {
     firstName,
     lastName,
     company,
-    phone,
-    email,
     vehiclePlate,
     purpose,
     expectedDuration: duration,
-  }), [company, duration, email, firstName, lastName, phone, purpose, vehiclePlate]);
+  }), [company, duration, firstName, lastName, purpose, vehiclePlate]);
   const memory = useMemo(
     () => evaluateGateMemory({
       visits: visits.data ?? [],
@@ -170,8 +166,6 @@ export default function GatekeeperPage() {
     setFirstName(next.firstName);
     setLastName(next.lastName);
     setCompany(next.company);
-    setPhone(next.phone);
-    setEmail(next.email);
     setVehiclePlate(next.vehiclePlate.toUpperCase());
     setPurpose(next.purpose);
     if (next.expectedDuration) setDuration(next.expectedDuration);
@@ -183,8 +177,6 @@ export default function GatekeeperPage() {
     if (field === "firstName") setFirstName(nextValue);
     else if (field === "lastName") setLastName(nextValue);
     else if (field === "company") setCompany(nextValue);
-    else if (field === "phone") setPhone(nextValue);
-    else if (field === "email") setEmail(nextValue);
     else setVehiclePlate(nextValue);
   };
   const onMemoryPick = (suggestion: GateMemorySuggestion) => {
@@ -239,7 +231,7 @@ export default function GatekeeperPage() {
   }, [entryDraft, memory.fill]);
 
   const resetEntry = () => {
-    setFirstName(""); setLastName(""); setCompany(""); setPhone(""); setEmail("");
+    setFirstName(""); setLastName(""); setCompany("");
     setVehiclePlate(""); setPurpose(""); setDuration("60"); setHostKey("");
     setPlatePhotoUrl(null); setVehiclePhotoUrl(null);
     setActiveMemoryField(null);
@@ -255,8 +247,6 @@ export default function GatekeeperPage() {
       firstName: previousPlateVisit.firstName,
       lastName: previousPlateVisit.lastName,
       company: previousPlateVisit.company ?? "",
-      phone: previousPlateVisit.phone ?? "",
-      email: previousPlateVisit.email ?? "",
       vehiclePlate: previousPlateVisit.vehiclePlate ?? "",
       purpose: previousPlateVisit.purpose ?? "",
       expectedDuration: previousPlateVisit.expectedDurationMinutes?.toString() ?? "60",
@@ -309,8 +299,6 @@ export default function GatekeeperPage() {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         company: company.trim() || undefined,
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
         vehiclePlate: vehiclePlate.trim() || undefined,
         purpose: purpose.trim() || undefined,
         expectedDurationMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
@@ -517,34 +505,6 @@ export default function GatekeeperPage() {
             {plateOcrStatus === "reading" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateReading")}</p>}
             {plateOcrStatus === "read" && ocrPlate && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateRead", { plate: ocrPlate })}</p>}
             {plateOcrStatus === "unreadable" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateUnreadable")}</p>}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>{t("gatekeeper.phone")}</Label>
-                <GateMemoryInput
-                  inputMode="tel"
-                  value={phone}
-                  suggestions={activeMemoryField === "phone" ? memory.suggestions : []}
-                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
-                  onPick={onMemoryPick}
-                  onChange={(event) => onMemoryFieldChange("phone", event.target.value)}
-                  onFocus={() => setActiveMemoryField("phone")}
-                  data-testid="input-gate-phone"
-                />
-              </div>
-              <div>
-                <Label>{t("gatekeeper.email")}</Label>
-                <GateMemoryInput
-                  type="email"
-                  value={email}
-                  suggestions={activeMemoryField === "email" ? memory.suggestions : []}
-                  suggestionsLabel={t("gatekeeper.memorySuggestions")}
-                  onPick={onMemoryPick}
-                  onChange={(event) => onMemoryFieldChange("email", event.target.value)}
-                  onFocus={() => setActiveMemoryField("email")}
-                  data-testid="input-gate-email"
-                />
-              </div>
-            </div>
             <div>
               <Label>{t("gatekeeper.currentLocation")} *</Label>
               {assignedSites.length > 0 ? (

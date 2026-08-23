@@ -44,8 +44,6 @@ function draft(overrides: Partial<GateEntryDraft> = {}): GateEntryDraft {
     firstName: "",
     lastName: "",
     company: "",
-    phone: "",
-    email: "",
     vehiclePlate: "",
     purpose: "",
     expectedDuration: "60",
@@ -153,12 +151,12 @@ describe("evaluateGateMemory", () => {
       firstName: "Jordan",
       lastName: "Hale",
       company: "Peak Energy",
-      phone: "555-0142",
-      email: "jordan@peak.example",
       vehiclePlate: "OK-4412",
       purpose: "Water haul",
       expectedDuration: "45",
     });
+    expect(result.fill).not.toHaveProperty("phone");
+    expect(result.fill).not.toHaveProperty("email");
   });
 
   it("matches plates ignoring punctuation and uses the newest visit", () => {
@@ -176,7 +174,8 @@ describe("evaluateGateMemory", () => {
       activeField: "vehiclePlate",
     });
     expect(result.fill?.purpose).toBe("Fresh haul");
-    expect(result.fill?.phone).toBe("555-7777");
+    expect(result.fill).not.toHaveProperty("phone");
+    expect(result.fill).not.toHaveProperty("email");
   });
 
   it("fills a unique person from a first-name prefix", () => {
@@ -284,20 +283,15 @@ describe("evaluateGateMemory", () => {
     expect(result.fill).toBeNull();
   });
 
-  it("matches phone digits and email prefixes", () => {
-    const byPhone = evaluateGateMemory({
-      visits: [peakJordan, summitMaya],
-      draft: draft({ phone: "405555" }),
-      activeField: "phone",
+  it("does not fill phone or email from historical visits", () => {
+    const result = evaluateGateMemory({
+      visits: [peakJordan],
+      draft: draft({ vehiclePlate: "OK-4412" }),
+      activeField: "vehiclePlate",
     });
-    expect(byPhone.fill?.firstName).toBe("Maya");
-
-    const byEmail = evaluateGateMemory({
-      visits: [peakJordan, summitMaya],
-      draft: draft({ email: "jordan@" }),
-      activeField: "email",
-    });
-    expect(byEmail.fill?.company).toBe("Peak Energy");
+    expect(result.fill?.firstName).toBe("Jordan");
+    expect(result.fill).not.toHaveProperty("phone");
+    expect(result.fill).not.toHaveProperty("email");
   });
 });
 

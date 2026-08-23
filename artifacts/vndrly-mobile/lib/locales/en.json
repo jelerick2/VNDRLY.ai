@@ -71,7 +71,9 @@
     "newEntry": "New gate entry",
     "nameRequired": "First name and last name are required.",
     "checkedInTitle": "Checked in",
-    "checkedInBody": "Gate entry recorded."
+    "checkedInBody": "Gate entry recorded.",
+    "tagPhoto": "Tag photo",
+    "vehiclePhoto": "Vehicle photo"
   },
   "login": {
     "title": "Field Employee Portal",
@@ -576,6 +578,8 @@
     },
     "certification": {
       "cert_number_required": "Certificate number is required.",
+      "invalid_document_url": "That certification document URL isn't valid.",
+      "not_found": "That certification wasn't found.",
       "verify_forbidden": "Only vendor admin can verify certifications."
     },
     "crew": {
@@ -896,12 +900,6 @@
       "transcribe_unavailable": "Speech transcription isn't available right now.",
       "tts_failed": "Couldn't play the voice response. Try again.",
       "tts_unavailable": "Voice response isn't available right now."
-    },
-    "certification": {
-      "cert_number_required": "Certificate number is required.",
-      "invalid_document_url": "That certification document URL isn't valid.",
-      "not_found": "That certification wasn't found.",
-      "verify_forbidden": "Only vendor admin can verify certifications."
     },
     "common": {
       "not_found": "We couldn't find that record."

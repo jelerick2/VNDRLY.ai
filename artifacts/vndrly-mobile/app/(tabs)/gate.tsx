@@ -38,8 +38,6 @@ export default function GatekeeperScreen() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
@@ -69,8 +67,6 @@ export default function GatekeeperScreen() {
     setFirstName("");
     setLastName("");
     setCompany("");
-    setPhone("");
-    setEmail("");
     setVehiclePlate("");
     setPurpose("");
     setDuration("60");
@@ -114,8 +110,6 @@ export default function GatekeeperScreen() {
         firstName,
         lastName,
         company,
-        phone,
-        email,
         vehiclePlate,
         purpose,
         durationStr: duration,
@@ -211,14 +205,36 @@ export default function GatekeeperScreen() {
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.vehiclePlate")}</Text>
             <TextInput value={vehiclePlate} onChangeText={setVehiclePlate} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
             <View style={styles.twoCol}>
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.phone")}</Text>
-                <TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
-              </View>
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.email")}</Text>
-                <TextInput value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
-              </View>
+              <TouchableOpacity
+                testID="gate-capture-tag-photo"
+                onPress={() => onCaptureEvidence("plate")}
+                disabled={busy}
+                style={[styles.photoButton, { borderColor: colors.border, opacity: busy ? 0.6 : 1 }]}
+              >
+                <Feather
+                  name={platePhotoUrl ? "check-circle" : "camera"}
+                  size={16}
+                  color={platePhotoUrl ? colors.primary : colors.mutedForeground}
+                />
+                <Text style={[styles.photoLabel, { color: colors.foreground }]}>
+                  {t("gatekeeper.tagPhoto")}{platePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="gate-capture-vehicle-photo"
+                onPress={() => onCaptureEvidence("vehicle")}
+                disabled={busy}
+                style={[styles.photoButton, { borderColor: colors.border, opacity: busy ? 0.6 : 1 }]}
+              >
+                <Feather
+                  name={vehiclePhotoUrl ? "check-circle" : "truck"}
+                  size={16}
+                  color={vehiclePhotoUrl ? colors.primary : colors.mutedForeground}
+                />
+                <Text style={[styles.photoLabel, { color: colors.foreground }]}>
+                  {t("gatekeeper.vehiclePhoto")}{vehiclePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.siteCodeLabel")}</Text>
@@ -250,10 +266,6 @@ export default function GatekeeperScreen() {
                 duration={duration}
                 onDurationChange={setDuration}
                 busy={busy}
-                platePhotoAttached={!!platePhotoUrl}
-                vehiclePhotoAttached={!!vehiclePhotoUrl}
-                onCapturePlatePhoto={() => onCaptureEvidence("plate")}
-                onCaptureVehiclePhoto={() => onCaptureEvidence("vehicle")}
                 onSubmit={onCheckIn}
                 onChangeSite={() => {
                   setConfirmedCode(null);
@@ -266,10 +278,6 @@ export default function GatekeeperScreen() {
                   purpose: t("visitor.purpose"),
                   purposePlaceholder: t("visitor.purposePlaceholder"),
                   expectedMinutes: t("visitor.expectedMinutes"),
-                  vehicleEvidence: t("visitor.vehicleEvidence"),
-                  capturePlatePhoto: t("visitor.capturePlatePhoto"),
-                  captureVehiclePhoto: t("visitor.captureVehiclePhoto"),
-                  attached: t("visitor.photoAttached"),
                   checkIn: t("visitor.checkIn"),
                   geofenceNote: t("visitor.geofenceNote"),
                 }}
@@ -291,6 +299,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
   twoCol: { flexDirection: "row", gap: 10 },
   field: { flex: 1, minWidth: 0 },
+  photoButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 12 },
+  photoLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
   label: { fontFamily: "Inter_500Medium", fontSize: 13, marginBottom: 6, marginTop: 6 },
   input: { borderRadius: 10, borderWidth: 1, fontFamily: "Inter_400Regular", fontSize: 15, paddingHorizontal: 12, paddingVertical: 10 },
   lookupRow: { alignItems: "center", flexDirection: "row", gap: 8 },
