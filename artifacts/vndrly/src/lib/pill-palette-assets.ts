@@ -32,6 +32,7 @@ import pillDarkGrey from "@assets/pills/pill_dark_grey.png";
 import pillVndrly from "@assets/pills/pill_vndrly.png";
 import pillBaker from "@assets/pills/pill_baker.png";
 import pillWinchester from "@assets/pills/pill_winchester.png";
+import pillFlywheel from "@assets/pills/pill_flywheel_blue.png";
 import pillGlossOverlay from "@assets/pills/pill_gloss_overlay.png";
 import pillLifecycleApproval1 from "@assets/pills/pill_lifecycle_approval1.png";
 import pillLifecycleApproval2 from "@assets/pills/pill_lifecycle_approval2.png";
@@ -73,6 +74,7 @@ export {
   pillVndrly,
   pillBaker,
   pillWinchester,
+  pillFlywheel,
   pillGlossOverlay,
   pillLifecycleApproval1,
   pillLifecycleApproval2,
@@ -103,4 +105,5 @@ export const PILL_BRAND = {
   vndrly: pillVndrly,
   baker: pillBaker,
   winchester: pillWinchester,
+  flywheel: pillFlywheel,
 } as const;

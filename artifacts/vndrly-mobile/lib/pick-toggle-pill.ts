@@ -7,6 +7,8 @@ import vndrlyPill from "@/assets/pills/pill_vndrly.png";
 import whitePill from "@/assets/pills/pill_white.png";
 import winchesterPill from "@/assets/pills/pill_winchester.png";
 
+const flywheelPill = require("../../../attached_assets/pills/pill_flywheel_blue.png");
+
 type PaletteEntry = { hex: string; src: number };
 
 const TOGGLE_PILL_PALETTE: PaletteEntry[] = [
@@ -71,6 +73,7 @@ export function pickTogglePillSrc(
 ): number {
   const name = brandName?.toLowerCase() ?? "";
   if (name.includes("winchester")) return winchesterPill;
+  if (name.includes("flywheel")) return flywheelPill;
   if (name.includes("baker")) return bakerPill;
   if (name.includes("vndrly")) return vndrlyPill;
   if (!brandColor) return vndrlyPill;

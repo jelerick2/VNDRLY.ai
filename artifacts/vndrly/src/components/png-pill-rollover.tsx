@@ -108,6 +108,7 @@ export function brandImagePillSrc(
   const name = brandName?.toLowerCase() ?? "";
   if (name.includes("baker")) return PILL_BRAND.baker;
   if (name.includes("winchester")) return PILL_BRAND.winchester;
+  if (name.includes("flywheel")) return PILL_BRAND.flywheel;
   if (name.includes("vndrly")) return PILL_BRAND.vndrly;
   return brandHuePillSrc(brandColor);
 }
@@ -140,6 +141,7 @@ function hoverSrcForColor(
   const name = brandName?.toLowerCase() ?? "";
   if (name.includes("baker")) return PILL_BRAND.baker;
   if (name.includes("winchester")) return PILL_BRAND.winchester;
+  if (name.includes("flywheel")) return PILL_BRAND.flywheel;
   if (name.includes("vndrly")) return PILL_BRAND.vndrly;
   return PILL_ACTION.blue;
 }
