@@ -2,6 +2,15 @@ import fsp from "node:fs/promises";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import ws from "ws";
+
+const DEFAULT_STORAGE_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+function configuredStorageMaxUploadBytes(): number {
+  const configured = Number(process.env.SUPABASE_STORAGE_MAX_UPLOAD_BYTES);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_STORAGE_MAX_UPLOAD_BYTES;
+}
 import type { ObjectAclPolicy } from "./objectAcl";
 import {
   localGetObject,
@@ -162,12 +171,26 @@ class SupabaseObjectStore implements ObjectStore {
   private async ensureBucket(): Promise<void> {
     if (!this.bucketReady) {
       this.bucketReady = (async () => {
-        const { data } = await this.client.storage.getBucket(this.bucket);
+        const { data, error: getError } = await this.client.storage.getBucket(
+          this.bucket,
+        );
         if (!data) {
           // Private bucket: reads always flow through our ACL-checked route.
-          await this.client.storage.createBucket(this.bucket, {
-            public: false,
-          });
+          const { error: createError } = await this.client.storage.createBucket(
+            this.bucket,
+            {
+              public: false,
+              fileSizeLimit: configuredStorageMaxUploadBytes(),
+            },
+          );
+          if (createError) throw createError;
+          return;
+        }
+        if (getError) throw getError;
+        if (data.public) {
+          throw new Error(
+            `Supabase Storage bucket ${this.bucket} must remain private`,
+          );
         }
       })().catch((err) => {
         // Reset so a transient failure can be retried on the next call.
@@ -442,7 +465,9 @@ export function getObjectStore(): ObjectStore {
   if (store) return store;
   const url = process.env.SUPABASE_URL;
   const serviceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY;
   const bucket = process.env.SUPABASE_STORAGE_BUCKET || "vndrly-objects";
 
   if (url && serviceKey) {

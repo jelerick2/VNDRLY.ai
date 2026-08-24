@@ -35,6 +35,7 @@
     "ios:sim:install": "powershell -ExecutionPolicy Bypass -File scripts/ios-simulator-install.ps1",
     "setup:vps": "node lib/e2e/scripts/godaddy-setup-vps.mjs",
     "setup:production": "node scripts/godaddy-provision.mjs",
+    "setup:supabase-storage": "node scripts/provision-supabase-storage.mjs",
     "deploy:production": "node scripts/godaddy-deploy.mjs",
     "preflight:deploy": "node scripts/preflight-deploy.mjs",
     "smoke:communications": "node scripts/smoke-communications.mjs",

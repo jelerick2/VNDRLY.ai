@@ -85,6 +85,6 @@ VNDRLY-machine-transfer-YYYYMMDD-HHMM/
 | Missing `DATABASE_URL` | Copy `.env.local` from old machine or rebuild from `.env.example` |
 | Deploy says missing VPS IP | Add `vps_ip` to `API Keys and Secrets\GoDaddy.env` |
 | Deploy says missing SSH | Add `ssh_pass` to `API Keys and Secrets\GoDaddy.env` |
-| Uploads fail in production | Add `SUPABASE_SERVICE_ROLE_KEY` to `.env.local` |
+| Uploads fail in production | Add `SUPABASE_SECRET_KEY` (preferred) or `SUPABASE_SERVICE_ROLE_KEY` to the private `Supabase.env` |
 
 See also: [deploy-godaddy.md](./deploy-godaddy.md), [database.md](./database.md), [production-handoff.md](./production-handoff.md).

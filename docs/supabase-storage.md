@@ -3,16 +3,28 @@
 VNDRLY uses Supabase Storage only from the API server. Browser and mobile
 clients upload through short-lived, HMAC-signed `/api/storage/upload/...` URLs;
 they never receive Supabase credentials or connect directly to the bucket.
-The service-role key must never be placed in a `VITE_*` or `EXPO_PUBLIC_*`
+The server key must never be placed in a `VITE_*` or `EXPO_PUBLIC_*`
 variable.
 
 ## Setup
 
-Set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
-`SUPABASE_STORAGE_BUCKET=vndrly-objects` in each machine's `.env.local` and in
-the deployment secret store. `SUPABASE_STORAGE_MAX_UPLOAD_BYTES` is optional
+Set `SUPABASE_URL` and a server-only key in the machine-local `Supabase.env`:
+use `SUPABASE_SECRET_KEY` for a current `sb_secret_...` key (preferred), or
+`SUPABASE_SERVICE_ROLE_KEY` for the supported legacy JWT key. Set
+`SUPABASE_STORAGE_BUCKET=vndrly-objects` when overriding the default bucket.
+The same canonical variables are passed to production by the deploy script;
+no secret belongs in GitHub. `SUPABASE_STORAGE_MAX_UPLOAD_BYTES` is optional
 and defaults to 25 MiB. The API creates the named bucket as private if it does
 not exist; no browser-facing Storage policies are required.
+
+Provision and verify the private bucket explicitly before deployment:
+
+```powershell
+pnpm setup:supabase-storage
+```
+
+The command is idempotent, refuses a public bucket, applies the configured
+upload-size ceiling when creating it, and never prints the server credential.
 
 Files live in one private bucket. ACL metadata is stored beside each file as an
 `.acl.json` sidecar, and every read passes through VNDRLY's authorization-aware

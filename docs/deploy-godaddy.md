@@ -34,6 +34,11 @@ api_secret ...
 
 `C:\Users\john\OneDrive\Documents\DEV\API Keys and Secrets\Supabase.env` — already used for `DATABASE_URL` password.
 
+Use standard environment entries in that private file: `SUPABASE_URL` plus
+`SUPABASE_SECRET_KEY` (preferred) or the legacy
+`SUPABASE_SERVICE_ROLE_KEY`. The deployment reads these directly and keeps
+them server-only.
+
 For OpenAI-powered server features such as gate plate OCR, store
 `OPENAI_API_KEY` in `OpenAI API Key v2.env` inside the local
 `API Keys and Secrets` folder. VNDRLY also checks

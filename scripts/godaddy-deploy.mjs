@@ -14,7 +14,6 @@ import {
   supabaseEnvPath,
   twilioEnvPath,
 } from "./secrets-path.mjs";
-import { readSupabaseSecrets } from "./supabase-secrets.mjs";
 const LOCAL_CFG = path.join(ROOT, ".local", "godaddy-vps.json");
 const BOOTSTRAP = path.join(ROOT, "scripts/server/bootstrap-vps.sh");
 const NGINX_SITE = path.join(ROOT, "scripts/server/vndrly.ai.nginx.conf");
@@ -227,17 +226,21 @@ async function main() {
     envValue(sendGridEnv, "SENDGRID_DOMAIN_AUTHENTICATED") ??
     "";
 
+  const supabaseEnv = parseEnvFile(supabaseEnvPath());
   const supabaseUrl =
     localEnv.match(/^SUPABASE_URL=(.+)$/m)?.[1]?.trim() ||
-    readSupabaseSecrets(supabaseEnvPath()).url ||
+    envValue(supabaseEnv, "SUPABASE_URL") ||
     "https://bihjmgbdzbhcnsuhzzwo.supabase.co";
-  const supabaseSecrets = readSupabaseSecrets(supabaseEnvPath());
-  const supabaseServiceKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+  const supabaseSecretKey =
     process.env.SUPABASE_SECRET_KEY?.trim() ||
+    localEnv.match(/^SUPABASE_SECRET_KEY=(.+)$/m)?.[1]?.trim() ||
+    envValue(supabaseEnv, "SUPABASE_SECRET_KEY") ||
+    "";
+  const supabaseServiceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
     localEnv.match(/^SUPABASE_SERVICE_ROLE_KEY=(.+)$/m)?.[1]?.trim() ||
     localEnv.match(/^SUPABASE_SERVICE_KEY=(.+)$/m)?.[1]?.trim() ||
-    supabaseSecrets.serviceRoleKey ||
+    envValue(supabaseEnv, "SUPABASE_SERVICE_ROLE_KEY") ||
     "";
   const storageBucket =
     localEnv.match(/^SUPABASE_STORAGE_BUCKET=(.+)$/m)?.[1]?.trim() ||
@@ -251,7 +254,10 @@ async function main() {
     `DATABASE_URL=${dbUrl}`,
     `SESSION_SECRET=${sessionSecret}`,
     `SUPABASE_URL=${supabaseUrl}`,
-    supabaseServiceKey ? `SUPABASE_SERVICE_ROLE_KEY=${supabaseServiceKey}` : "",
+    supabaseSecretKey ? `SUPABASE_SECRET_KEY=${supabaseSecretKey}` : "",
+    supabaseServiceRoleKey
+      ? `SUPABASE_SERVICE_ROLE_KEY=${supabaseServiceRoleKey}`
+      : "",
     `SUPABASE_STORAGE_BUCKET=${storageBucket}`,
     "AI_INTEGRATIONS_ANTHROPIC_BASE_URL=https://api.anthropic.com",
     anthropicKey ? `AI_INTEGRATIONS_ANTHROPIC_API_KEY=${anthropicKey}` : "",

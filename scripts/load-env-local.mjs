@@ -12,7 +12,6 @@ import {
   supabaseEnvPath,
   twilioEnvPath,
 } from "./secrets-path.mjs";
-import { readSupabaseSecrets } from "./supabase-secrets.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const envPath = resolve(repoRoot, ".env.local");
@@ -54,9 +53,13 @@ function envFileValue(env, key) {
 const openAiEnv = parseEnvFile(openAiEnvPath());
 setEnv("OPENAI_API_KEY", envFileValue(openAiEnv, "OPENAI_API_KEY"));
 
-const supabaseSecrets = readSupabaseSecrets(supabaseEnvPath());
-setEnv("SUPABASE_URL", supabaseSecrets.url);
-setEnv("SUPABASE_SERVICE_ROLE_KEY", supabaseSecrets.serviceRoleKey);
+const supabaseEnv = parseEnvFile(supabaseEnvPath());
+setEnv("SUPABASE_URL", envFileValue(supabaseEnv, "SUPABASE_URL"));
+setEnv("SUPABASE_SECRET_KEY", envFileValue(supabaseEnv, "SUPABASE_SECRET_KEY"));
+setEnv(
+  "SUPABASE_SERVICE_ROLE_KEY",
+  envFileValue(supabaseEnv, "SUPABASE_SERVICE_ROLE_KEY"),
+);
 
 const mapboxEnv = parseEnvFile(mapboxEnvPath());
 const mapboxAccessToken =
