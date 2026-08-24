@@ -9,6 +9,7 @@ import askVOrange from "@assets/askv/AskV_VNDRLY_Orange_v1.png";
 import askVPurple from "@assets/askv/AskV_VNDRLY_Purple_v1.png";
 import askVRed from "@assets/askv/AskV_VNDRLY_Red_v3.png";
 import askVWinchester from "@assets/askv/AskV_VNDRLY_Winchester_v2.png";
+import askVFlywheel from "@assets/askv/AskV_VNDRLY_flywheel_Blue_v1.png";
 
 import { isBakerBrand, isWinchesterBrand } from "@/lib/portal-branding";
 
@@ -31,6 +32,10 @@ export const ASKV_IDLE_SRC = askVGrey;
 
 function isVndrlyBrand(brandName?: string | null): boolean {
   return brandName?.toLowerCase().includes("vndrly") ?? false;
+}
+
+function isFlywheelBrand(brandName?: string | null): boolean {
+  return brandName?.toLowerCase().includes("flywheel") ?? false;
 }
 
 function hexToRgb(hex: string): [number, number, number] | null {
@@ -90,6 +95,7 @@ export function pickAskVLogo(
 ): string {
   if (isBakerBrand(brandName)) return askVBaker;
   if (isWinchesterBrand(brandName)) return askVWinchester;
+  if (isFlywheelBrand(brandName)) return askVFlywheel;
   if (isVndrlyBrand(brandName)) return askVAmber;
   if (!brandColor) return ASKV_DEFAULT_SRC;
   const rgb = hexToRgb(brandColor);
