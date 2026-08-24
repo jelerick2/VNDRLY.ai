@@ -19,8 +19,10 @@ describe("extractPlateCandidate", () => {
     ).toBe("OK4412");
   });
 
-  it("ignores punctuation and requires a mixed letter-number tag", () => {
+  it("accepts mixed and personalized single-class plates while rejecting years", () => {
     expect(extractPlateCandidate("plate: abc-1234")).toBe("ABC-1234");
+    expect(extractPlateCandidate('{"plate":"COWBOY"}')).toBe("COWBOY");
+    expect(extractPlateCandidate('{"plate":"77777"}')).toBe("77777");
     expect(extractPlateCandidate("2026")).toBeNull();
   });
 });

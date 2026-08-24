@@ -1,5 +1,5 @@
-export const LEGAL_EFFECTIVE_DATE = "August 20, 2026";
-export const LEGAL_POLICY_VERSION = "2026-08-20";
+export const LEGAL_EFFECTIVE_DATE = "August 24, 2026";
+export const LEGAL_POLICY_VERSION = "2026-08-24";
 export const LEGAL_CONTACT_EMAIL = "legal@vndrly.ai";
 export const LEGAL_SUPPORT_EMAIL = "support@vndrly.ai";
 export const LEGAL_SITE_ORIGIN = "https://vndrly.ai";
@@ -49,6 +49,14 @@ export const PRIVACY_POLICY_SECTIONS: LegalSection[] = [
       "VNDRLY may collect precise location data from authorized field users when location sharing is enabled, when a user is en route to a ticket, on location, on site, clocked in, or otherwise using a location-enabled workflow.",
       "Location data is used to support route estimates, crew maps, site geofences, ticket mileage, ETA, timekeeping context, compliance review, dispute resolution, and safety-adjacent operational visibility. Off-shift employees should not appear on live crew maps unless a configured workflow and consent allow it.",
       "Users can control device-level location permissions through their iOS or browser settings. Turning off location may prevent certain VNDRLY field workflows from working correctly.",
+    ],
+  },
+  {
+    title: "Gate and Vehicle Evidence",
+    body: [
+      "Authorized gate personnel may record visitor names, companies, license-plate values, check-in and check-out times, site location, and separate photographs of a vehicle tag and vehicle for site-security and operational records.",
+      "When plate-reading assistance is used, VNDRLY sends the selected plate photograph to an artificial-intelligence service provider solely to extract the visible plate characters. Operators can type or correct the plate manually when automated reading is unavailable or inaccurate.",
+      "Gate photographs are stored in private application storage and are available only to authorized users associated with the relevant site or host organization. Retention follows the customer and legal requirements applicable to the visitor log.",
     ],
   },
   {

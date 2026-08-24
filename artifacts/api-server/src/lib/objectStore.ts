@@ -5,6 +5,9 @@ import ws from "ws";
 import type { ObjectAclPolicy } from "./objectAcl";
 import {
   localGetObject,
+  localGetObjectAcl,
+  localDeleteObject,
+  localListUploadsOlderThan,
   localPutObject,
   localSetAclPolicy,
   localWriteUpload,
@@ -50,6 +53,9 @@ export interface ObjectStore {
   setAcl(objectPath: string, acl: ObjectAclPolicy): Promise<string>;
   /** Fetch an object by `/objects/...` path, or null if absent. */
   getObject(objectPath: string): Promise<StoredObject | null>;
+  getObjectAcl(objectPath: string): Promise<ObjectAclPolicy | null>;
+  deleteObject(objectPath: string): Promise<void>;
+  listUploadsOlderThan(cutoff: Date): Promise<string[]>;
   /** Fetch a public branding asset (no auth). Key is relative to `public/`. */
   getPublicObject(relativePath: string): Promise<StoredObject | null>;
   /** Write a public branding asset; returns the API path clients store in DB. */
@@ -274,6 +280,43 @@ class SupabaseObjectStore implements ObjectStore {
     };
   }
 
+  async getObjectAcl(objectPath: string): Promise<ObjectAclPolicy | null> {
+    await this.ensureBucket();
+    const key = objectPathToKey(objectPath);
+    if (!key) return null;
+    const { data } = await this.client.storage.from(this.bucket).download(`${key}.acl.json`);
+    if (!data) return null;
+    try { return JSON.parse(await data.text()) as ObjectAclPolicy; }
+    catch { return null; }
+  }
+
+  async deleteObject(objectPath: string): Promise<void> {
+    await this.ensureBucket();
+    const key = objectPathToKey(objectPath);
+    if (!key) throw new Error("Invalid object path");
+    const { error } = await this.client.storage.from(this.bucket).remove([key, `${key}.acl.json`]);
+    if (error) throw error;
+  }
+
+  async listUploadsOlderThan(cutoff: Date): Promise<string[]> {
+    await this.ensureBucket();
+    const paths: string[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await this.client.storage.from(this.bucket).list("uploads", {
+        limit: 1000,
+        offset,
+        sortBy: { column: "created_at", order: "asc" },
+      });
+      if (error) throw error;
+      for (const item of data ?? []) {
+        if (item.name.endsWith(".acl.json")) continue;
+        const createdAt = item.created_at ? new Date(item.created_at) : null;
+        if (createdAt && createdAt < cutoff) paths.push(`/objects/uploads/${item.name}`);
+      }
+      if (!data || data.length < 1000) return paths;
+    }
+  }
+
   async getPublicObject(relativePath: string): Promise<StoredObject | null> {
     await this.ensureBucket();
     const key = publicKey(relativePath);
@@ -358,6 +401,18 @@ class FilesystemObjectStore implements ObjectStore {
       acl: obj.acl,
       body,
     };
+  }
+
+  async getObjectAcl(objectPath: string): Promise<ObjectAclPolicy | null> {
+    return localGetObjectAcl(objectPath);
+  }
+
+  async deleteObject(objectPath: string): Promise<void> {
+    await localDeleteObject(objectPath);
+  }
+
+  async listUploadsOlderThan(cutoff: Date): Promise<string[]> {
+    return localListUploadsOlderThan(cutoff);
   }
 
   async getPublicObject(relativePath: string): Promise<StoredObject | null> {

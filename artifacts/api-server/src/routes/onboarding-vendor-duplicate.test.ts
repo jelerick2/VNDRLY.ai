@@ -139,6 +139,11 @@ describe.runIf(haveRealDb)(
       expectStatus(res, 201);
       expect(res.body.orgType).toBe("vendor");
       expect(typeof res.body.orgId).toBe("number");
+      expect(res.body.progress).toMatchObject({
+        vendorId: res.body.orgId,
+        currentStep: "platform-eula",
+        completedSteps: ["company-basics"],
+      });
       createdVendorIds.push(res.body.orgId);
     });
   },

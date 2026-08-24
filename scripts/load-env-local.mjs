@@ -5,7 +5,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mapboxEnvPath, sendGridEnvPath, twilioEnvPath } from "./secrets-path.mjs";
+import {
+  mapboxEnvPath,
+  openAiEnvPath,
+  sendGridEnvPath,
+  supabaseEnvPath,
+  twilioEnvPath,
+} from "./secrets-path.mjs";
+import { readSupabaseSecrets } from "./supabase-secrets.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const envPath = resolve(repoRoot, ".env.local");
@@ -36,6 +43,20 @@ function setEnv(key, value) {
 for (const [key, value] of Object.entries(parseEnvFile(envPath))) {
   setEnv(key, value);
 }
+
+function envFileValue(env, key) {
+  const matchingKey = Object.keys(env).find(
+    (candidate) => candidate.toLowerCase() === key.toLowerCase(),
+  );
+  return matchingKey ? env[matchingKey] : "";
+}
+
+const openAiEnv = parseEnvFile(openAiEnvPath());
+setEnv("OPENAI_API_KEY", envFileValue(openAiEnv, "OPENAI_API_KEY"));
+
+const supabaseSecrets = readSupabaseSecrets(supabaseEnvPath());
+setEnv("SUPABASE_URL", supabaseSecrets.url);
+setEnv("SUPABASE_SERVICE_ROLE_KEY", supabaseSecrets.serviceRoleKey);
 
 const mapboxEnv = parseEnvFile(mapboxEnvPath());
 const mapboxAccessToken =

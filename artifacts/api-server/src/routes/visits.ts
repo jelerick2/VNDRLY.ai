@@ -30,6 +30,8 @@ import {
 
 import { SESSION_SECRET } from "../lib/session";
 import { enforceVisitsRateLimit } from "../lib/visits-rate-limit";
+import { enforceGateOcrRateLimit } from "../lib/gate-ocr-rate-limit";
+import { ObjectStorageService } from "../lib/objectStorage";
 import { isGeofenceBypassActive } from "../lib/geo";
 import {
   AUTH_GUEST_REQUIRED,
@@ -53,6 +55,23 @@ import {
 const COOKIE_NAME = "vndrly_session";
 const GUEST_COOKIE_NAME = "vndrly_guest";
 const GUEST_SESSION_HOURS = 24;
+const MAX_GATE_EVIDENCE_BYTES = 8 * 1024 * 1024;
+const evidenceStorage = new ObjectStorageService();
+
+async function validateGateEvidencePath(raw: unknown, userId: number): Promise<string | null> {
+  if (raw == null || raw === "") return null;
+  const path = String(raw).trim();
+  if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(path)) {
+    throw new Error("Gate evidence has an invalid storage path.");
+  }
+  const object = await evidenceStorage.getStoredObject(path);
+  const contentType = object.contentType.toLowerCase().split(";")[0].trim();
+  const allowedTypes = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif"]);
+  if (object.acl?.owner !== String(userId) || !allowedTypes.has(contentType) || object.size > MAX_GATE_EVIDENCE_BYTES) {
+    throw new Error("Gate evidence is unavailable or is not owned by this session.");
+  }
+  return path;
+}
 
 const COOKIE_OPTIONS_GUEST = {
   httpOnly: true,
@@ -413,11 +432,21 @@ router.get("/visits/gate/assigned-sites", async (req, res): Promise<void> => {
 router.post("/visits/gate/read-plate", async (req, res): Promise<void> => {
   const session = await requireGatekeeperSession(req, res);
   if (!session) return;
-  const b = (req.body ?? {}) as { imageBase64?: string; mimeType?: string };
-  const imageBase64 = typeof b.imageBase64 === "string" ? b.imageBase64.trim() : "";
-  const mimeType = typeof b.mimeType === "string" && b.mimeType.trim() ? b.mimeType.trim() : "image/jpeg";
-  if (!imageBase64) {
+  if (!await enforceGateOcrRateLimit(req, res, session)) return;
+  const b = (req.body ?? {}) as { objectPath?: string };
+  if (!b.objectPath) {
     res.status(400).json({ message: "Plate photo is required", code: VISIT_INVALID_INPUT });
+    return;
+  }
+  let imageBase64: string;
+  let mimeType: string;
+  try {
+    const path = await validateGateEvidencePath(b.objectPath, session.userId!);
+    const object = await evidenceStorage.getStoredObject(path!);
+    imageBase64 = object.body.toString("base64");
+    mimeType = object.contentType;
+  } catch (reason) {
+    res.status(400).json({ message: reason instanceof Error ? reason.message : "Plate photo could not be read", code: VISIT_INVALID_INPUT });
     return;
   }
   try {
@@ -499,10 +528,6 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
       res.status(400).json({ message: "hostVendorId is required", code: VISIT_HOST_VENDOR_REQUIRED });
       return;
     }
-    if (b.hostVendorId !== session.vendorId) {
-      res.status(403).json({ message: "Gatekeepers can only check in visitors for their vendor", code: VISIT_NO_ACCESS });
-      return;
-    }
     const [assign] = await db
       .select({ id: siteWorkAssignmentsTable.id })
       .from(siteWorkAssignmentsTable)
@@ -536,12 +561,17 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
     ? Math.min(b.expectedDurationMinutes, 24 * 60)
     : null;
   const expiresAt = expectedDuration ? new Date(Date.now() + expectedDuration * 60 * 1000) : null;
-  const platePhotoUrl = typeof b.platePhotoUrl === "string" && b.platePhotoUrl.trim()
-    ? b.platePhotoUrl.trim()
-    : null;
-  const vehiclePhotoUrl = typeof b.vehiclePhotoUrl === "string" && b.vehiclePhotoUrl.trim()
-    ? b.vehiclePhotoUrl.trim()
-    : null;
+  let platePhotoUrl: string | null;
+  let vehiclePhotoUrl: string | null;
+  try {
+    [platePhotoUrl, vehiclePhotoUrl] = await Promise.all([
+      validateGateEvidencePath(b.platePhotoUrl, session.userId!),
+      validateGateEvidencePath(b.vehiclePhotoUrl, session.userId!),
+    ]);
+  } catch (reason) {
+    res.status(400).json({ message: reason instanceof Error ? reason.message : "Gate evidence is invalid", code: VISIT_INVALID_INPUT });
+    return;
+  }
 
   const [visit] = await db
     .insert(siteVisitsTable)
@@ -938,12 +968,16 @@ router.get("/visits/events", async (req, res): Promise<void> => {
   if (!await enforceVisitsRateLimit(req, res, session)) return;
 
   let assignedSiteIds: Set<number> | null = null;
-  if (isGatekeeperSession(session) && session.vendorId) {
+  const refreshAssignedSites = async (): Promise<void> => {
+    if (!isGatekeeperSession(session) || !session.vendorId) return;
     const assignments = await db
       .select({ siteLocationId: siteWorkAssignmentsTable.siteLocationId })
       .from(siteWorkAssignmentsTable)
       .where(eq(siteWorkAssignmentsTable.vendorId, session.vendorId));
     assignedSiteIds = new Set(assignments.map((row) => row.siteLocationId));
+  };
+  if (isGatekeeperSession(session) && session.vendorId) {
+    await refreshAssignedSites();
   }
 
   const visible = (ev: PublishedVisitEvent): boolean =>
@@ -985,6 +1019,7 @@ router.get("/visits/events", async (req, res): Promise<void> => {
     });
 
   const heartbeat = setInterval(() => {
+    void refreshAssignedSites().catch(() => undefined);
     try { res.write(`: ping\n\n`); } catch { /* ignore */ }
   }, 25000);
 
@@ -1059,7 +1094,13 @@ router.get("/visits", async (req, res): Promise<void> => {
   const siteParam = req.query.siteLocationId ? Number(req.query.siteLocationId) : null;
   const fromParam = typeof req.query.from === "string" ? new Date(req.query.from) : null;
   const toParam = typeof req.query.to === "string" ? new Date(req.query.to) : null;
+  const activeOnly = req.query.activeOnly === "true";
+  const requestedLimit = Number(req.query.limit);
+  const requestedOffset = Number(req.query.offset);
+  const limit = Number.isSafeInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 500;
+  const offset = Number.isSafeInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
   const conds: any[] = [];
+  if (activeOnly) conds.push(isNull(siteVisitsTable.checkOutTime));
   if (siteParam && Number.isFinite(siteParam)) {
     conds.push(eq(siteVisitsTable.siteLocationId, siteParam));
   }
@@ -1123,7 +1164,8 @@ router.get("/visits", async (req, res): Promise<void> => {
     .leftJoin(vendorsTable, eq(vendorsTable.id, siteVisitsTable.hostVendorId))
     .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(siteVisitsTable.checkInTime))
-    .limit(500);
+    .limit(limit)
+    .offset(offset);
   res.json(rows);
 });
 
@@ -1182,7 +1224,20 @@ router.get("/visits/:id", async (req, res): Promise<void> => {
     res.status(404).json({ message: "Visit not found", code: VISIT_NOT_FOUND });
     return;
   }
-  if (session.role === "vendor" && v.hostVendorId !== session.vendorId) {
+  if (isGatekeeperSession(session)) {
+    const [assignment] = await db
+      .select({ id: siteWorkAssignmentsTable.id })
+      .from(siteWorkAssignmentsTable)
+      .where(and(
+        eq(siteWorkAssignmentsTable.vendorId, session.vendorId!),
+        eq(siteWorkAssignmentsTable.siteLocationId, v.siteLocationId),
+      ))
+      .limit(1);
+    if (!assignment) {
+      res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
+      return;
+    }
+  } else if (session.role === "vendor" && v.hostVendorId !== session.vendorId) {
     res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
     return;
   }

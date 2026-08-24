@@ -28,10 +28,13 @@ import {
   type GateMemoryField,
   type GateMemorySuggestion,
 } from "@/lib/gate-entry-memory";
-import { readPlateFromPhoto } from "@/lib/gate-plate-ocr";
-import { visitsApi, type SiteContext } from "@/lib/visits-api";
+import { listAllVisits, visitsApi, type SiteContext } from "@/lib/visits-api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function evidenceUrl(path: string): string {
+  return path.startsWith("/objects/") ? `${BASE}/api/storage${path}` : path;
+}
 
 type Coordinates = { latitude: number; longitude: number };
 type Translate = (key: string) => string;
@@ -53,6 +56,7 @@ function currentPosition(required: boolean, t: Translate): Promise<Coordinates |
 
 async function uploadEvidence(file: File, t: Translate): Promise<string> {
   if (!file.type.startsWith("image/")) throw new Error(t("gatekeeper.selectImage"));
+  if (file.size > 8 * 1024 * 1024) throw new Error(t("gatekeeper.photoTooLarge"));
   const request = await fetch(`${BASE}/api/storage/uploads/request-url`, {
     method: "POST",
     credentials: "include",
@@ -68,10 +72,20 @@ async function uploadEvidence(file: File, t: Translate): Promise<string> {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ objectURL: descriptor.uploadURL, visibility: "public" }),
+    body: JSON.stringify({ objectURL: descriptor.uploadURL, visibility: "private", purpose: "gate-evidence" }),
   });
   if (!finalize.ok) throw new Error(t("gatekeeper.photoFinalizeFailed"));
   return descriptor.objectPath;
+}
+
+async function deleteUnattachedEvidence(objectPath: string | null): Promise<void> {
+  if (!objectPath) return;
+  await fetch(`${BASE}/api/storage/uploads`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ objectPath }),
+  }).catch(() => undefined);
 }
 
 export default function GatekeeperPage() {
@@ -100,11 +114,17 @@ export default function GatekeeperPage() {
   const [memoryDeleting, setMemoryDeleting] = useState(false);
   const [plateOcrStatus, setPlateOcrStatus] = useState<"idle" | "reading" | "read" | "unreadable">("idle");
   const [ocrPlate, setOcrPlate] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const visits = useQuery({
     queryKey: ["gatekeeper-visits"],
-    queryFn: () => visitsApi.list(),
+    queryFn: () => visitsApi.list({ activeOnly: true, limit: 1000 }),
     refetchInterval: 30000,
+    retry: false,
+  });
+  const recentVisits = useQuery({
+    queryKey: ["gatekeeper-recent-visits"],
+    queryFn: () => visitsApi.list({ limit: 1000 }),
     retry: false,
   });
   const assigned = useQuery({
@@ -123,7 +143,7 @@ export default function GatekeeperPage() {
     enabled: !!confirmedCode,
     retry: false,
   });
-  const activeVisits = (visits.data ?? []).filter((visit) => !visit.checkOutTime);
+  const activeVisits = visits.data ?? [];
   const live = useGateLiveMonitor({
     enabled: Boolean(user),
     siteLocationId: site.data?.site.id ?? null,
@@ -139,10 +159,10 @@ export default function GatekeeperPage() {
     })),
     queryKey: ["gatekeeper-visits"],
   });
-  const exportRows = useMemo(() => toGateLogRows(visits.data ?? []), [visits.data]);
+  const exportRows = useMemo(() => toGateLogRows(recentVisits.data ?? []), [recentVisits.data]);
   const previousPlateVisit = useMemo(
-    () => latestVisitForPlate(visits.data ?? [], vehiclePlate),
-    [vehiclePlate, visits.data],
+    () => latestVisitForPlate(recentVisits.data ?? [], vehiclePlate),
+    [vehiclePlate, recentVisits.data],
   );
   const entryDraft = useMemo<GateEntryDraft>(() => ({
     firstName,
@@ -154,12 +174,12 @@ export default function GatekeeperPage() {
   }), [company, duration, firstName, lastName, purpose, vehiclePlate]);
   const memory = useMemo(
     () => evaluateGateMemory({
-      visits: visits.data ?? [],
+      visits: recentVisits.data ?? [],
       draft: entryDraft,
       activeField: activeMemoryField,
       isDeleting: memoryDeleting,
     }),
-    [activeMemoryField, entryDraft, memoryDeleting, visits.data],
+    [activeMemoryField, entryDraft, memoryDeleting, recentVisits.data],
   );
 
   const applyEntryDraft = (next: GateEntryDraft) => {
@@ -259,13 +279,14 @@ export default function GatekeeperPage() {
     if (kind === "plate") setPlateOcrStatus("reading");
     try {
       if (kind === "vehicle") {
-        setVehiclePhotoUrl(await uploadEvidence(file, t));
+        const next = await uploadEvidence(file, t);
+        void deleteUnattachedEvidence(vehiclePhotoUrl);
+        setVehiclePhotoUrl(next);
         return;
       }
-      const [objectPath, plate] = await Promise.all([
-        uploadEvidence(file, t),
-        readPlateFromPhoto(file, (input) => visitsApi.readPlate(input)).catch(() => null),
-      ]);
+      const objectPath = await uploadEvidence(file, t);
+      const plate = await visitsApi.readPlate({ objectPath }).then((result) => result.plate).catch(() => null);
+      void deleteUnattachedEvidence(platePhotoUrl);
       setPlatePhotoUrl(objectPath);
       if (plate) {
         setMemoryDeleting(false);
@@ -313,6 +334,7 @@ export default function GatekeeperPage() {
       });
       resetEntry();
       await queryClient.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
+      await queryClient.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("gatekeeper.checkInFailed"));
     } finally {
@@ -326,10 +348,25 @@ export default function GatekeeperPage() {
       const coords = await currentPosition(false, t);
       await visitsApi.gateCheckOut(id, coords?.latitude, coords?.longitude);
       await queryClient.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
+      await queryClient.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t("gatekeeper.checkOutFailed"));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const exportCompleteLog = async (format: "pdf" | "excel" | "word") => {
+    setExporting(true); setError(null);
+    try {
+      const rows = toGateLogRows(await listAllVisits());
+      if (format === "pdf") await exportPdf(rows);
+      else if (format === "excel") exportExcel(rows);
+      else exportWord(rows);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t("gatekeeper.historyLoadFailed"));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -358,7 +395,7 @@ export default function GatekeeperPage() {
           role="status"
         >
           {live.flash.platePhotoUrl ? (
-            <img src={live.flash.platePhotoUrl} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" />
+            <img src={evidenceUrl(live.flash.platePhotoUrl)} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" />
           ) : (
             <Shield className="h-10 w-10 shrink-0" style={iconStyle} />
           )}
@@ -420,9 +457,9 @@ export default function GatekeeperPage() {
                 <span className="text-xs text-muted-foreground">{t("gatekeeper.records", { count: exportRows.length })}</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <BlueButton onClick={() => void exportPdf(exportRows)} disabled={!exportRows.length}><FileText className="mr-1 h-4 w-4" />PDF</BlueButton>
-                <BlueButton onClick={() => exportExcel(exportRows)} disabled={!exportRows.length}><Sheet className="mr-1 h-4 w-4" />Excel</BlueButton>
-                <BlueButton onClick={() => exportWord(exportRows)} disabled={!exportRows.length}><FileText className="mr-1 h-4 w-4" />Word</BlueButton>
+                <BlueButton onClick={() => void exportCompleteLog("pdf")} disabled={!exportRows.length || exporting}><FileText className="mr-1 h-4 w-4" />PDF</BlueButton>
+                <BlueButton onClick={() => void exportCompleteLog("excel")} disabled={!exportRows.length || exporting}><Sheet className="mr-1 h-4 w-4" />Excel</BlueButton>
+                <BlueButton onClick={() => void exportCompleteLog("word")} disabled={!exportRows.length || exporting}><FileText className="mr-1 h-4 w-4" />Word</BlueButton>
               </div>
             </div>
           </CardContent>

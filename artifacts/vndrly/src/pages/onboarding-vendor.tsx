@@ -121,9 +121,7 @@ export default function OnboardingVendor() {
   // duplicate org row in submitBasics → onboardingApi.startVendor.
   const [nameMatches, setNameMatches] = useState<{ name: string; score: number }[]>([]);
   const [nameMatchesLoading, setNameMatchesLoading] = useState(false);
-  // The name the most recent check resolved for; gates submitBasics so
-  // a fast Enter can't slip through before the debounced check fires.
-  const [checkedName, setCheckedName] = useState<string | null>("");
+  const [nameCheckUnavailable, setNameCheckUnavailable] = useState(false);
   const [confirmDifferentVendor, setConfirmDifferentVendor] = useState(false);
   const [taxIds, setTaxIds] = useState({ federalTaxId: "", stateTaxId: "", physicalAddress: "", billingAddress: "" });
   const [selectedWtIds, setSelectedWtIds] = useState<number[]>([]);
@@ -269,19 +267,18 @@ export default function OnboardingVendor() {
       // Clear any stale state once the account exists.
       setNameMatches([]);
       setNameMatchesLoading(false);
-      setCheckedName(basics.name.trim());
+      setNameCheckUnavailable(false);
       setConfirmDifferentVendor(false);
       return;
     }
     const trimmed = basics.name.trim();
     setConfirmDifferentVendor(false);
+    setNameCheckUnavailable(false);
     if (trimmed.length < 3) {
       setNameMatches([]);
       setNameMatchesLoading(false);
-      setCheckedName(trimmed);
       return;
     }
-    setCheckedName(null);
     setNameMatchesLoading(true);
     const controller = new AbortController();
     const handle = setTimeout(async () => {
@@ -293,13 +290,13 @@ export default function OnboardingVendor() {
         if (controller.signal.aborted) return;
         if (!res.ok) {
           setNameMatches([]);
-          setCheckedName(null);
+          setNameCheckUnavailable(true);
           return;
         }
         const data = (await res.json()) as { matches?: { name: string; score: number }[] };
         if (controller.signal.aborted) return;
         setNameMatches(Array.isArray(data.matches) ? data.matches : []);
-        setCheckedName(trimmed);
+        setNameCheckUnavailable(false);
       } catch (err) {
         if (
           controller.signal.aborted ||
@@ -308,7 +305,7 @@ export default function OnboardingVendor() {
           return;
         }
         setNameMatches([]);
-        setCheckedName(null);
+        setNameCheckUnavailable(true);
       } finally {
         if (!controller.signal.aborted) setNameMatchesLoading(false);
       }
@@ -320,10 +317,6 @@ export default function OnboardingVendor() {
   }, [basics.name, orgId]);
 
   const trimmedBasicsName = basics.name.trim();
-  const namePending =
-    !orgId &&
-    trimmedBasicsName.length >= 3 &&
-    (nameMatchesLoading || checkedName !== trimmedBasicsName);
   const namePassesDuplicateCheck =
     orgId !== null || nameMatches.length === 0 || confirmDifferentVendor;
 
@@ -383,13 +376,9 @@ export default function OnboardingVendor() {
       toast({ title: "Passwords do not match.", variant: "destructive" });
       return;
     }
-    // Duplicate-name guard: don't let a fast Enter race past the
-    // debounced /vendors/check-name lookup, and require explicit
-    // confirmation when the lookup matched an existing vendor.
-    if (namePending) {
-      toast({ title: "Checking for similar vendors…" });
-      return;
-    }
+    // The duplicate lookup is advisory and must never deadlock account
+    // creation when it is slow or unavailable. A completed lookup with
+    // a match still requires explicit confirmation.
     if (!namePassesDuplicateCheck) {
       toast({
         title: "Please confirm this is a different vendor before continuing.",
@@ -407,12 +396,11 @@ export default function OnboardingVendor() {
         password: basics.password,
       });
       setOrgId(resp.orgId);
-      setCompleted(["company-basics"]);
-      setStepIndex(1);
-      await onboardingApi.updateProgress("vendor", resp.orgId, {
-        currentStep: "platform-eula",
-        completedSteps: ["company-basics"],
-      });
+      setCompleted(resp.progress.completedSteps);
+      setSkipped(resp.progress.skippedSteps);
+      setPayload(resp.progress.payload as VendorPayload);
+      const nextIndex = STEPS.findIndex((step) => step.key === resp.progress.currentStep);
+      setStepIndex(nextIndex >= 0 ? nextIndex : 1);
       setShowAccountCreated(true);
     } catch (err) {
       toast({ title: (err as Error).message, variant: "destructive" });
@@ -792,6 +780,11 @@ export default function OnboardingVendor() {
                     Checking for similar vendors…
                   </p>
                 )}
+                {!orgId && nameCheckUnavailable && (
+                  <p className="mt-1 text-xs text-amber-700" role="status" data-testid="vendor-onboarding-match-unavailable">
+                    Similar-name checking is temporarily unavailable. You can still create your account.
+                  </p>
+                )}
               </div>
               <div>
                 <Label>Your Name *</Label>
@@ -1119,7 +1112,7 @@ export default function OnboardingVendor() {
               {stepIndex === 0 ? (
                 <OnboardingPillButton
                   onClick={submitBasics}
-                  disabled={loading || namePending || !namePassesDuplicateCheck}
+                  disabled={loading || !namePassesDuplicateCheck}
                   data-testid="button-create-account"
                   className="px-6"
                 >

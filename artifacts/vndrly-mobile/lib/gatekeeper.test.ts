@@ -55,16 +55,16 @@ beforeEach(() => {
 describe("fetchGatekeeperHistory", () => {
   it("lists visits from the last 30 days including checked-out rows", async () => {
     const { fetchGatekeeperHistory } = await import("./gatekeeper");
-    apiFetchMock.mockResolvedValue([
+    apiFetchMock.mockResolvedValueOnce([
       { id: 1, checkOutTime: "2026-08-23T18:00:00.000Z" },
       { id: 2, checkOutTime: null },
-    ]);
+    ]).mockResolvedValueOnce([]);
 
     const from = "2026-07-24T17:00:00.000Z";
     const rows = await fetchGatekeeperHistory(from);
 
     expect(apiFetchMock).toHaveBeenCalledWith(
-      `/api/visits?from=${encodeURIComponent(from)}`,
+      `/api/visits?from=${encodeURIComponent(from)}&limit=1000&offset=0`,
     );
     expect(rows).toHaveLength(2);
   });

@@ -61,9 +61,9 @@ describe("pickPreferredGateDefaultSite", () => {
     assignmentId: 99,
   };
 
-  it("prefers Flywheel Energy Spur when that site is assigned", () => {
+  it("uses the API-selected default rather than a hard-coded customer site", () => {
     expect(pickPreferredGateDefaultSite([older, spur], older)?.siteCode).toBe(
-      FLYWHEEL_SPUR_SITE_CODE,
+      "SITE-OLD",
     );
   });
 
@@ -96,7 +96,7 @@ describe("resolveAssignedGateSites", () => {
     vendors: [{ id: 1054 }],
   };
 
-  it("falls back to Flywheel Spur when the assigned-sites API is missing", async () => {
+  it("does not guess a customer site when the assigned-sites API is missing", async () => {
     const result = await resolveAssignedGateSites({
       vendorId: 1054,
       listAssigned: async () => {
@@ -104,7 +104,6 @@ describe("resolveAssignedGateSites", () => {
       },
       getSiteContext: async () => spurContext,
     });
-    expect(result.defaultSite?.siteCode).toBe(FLYWHEEL_SPUR_SITE_CODE);
-    expect(result.defaultSite?.name).toBe("Flywheel Energy Spur");
+    expect(result).toEqual({ sites: [], defaultSite: null });
   });
 });

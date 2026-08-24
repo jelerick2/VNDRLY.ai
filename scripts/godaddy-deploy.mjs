@@ -5,7 +5,16 @@
 import { Client } from "ssh2";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { ROOT, godaddyEnvPath, mapboxEnvPath, sendGridEnvPath, supabaseEnvPath, twilioEnvPath } from "./secrets-path.mjs";
+import {
+  ROOT,
+  godaddyEnvPath,
+  mapboxEnvPath,
+  openAiEnvPath,
+  sendGridEnvPath,
+  supabaseEnvPath,
+  twilioEnvPath,
+} from "./secrets-path.mjs";
+import { readSupabaseSecrets } from "./supabase-secrets.mjs";
 const LOCAL_CFG = path.join(ROOT, ".local", "godaddy-vps.json");
 const BOOTSTRAP = path.join(ROOT, "scripts/server/bootstrap-vps.sh");
 const NGINX_SITE = path.join(ROOT, "scripts/server/vndrly.ai.nginx.conf");
@@ -142,9 +151,11 @@ async function main() {
   const akMatch = localEnv.match(/^AI_INTEGRATIONS_ANTHROPIC_API_KEY=(.+)$/m);
   if (akMatch) anthropicKey = akMatch[1].trim();
 
-  let openaiKey = "";
+  const openAiEnv = parseEnvFile(openAiEnvPath());
+  let openaiKey = process.env.OPENAI_API_KEY?.trim() ?? "";
   const oaiMatch = localEnv.match(/^OPENAI_API_KEY=(.+)$/m);
-  if (oaiMatch) openaiKey = oaiMatch[1].trim();
+  if (!openaiKey && oaiMatch) openaiKey = oaiMatch[1].trim();
+  if (!openaiKey) openaiKey = envValue(openAiEnv, "OPENAI_API_KEY").trim();
 
   const finnhubKey = localEnv.match(/^FINNHUB_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
   const alphaVantageKey =
@@ -218,12 +229,15 @@ async function main() {
 
   const supabaseUrl =
     localEnv.match(/^SUPABASE_URL=(.+)$/m)?.[1]?.trim() ||
+    readSupabaseSecrets(supabaseEnvPath()).url ||
     "https://bihjmgbdzbhcnsuhzzwo.supabase.co";
+  const supabaseSecrets = readSupabaseSecrets(supabaseEnvPath());
   const supabaseServiceKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
     process.env.SUPABASE_SECRET_KEY?.trim() ||
     localEnv.match(/^SUPABASE_SERVICE_ROLE_KEY=(.+)$/m)?.[1]?.trim() ||
     localEnv.match(/^SUPABASE_SERVICE_KEY=(.+)$/m)?.[1]?.trim() ||
+    supabaseSecrets.serviceRoleKey ||
     "";
   const storageBucket =
     localEnv.match(/^SUPABASE_STORAGE_BUCKET=(.+)$/m)?.[1]?.trim() ||

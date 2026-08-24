@@ -49,26 +49,26 @@ export default function SignupPartner() {
   // system is warned to contact us before creating a duplicate row.
   const [matches, setMatches] = useState<CheckNameMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
-  // The name the most recent check resolved for; gates submit so a fast
-  // Enter can't slip through before the debounced check fires.
-  const [checkedName, setCheckedName] = useState<string | null>(null);
+  const [nameCheckUnavailable, setNameCheckUnavailable] = useState(false);
   const [confirmDifferent, setConfirmDifferent] = useState(false);
 
   const update = (field: string, value: string) => setForm((prev) => ({ ...prev, [field]: value }));
-  const formReady = form.name.length > 0 || form.contactName.length > 0 || form.contactEmail.length > 0;
+  const formReady =
+    form.name.trim().length > 0 &&
+    form.contactName.trim().length > 0 &&
+    form.contactEmail.trim().length > 0;
 
   // Debounced fuzzy lookup; AbortController prevents stale responses
   // from overwriting state for a newer name.
   useEffect(() => {
     const trimmed = form.name.trim();
     setConfirmDifferent(false);
+    setNameCheckUnavailable(false);
     if (trimmed.length < 3) {
       setMatches([]);
       setMatchesLoading(false);
-      setCheckedName(trimmed);
       return;
     }
-    setCheckedName(null);
     setMatchesLoading(true);
     const controller = new AbortController();
     const handle = setTimeout(async () => {
@@ -80,13 +80,13 @@ export default function SignupPartner() {
         if (controller.signal.aborted) return;
         if (!res.ok) {
           setMatches([]);
-          setCheckedName(null);
+          setNameCheckUnavailable(true);
           return;
         }
         const data = (await res.json()) as { matches?: CheckNameMatch[] };
         if (controller.signal.aborted) return;
         setMatches(Array.isArray(data.matches) ? data.matches : []);
-        setCheckedName(trimmed);
+        setNameCheckUnavailable(false);
       } catch (err) {
         if (
           controller.signal.aborted ||
@@ -95,7 +95,7 @@ export default function SignupPartner() {
           return;
         }
         setMatches([]);
-        setCheckedName(null);
+        setNameCheckUnavailable(true);
       } finally {
         if (!controller.signal.aborted) setMatchesLoading(false);
       }
@@ -107,16 +107,10 @@ export default function SignupPartner() {
   }, [form.name]);
 
   const trimmedName = form.name.trim();
-  const checkPending =
-    trimmedName.length >= 3 && (matchesLoading || checkedName !== trimmedName);
   const blockedByDuplicate = matches.length > 0 && !confirmDifferent;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (checkPending) {
-      toast({ title: "Checking for similar partners…" });
-      return;
-    }
     if (blockedByDuplicate) {
       toast({
         title: "Please confirm this is a different partner before continuing.",
@@ -189,7 +183,7 @@ export default function SignupPartner() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label className="text-gray-700">Company Name *</Label>
-                <Input value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="e.g. Exxon Energy" className="h-10" data-testid="signup-input-name" />
+                <Input required value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="e.g. Exxon Energy" className="h-10" data-testid="signup-input-name" />
                 {matches.length > 0 && (
                   <div
                     role="alert"
@@ -226,14 +220,19 @@ export default function SignupPartner() {
                     Checking for similar partners…
                   </p>
                 )}
+                {nameCheckUnavailable && (
+                  <p className="mt-1 text-xs text-amber-700" role="status" data-testid="partner-signup-match-unavailable">
+                    Similar-name checking is temporarily unavailable. You can still create your account.
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-gray-700">Contact Name *</Label>
-                <Input value={form.contactName} onChange={(e) => update("contactName", e.target.value)} placeholder="Full name" className="h-10" data-testid="signup-input-contact-name" />
+                <Input required value={form.contactName} onChange={(e) => update("contactName", e.target.value)} placeholder="Full name" className="h-10" data-testid="signup-input-contact-name" />
               </div>
               <div className="space-y-2">
                 <Label className="text-gray-700">Contact Email *</Label>
-                <Input type="email" value={form.contactEmail} onChange={(e) => update("contactEmail", e.target.value)} placeholder="email@company.com" className="h-10" data-testid="signup-input-contact-email" />
+                <Input required type="email" value={form.contactEmail} onChange={(e) => update("contactEmail", e.target.value)} placeholder="email@company.com" className="h-10" data-testid="signup-input-contact-email" />
               </div>
               <div className="space-y-2">
                 <Label className="text-gray-700">Contact Phone</Label>
@@ -319,7 +318,7 @@ export default function SignupPartner() {
                 {formReady ? (
                   <PngPillButton color="blue"
                     type="submit"
-                    disabled={saving || checkPending || blockedByDuplicate}
+                    disabled={saving || blockedByDuplicate}
                     className="w-full h-11"
                     data-testid="button-submit-signup"
                   >

@@ -34,6 +34,13 @@ api_secret ...
 
 `C:\Users\john\OneDrive\Documents\DEV\API Keys and Secrets\Supabase.env` — already used for `DATABASE_URL` password.
 
+For OpenAI-powered server features such as gate plate OCR, store
+`OPENAI_API_KEY` in `OpenAI API Key v2.env` inside the local
+`API Keys and Secrets` folder. VNDRLY also checks
+`%USERPROFILE%\DEV\API Keys and Secrets` and never exposes this server-only
+value to the web or mobile client. Set `OPENAI_ENV` to an absolute file path
+when a machine uses a different location.
+
 ## One-time VPS discovery
 
 ```powershell

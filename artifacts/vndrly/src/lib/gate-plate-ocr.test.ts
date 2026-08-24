@@ -11,7 +11,9 @@ describe("extractPlateCandidate", () => {
     expect(extractPlateCandidate("OKLAHOMA\nEXP 12/26\nOK 4412\nUSA")).toBe("OK4412");
   });
 
-  it("returns null when no mixed letter-number tag is present", () => {
+  it("accepts personalized plates and rejects non-plate text", () => {
+    expect(extractPlateCandidate('{"plate":"COWBOY"}')).toBe("COWBOY");
+    expect(extractPlateCandidate('{"plate":"77777"}')).toBe("77777");
     expect(extractPlateCandidate("No license plate is visible.")).toBeNull();
     expect(extractPlateCandidate("2026")).toBeNull();
   });

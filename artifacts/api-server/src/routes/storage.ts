@@ -13,10 +13,51 @@ import { ObjectPermission } from "../lib/objectAcl";
 import { getSessionFromRequest } from "../lib/session";
 import { getObjectStore, UPLOAD_ROUTE } from "../lib/objectStore";
 import { absoluteUploadUrl } from "../lib/uploadUrl";
+import { db, siteLocationsTable, siteVisitsTable, siteWorkAssignmentsTable } from "@workspace/db";
+import { and, eq, or } from "drizzle-orm";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
 const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+function hasValidImageSignature(contentType: string, body: Buffer): boolean {
+  const type = contentType.toLowerCase().split(";")[0].trim();
+  if (!type.startsWith("image/")) return true;
+  if (type === "image/jpeg" || type === "image/jpg") return body.length >= 3 && body[0] === 0xff && body[1] === 0xd8 && body[2] === 0xff;
+  if (type === "image/png") return body.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (type === "image/gif") return body.subarray(0, 6).toString("ascii") === "GIF87a" || body.subarray(0, 6).toString("ascii") === "GIF89a";
+  if (type === "image/webp") return body.subarray(0, 4).toString("ascii") === "RIFF" && body.subarray(8, 12).toString("ascii") === "WEBP";
+  if (type === "image/heic" || type === "image/heif") return body.subarray(4, 12).toString("ascii").includes("ftyp");
+  return true;
+}
+
+async function canReadVisitEvidence(session: ReturnType<typeof getSessionFromRequest>, objectPath: string): Promise<boolean> {
+  if (!session?.userId) return false;
+  if (session.role === "admin") return true;
+  const [visit] = await db
+    .select({
+      siteLocationId: siteVisitsTable.siteLocationId,
+      hostVendorId: siteVisitsTable.hostVendorId,
+      sitePartnerId: siteLocationsTable.partnerId,
+    })
+    .from(siteVisitsTable)
+    .leftJoin(siteLocationsTable, eq(siteLocationsTable.id, siteVisitsTable.siteLocationId))
+    .where(or(eq(siteVisitsTable.platePhotoUrl, objectPath), eq(siteVisitsTable.vehiclePhotoUrl, objectPath)))
+    .limit(1);
+  if (!visit) return false;
+  if (session.role === "partner") return session.partnerId === visit.sitePartnerId;
+  if (session.role !== "vendor" || !session.vendorId) return false;
+  if (session.vendorRole !== "gatekeeper") return session.vendorId === visit.hostVendorId;
+  const [assignment] = await db
+    .select({ id: siteWorkAssignmentsTable.id })
+    .from(siteWorkAssignmentsTable)
+    .where(and(
+      eq(siteWorkAssignmentsTable.vendorId, session.vendorId),
+      eq(siteWorkAssignmentsTable.siteLocationId, visit.siteLocationId),
+    ))
+    .limit(1);
+  return Boolean(assignment);
+}
 
 function maxUploadBytes(): number {
   const configured = Number(process.env.SUPABASE_STORAGE_MAX_UPLOAD_BYTES);
@@ -60,6 +101,10 @@ router.put(
       typeof req.headers["content-type"] === "string"
         ? req.headers["content-type"]
         : "application/octet-stream";
+    if (!hasValidImageSignature(contentType, body)) {
+      res.status(415).json({ error: "Uploaded bytes do not match a supported image type" });
+      return;
+    }
     try {
       await getObjectStore().putUpload(uploadId, contentType, body);
       res.status(204).end();
@@ -131,12 +176,50 @@ router.post("/storage/uploads/finalize", async (req: Request, res: Response) => 
       {
         owner: String(session.userId),
         visibility,
+        ...(req.body?.purpose === "gate-evidence" ? { purpose: "gate-evidence" as const } : {}),
       },
     );
     res.json({ objectPath });
   } catch (error) {
     console.error("Error finalizing upload ACL", error);
     res.status(500).json({ error: "Failed to finalize upload" });
+  }
+});
+
+router.delete("/storage/uploads", async (req: Request, res: Response) => {
+  const session = getSessionFromRequest(req);
+  if (!session?.userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const objectPath = String(req.body?.objectPath ?? "").trim();
+  if (!/^\/objects\/uploads\/[0-9a-f-]{36}$/i.test(objectPath)) {
+    res.status(400).json({ error: "Invalid object path" });
+    return;
+  }
+  try {
+    const object = await objectStorageService.getStoredObject(objectPath);
+    if (object.acl?.owner !== String(session.userId)) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    const [reference] = await db
+      .select({ id: siteVisitsTable.id })
+      .from(siteVisitsTable)
+      .where(or(eq(siteVisitsTable.platePhotoUrl, objectPath), eq(siteVisitsTable.vehiclePhotoUrl, objectPath)))
+      .limit(1);
+    if (reference) {
+      res.status(409).json({ error: "Object is attached to a visit" });
+      return;
+    }
+    await objectStorageService.deleteStoredObject(objectPath);
+    res.status(204).end();
+  } catch (error) {
+    if (error instanceof ObjectNotFoundError) {
+      res.status(204).end();
+      return;
+    }
+    res.status(500).json({ error: "Failed to delete upload" });
   }
 });
 
@@ -183,11 +266,12 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     const objectPath = `/objects/${wildcardPath}`;
     const obj = await objectStorageService.getStoredObject(objectPath);
 
-    const canAccess = await objectStorageService.canAccessStoredObject({
+    const aclAccess = await objectStorageService.canAccessStoredObject({
       userId,
       object: obj,
       requestedPermission: ObjectPermission.READ,
     });
+    const canAccess = aclAccess || await canReadVisitEvidence(session, objectPath);
     if (!canAccess) {
       res.status(403).json({ error: "Forbidden" });
       return;

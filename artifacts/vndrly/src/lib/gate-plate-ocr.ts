@@ -20,7 +20,7 @@ function isPlausiblePlate(compact: string): boolean {
   if (compact.startsWith("EXP")) return false;
   if (/^(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\d+$/.test(compact)) return false;
   if (/^\d{4}$/.test(compact) && Number(compact) >= 1990 && Number(compact) <= 2100) return false;
-  return /[A-Z]/.test(compact) && /[0-9]/.test(compact);
+  return /[A-Z0-9]/.test(compact);
 }
 
 function scorePlate(compact: string): number {

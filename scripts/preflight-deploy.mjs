@@ -5,7 +5,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ROOT, godaddyEnvPath } from "./secrets-path.mjs";
+import { ROOT, godaddyEnvPath, supabaseEnvPath } from "./secrets-path.mjs";
+import { readSupabaseSecrets } from "./supabase-secrets.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -32,12 +33,16 @@ function ok(v) {
 
 const localEnv = parseEnvFile(path.join(ROOT, ".env.local"));
 const gd = parseEnvFile(godaddyEnvPath());
+const supabaseSecrets = readSupabaseSecrets(supabaseEnvPath());
 const localVps = existsSync(path.join(ROOT, ".local", "godaddy-vps.json"))
   ? JSON.parse(readFileSync(path.join(ROOT, ".local", "godaddy-vps.json"), "utf8"))
   : {};
 
 const serviceKey =
-  localEnv.supabase_service_role_key || localEnv.supabase_service_key || "";
+  localEnv.supabase_service_role_key ||
+  localEnv.supabase_service_key ||
+  supabaseSecrets.serviceRoleKey ||
+  "";
 const vpsIp = gd.vps_ip || localVps.ip || "";
 const realVps = vpsIp && !/YOUR\.IP|HERE|PLACEHOLDER/i.test(vpsIp);
 const realSsh = Boolean(gd.ssh_pass && !/YOUR_|PASSWORD|HERE|PLACEHOLDER/i.test(gd.ssh_pass));
@@ -45,7 +50,7 @@ const realSsh = Boolean(gd.ssh_pass && !/YOUR_|PASSWORD|HERE|PLACEHOLDER/i.test(
 console.log("=== VNDRLY deploy preflight ===\n");
 console.log("GitHub main:", "(run: git fetch origin && git log -1 --oneline origin/main)");
 console.log("DATABASE_URL:", ok(localEnv.database_url));
-console.log("SUPABASE_URL:", ok(localEnv.supabase_url));
+console.log("SUPABASE_URL:", ok(localEnv.supabase_url || supabaseSecrets.url));
 console.log("SUPABASE_SERVICE_ROLE_KEY:", serviceKey && !/YOUR_/i.test(serviceKey) ? "OK" : "MISSING (uploads use disk on server without this)");
 console.log("SESSION_SECRET:", ok(localEnv.session_secret));
 console.log("VPS IP (GoDaddy.env or .local/godaddy-vps.json):", realVps ? vpsIp : `MISSING (DNS suggests 34.111.179.208 — set vps_ip in API Keys and Secrets/GoDaddy.env)`);

@@ -25,7 +25,7 @@ export type GateSiteContextLike = {
   vendors: { id: number }[];
 };
 
-/** Same current-location default the web gate booth uses. */
+/** Legacy fixture value retained for compatibility tests; runtime defaults come only from assigned-sites. */
 export const FLYWHEEL_SPUR_SITE_CODE = "SITE-B40D77D2";
 
 export function shouldApplyDefaultGateSite(input: {
@@ -48,7 +48,7 @@ export function pickPreferredGateDefaultSite(
   sites: AssignedGateSite[],
   apiDefault: AssignedGateSite | null,
 ): AssignedGateSite | null {
-  return sites.find((site) => site.siteCode === FLYWHEEL_SPUR_SITE_CODE) ?? apiDefault ?? null;
+  return apiDefault && sites.some((site) => site.id === apiDefault.id) ? apiDefault : sites[0] ?? null;
 }
 
 export async function resolveAssignedGateSites(input: {
@@ -57,27 +57,6 @@ export async function resolveAssignedGateSites(input: {
   getSiteContext: (siteCode: string) => Promise<GateSiteContextLike>;
   fallbackSiteCode?: string;
 }): Promise<AssignedGateSitesResponse> {
-  try {
-    return await input.listAssigned();
-  } catch {
-    const code = input.fallbackSiteCode ?? FLYWHEEL_SPUR_SITE_CODE;
-    try {
-      const ctx = await input.getSiteContext(code);
-      if (input.vendorId != null && !ctx.vendors.some((vendor) => vendor.id === input.vendorId)) {
-        return { sites: [], defaultSite: null };
-      }
-      const site: AssignedGateSite = {
-        id: ctx.site.id,
-        name: ctx.site.name,
-        address: ctx.site.address,
-        siteCode: ctx.site.siteCode,
-        latitude: ctx.site.latitude,
-        longitude: ctx.site.longitude,
-        assignmentId: ctx.site.id,
-      };
-      return { sites: [site], defaultSite: site };
-    } catch {
-      return { sites: [], defaultSite: null };
-    }
-  }
+  try { return await input.listAssigned(); }
+  catch { return { sites: [], defaultSite: null }; }
 }

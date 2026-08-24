@@ -95,7 +95,7 @@ describe("resolveAssignedGateSites", () => {
     expect(getSiteContext).not.toHaveBeenCalled();
   });
 
-  it("falls back to Flywheel Spur when the assigned-sites API is missing and the vendor is pinned there", async () => {
+  it("does not guess a customer site when the assigned-sites API is unavailable", async () => {
     const result = await resolveAssignedGateSites({
       vendorId: 1054,
       listAssigned: async () => {
@@ -103,8 +103,7 @@ describe("resolveAssignedGateSites", () => {
       },
       getSiteContext: async () => spurContext,
     });
-    expect(result.defaultSite?.siteCode).toBe(FLYWHEEL_SPUR_SITE_CODE);
-    expect(result.defaultSite?.name).toBe("Flywheel Energy Spur");
+    expect(result).toEqual({ sites: [], defaultSite: null });
   });
 
   it("does not fall back to Flywheel Spur for a vendor that is not assigned there", async () => {

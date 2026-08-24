@@ -75,6 +75,7 @@ import {
 } from "./lib/approval-recompute-worker";
 import { startCommentReplyDigest } from "./lib/comment-reply-digest";
 import { markStuckDeliveryJobsAsFailed } from "./routes/reports";
+import { startGateEvidenceCleanupWorker, stopGateEvidenceCleanupWorker } from "./lib/gate-evidence-cleanup";
 
 const rawPort = process.env["PORT"];
 
@@ -132,6 +133,7 @@ function onListening(): void {
   startInactivityNotifier();
   startRulesEngine();
   startStaleVisitSweeper();
+  startGateEvidenceCleanupWorker();
   startVisitEventBus();
   startLocationEventBus();
   startTicketEventBus();
@@ -199,6 +201,7 @@ function onError(err: NodeJS.ErrnoException): void {
 function shutdown(signal: NodeJS.Signals): void {
   logger.info({ signal }, "Shutting down server");
   stopStaleVisitSweeper();
+  stopGateEvidenceCleanupWorker();
   stopScheduledNotificationWorker();
   stopInvoicePeriodWorker();
   stopInvoiceAgingWorker();

@@ -28,7 +28,7 @@ export async function pickAndUploadImage(): Promise<UploadResult | null> {
   return uploadAsset(result.assets[0]);
 }
 
-export async function captureAndUploadImage(): Promise<UploadResult | null> {
+export async function captureAndUploadImage(options?: { maxBytes?: number; purpose?: "gate-evidence" }): Promise<UploadResult | null> {
   const perm = await ImagePicker.requestCameraPermissionsAsync();
   if (perm.status !== "granted") {
     throw new Error("Camera permission denied");
@@ -38,17 +38,22 @@ export async function captureAndUploadImage(): Promise<UploadResult | null> {
     allowsEditing: false,
   });
   if (result.canceled || !result.assets?.[0]) return null;
-  return uploadAsset(result.assets[0]);
+  return uploadAsset(result.assets[0], options?.maxBytes, options?.purpose);
 }
 
 async function uploadAsset(
   asset: ImagePicker.ImagePickerAsset,
+  maxBytes?: number,
+  purpose?: "gate-evidence",
 ): Promise<UploadResult> {
   const contentType = asset.mimeType || "image/jpeg";
   const name = asset.fileName || `photo-${Date.now()}.jpg`;
 
   const blob = await fetch(asset.uri).then((r) => r.blob());
   const size = blob.size || asset.fileSize || 0;
+  if (maxBytes && size > maxBytes) {
+    throw new Error(`Photo is too large to upload. Use an image smaller than ${Math.floor(maxBytes / (1024 * 1024))} MB.`);
+  }
 
   const presigned = await apiFetch<{ uploadURL: string; objectPath: string }>(
     "/api/storage/uploads/request-url",
@@ -77,7 +82,8 @@ async function uploadAsset(
     method: "POST",
     body: JSON.stringify({
       objectURL: presigned.uploadURL,
-      visibility: "public",
+      visibility: "private",
+      ...(purpose ? { purpose } : {}),
     }),
   });
 

@@ -23,7 +23,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/useColors";
 import { translateApiError } from "@/lib/apiErrors";
 import {
-  FLYWHEEL_SPUR_SITE_CODE,
   pickDefaultGateHostKey,
   pickPreferredGateDefaultSite,
   resolveAssignedGateSites,
@@ -32,8 +31,11 @@ import {
 import { fetchSiteContext, type SiteContext } from "@/lib/guest";
 import {
   fetchAssignedGateSites,
+  deleteGateEvidence,
+  fetchGatekeeperRecentVisits,
   fetchGatekeeperVisits,
   gatekeeperCheckOut,
+  readGatePlate,
   submitGatekeeperVisit,
 } from "@/lib/gatekeeper";
 import { captureAndUploadImage } from "@/lib/photos";
@@ -64,6 +66,11 @@ export default function GatekeeperScreen() {
     refetchInterval: 30000,
     retry: false,
   });
+  const recentVisits = useQuery({
+    queryKey: ["gatekeeper-recent-visits"],
+    queryFn: fetchGatekeeperRecentVisits,
+    retry: false,
+  });
   const assigned = useQuery({
     queryKey: ["gatekeeper-assigned-sites", user?.vendorId],
     queryFn: () =>
@@ -79,7 +86,7 @@ export default function GatekeeperScreen() {
     assignedSites,
     assigned.data?.defaultSite ?? null,
   );
-  const defaultSiteCode = preferredSite?.siteCode ?? FLYWHEEL_SPUR_SITE_CODE;
+  const defaultSiteCode = preferredSite?.siteCode;
   const ctxQuery = useQuery<SiteContext>({
     queryKey: ["gatekeeper-site-context", confirmedCode],
     queryFn: () => fetchSiteContext(confirmedCode!),
@@ -90,6 +97,7 @@ export default function GatekeeperScreen() {
   useEffect(() => {
     if (appliedDefault.current) return;
     if (!shouldApplyDefaultGateSite({ confirmedCode, typedCode: siteCode, defaultSiteCode })) return;
+    if (!defaultSiteCode) return;
     appliedDefault.current = true;
     setSiteCode(defaultSiteCode);
     setConfirmedCode(defaultSiteCode);
@@ -130,16 +138,38 @@ export default function GatekeeperScreen() {
   const onCaptureEvidence = async (kind: "plate" | "vehicle") => {
     setBusy(true);
     try {
-      const result = await captureAndUploadImage();
+      const result = await captureAndUploadImage({ maxBytes: 8 * 1024 * 1024, purpose: "gate-evidence" });
       if (!result) return;
-      if (kind === "plate") setPlatePhotoUrl(result.objectPath);
-      else setVehiclePhotoUrl(result.objectPath);
+      if (kind === "plate") {
+        void deleteGateEvidence(platePhotoUrl).catch(() => undefined);
+        setPlatePhotoUrl(result.objectPath);
+        const plate = await readGatePlate(result.objectPath).catch(() => null);
+        if (plate) setVehiclePlate(plate);
+      }
+      else {
+        void deleteGateEvidence(vehiclePhotoUrl).catch(() => undefined);
+        setVehiclePhotoUrl(result.objectPath);
+      }
     } catch (e) {
       Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorAttachPhoto")));
     } finally {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    const normalized = vehiclePlate.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (normalized.length < 3) return;
+    const prior = [...(recentVisits.data ?? [])]
+      .filter((visit) => (visit.vehiclePlate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === normalized)
+      .sort((a, b) => Date.parse(b.checkInTime) - Date.parse(a.checkInTime))[0];
+    if (!prior) return;
+    if (!firstName) setFirstName(prior.firstName ?? "");
+    if (!lastName) setLastName(prior.lastName ?? "");
+    if (!company) setCompany(prior.company ?? "");
+    if (!purpose) setPurpose(prior.purpose ?? "");
+    if (duration === "60" && prior.expectedDurationMinutes) setDuration(String(prior.expectedDurationMinutes));
+  }, [company, duration, firstName, lastName, purpose, recentVisits.data, vehiclePlate]);
 
   const onCheckIn = async () => {
     const ctx = ctxQuery.data;
@@ -173,6 +203,7 @@ export default function GatekeeperScreen() {
       }
       resetForm();
       await qc.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
+      await qc.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
       Alert.alert(t("gatekeeper.checkedInTitle"), t("gatekeeper.checkedInBody"));
     } catch (e) {
       Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorCheckIn")));
@@ -186,6 +217,7 @@ export default function GatekeeperScreen() {
     try {
       await gatekeeperCheckOut(visitId);
       await qc.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
+      await qc.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
     } catch (e) {
       Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorCheckOut")));
     } finally {

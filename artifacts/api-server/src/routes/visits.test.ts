@@ -1008,6 +1008,25 @@ describe("gatekeeper visit workflow", () => {
     expect(checkOut.body.checkOutTime).toBeTruthy();
   });
 
+  it("can check in a visitor for another vendor assigned to the same guarded site", async () => {
+    const { site, vendor, otherVendor } = seedScenario();
+    fixtures.siteWorkAssignments.push({ id: 2, siteLocationId: site.id, vendorId: otherVendor.id });
+    const response = await request(app)
+      .post("/api/visits/gate/check-in")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .send({
+        firstName: "Morgan",
+        lastName: "Driver",
+        siteLocationId: site.id,
+        hostType: "vendor",
+        hostVendorId: otherVendor.id,
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+    expectStatus(response, 201);
+    expect(response.body.hostVendorId).toBe(otherVendor.id);
+  });
+
   it("cannot operate a gate at a site where its vendor is unassigned", async () => {
     const { otherSite, vendor } = seedScenario();
     const response = await request(app)
@@ -1095,6 +1114,16 @@ describe("GET /api/visits/:id (staff detail)", () => {
       .set("Cookie", staffCookie({ role: "vendor", vendorId: 999 }));
     expect(res.status).toBe(403);
     expect(res.body.code).toBe("visit.no_access");
+  });
+
+  it("lets a gatekeeper read any visit at a site assigned to its vendor", async () => {
+    const { visitId } = seedDetailVisit();
+    const assignedVendorId = fixtures.siteWorkAssignments[0].vendorId as number;
+    const res = await request(app)
+      .get(`/api/visits/${visitId}`)
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: assignedVendorId, vendorRole: "gatekeeper" }));
+    expectStatus(res, 200);
+    expect(res.body.id).toBe(visitId);
   });
 
   it("returns 403 when a partner reads a visit at another partner's site", async () => {

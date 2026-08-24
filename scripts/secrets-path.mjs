@@ -26,8 +26,9 @@ const ONEDRIVE_SECRETS = path.join(
  * Prefers an existing directory among:
  *   1. VNDRLY_SECRETS_DIR
  *   2. <repo-parent>\API Keys and Secrets
- *   3. %USERPROFILE%\OneDrive\Documents\DEV\API Keys and Secrets
- *   4. C:\Users\john\OneDrive\Documents\DEV\API Keys and Secrets
+ *   3. %USERPROFILE%\DEV\API Keys and Secrets
+ *   4. %USERPROFILE%\OneDrive\Documents\DEV\API Keys and Secrets
+ *   5. C:\Users\john\OneDrive\Documents\DEV\API Keys and Secrets
  */
 export function resolveSecretsDir() {
   if (process.env.VNDRLY_SECRETS_DIR) {
@@ -36,6 +37,7 @@ export function resolveSecretsDir() {
   const home = os.homedir();
   const candidates = [
     path.join(DEV_ROOT, "API Keys and Secrets"),
+    path.join(home, "DEV", "API Keys and Secrets"),
     path.join(home, "OneDrive", "Documents", "DEV", "API Keys and Secrets"),
     path.join(home, "Documents", "DEV", "API Keys and Secrets"),
     ONEDRIVE_SECRETS,
@@ -73,4 +75,29 @@ export function twilioEnvPath() {
 
 export function sendGridEnvPath() {
   return process.env.SENDGRID_ENV || path.join(SECRETS_DIR, "SendGrid_API_Key.env");
+}
+
+/**
+ * OpenAI server credential file. Override with OPENAI_ENV on any machine.
+ * The extra user-level DEV location supports VNDRLY's current Windows setup
+ * without copying the key into the repository.
+ */
+export function openAiEnvPath() {
+  if (process.env.OPENAI_ENV) return process.env.OPENAI_ENV;
+
+  const home = os.homedir();
+  const directories = [
+    SECRETS_DIR,
+    path.join(home, "DEV", "API Keys and Secrets"),
+  ];
+  const fileNames = ["OpenAI API Key v2.env", "OpenAI API Key.env"];
+
+  for (const directory of directories) {
+    for (const fileName of fileNames) {
+      const candidate = path.join(directory, fileName);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+
+  return path.join(SECRETS_DIR, fileNames[0]);
 }

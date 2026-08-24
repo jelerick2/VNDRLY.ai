@@ -1737,6 +1737,7 @@
     "duplicateConfirmLabel": "I'm sure this is a different company — sign up anyway.",
     "duplicateConfirmRequired": "Please confirm this is a different company before continuing.",
     "duplicateChecking": "Checking for similar vendors…",
+    "duplicateCheckUnavailable": "Similar-name checking is temporarily unavailable. You can still create your account.",
     "duplicateHardWarningTitle": "A vendor named \"{{name}}\" already exists.",
     "duplicateHardWarningBody": "Pick a different name to continue. If this is the same company, sign in to your existing account instead."
   },

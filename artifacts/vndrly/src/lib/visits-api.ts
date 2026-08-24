@@ -102,11 +102,14 @@ export type VisitorDetail = VisitorRow & {
 };
 
 export const visitsApi = {
-  list: (params?: { siteLocationId?: number; from?: string; to?: string }) => {
+  list: (params?: { siteLocationId?: number; from?: string; to?: string; activeOnly?: boolean; limit?: number; offset?: number }) => {
     const qs: string[] = [];
     if (params?.siteLocationId) qs.push(`siteLocationId=${params.siteLocationId}`);
     if (params?.from) qs.push(`from=${encodeURIComponent(params.from)}`);
     if (params?.to) qs.push(`to=${encodeURIComponent(params.to)}`);
+    if (params?.activeOnly) qs.push("activeOnly=true");
+    if (params?.limit) qs.push(`limit=${params.limit}`);
+    if (params?.offset) qs.push(`offset=${params.offset}`);
     return jf<VisitorRow[]>(`/api/visits${qs.length ? `?${qs.join("&")}` : ""}`);
   },
   get: (id: number) => jf<VisitorDetail>(`/api/visits/${id}`),
@@ -161,6 +164,16 @@ export const visitsApi = {
   }) => jf<VisitorRow>(`/api/visits/gate/check-in`, { method: "POST", body: JSON.stringify(input) }),
   gateCheckOut: (id: number, latitude?: number, longitude?: number) =>
     jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
-  readPlate: (input: { imageBase64: string; mimeType: string }) =>
+  readPlate: (input: { objectPath: string }) =>
     jf<{ plate: string | null }>(`/api/visits/gate/read-plate`, { method: "POST", body: JSON.stringify(input) }),
 };
+
+export async function listAllVisits(params?: { siteLocationId?: number; from?: string; to?: string; activeOnly?: boolean }): Promise<VisitorRow[]> {
+  const rows: VisitorRow[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await visitsApi.list({ ...params, limit: pageSize, offset });
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}

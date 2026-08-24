@@ -8,7 +8,7 @@ import { Card, CardContent, CARD_INNER_TILE_CLASS } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FIELD_OPS_PAGE_CLASS } from "@/lib/field-ops-content-pane";
 import { filterGateHistory, gateHistoryFromIso } from "@/lib/gate-history";
-import { visitsApi } from "@/lib/visits-api";
+import { listAllVisits } from "@/lib/visits-api";
 
 export default function GateHistoryPage() {
   const { t } = useTranslation();
@@ -16,7 +16,7 @@ export default function GateHistoryPage() {
   const from = useMemo(() => gateHistoryFromIso(), []);
   const visits = useQuery({
     queryKey: ["gate-history", from],
-    queryFn: () => visitsApi.list({ from }),
+    queryFn: () => listAllVisits({ from }),
     retry: false,
   });
   const rows = useMemo(

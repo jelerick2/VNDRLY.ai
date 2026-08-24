@@ -52,8 +52,7 @@ export default function SignupVendorScreen() {
 
   // Fuzzy duplicate check via the public /vendors/check-name endpoint.
   const [matches, setMatches] = useState<CheckNameMatch[]>([]);
-  const [matchesLoading, setMatchesLoading] = useState(false);
-  const [checkedName, setCheckedName] = useState<string | null>(null);
+  const [nameCheckUnavailable, setNameCheckUnavailable] = useState(false);
   const [confirmDifferent, setConfirmDifferent] = useState(false);
 
   const update = (field: keyof FormState, value: string) =>
@@ -64,14 +63,11 @@ export default function SignupVendorScreen() {
   useEffect(() => {
     const trimmed = form.name.trim();
     setConfirmDifferent(false);
+    setNameCheckUnavailable(false);
     if (trimmed.length < 3) {
       setMatches([]);
-      setMatchesLoading(false);
-      setCheckedName(trimmed);
       return;
     }
-    setCheckedName(null);
-    setMatchesLoading(true);
     const controller = new AbortController();
     const handle = setTimeout(async () => {
       try {
@@ -81,7 +77,7 @@ export default function SignupVendorScreen() {
         );
         if (controller.signal.aborted) return;
         setMatches(res.matches);
-        setCheckedName(trimmed);
+        setNameCheckUnavailable(false);
       } catch (err) {
         if (
           controller.signal.aborted ||
@@ -90,9 +86,7 @@ export default function SignupVendorScreen() {
           return;
         }
         setMatches([]);
-        setCheckedName(null);
-      } finally {
-        if (!controller.signal.aborted) setMatchesLoading(false);
+        setNameCheckUnavailable(true);
       }
     }, 300);
     return () => {
@@ -109,10 +103,6 @@ export default function SignupVendorScreen() {
     form.password.length >= PASSWORD_MIN &&
     form.password === form.confirm;
 
-  const trimmedName = form.name.trim();
-  const checkPending =
-    trimmedName.length >= 3 &&
-    (matchesLoading || checkedName !== trimmedName);
   // A score of 1 means the proposed name canonicalizes (NFKD-fold,
   // lowercase, strip punctuation, drop generic suffixes like "Inc"/"LLC")
   // to an existing vendor's name — exactly the rule the server uses to
@@ -142,10 +132,6 @@ export default function SignupVendorScreen() {
         return;
       }
       Alert.alert(t("vendorSignup.error"), t("vendorSignup.requireFields"));
-      return;
-    }
-    if (checkPending) {
-      Alert.alert(t("vendorSignup.duplicateChecking"));
       return;
     }
     if (hasHardDuplicate) {
@@ -306,6 +292,12 @@ export default function SignupVendorScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          ) : nameCheckUnavailable ? (
+            <View testID="vendor-signup-name-check-unavailable" style={styles.warningCard}>
+              <Text style={styles.warningTitle}>
+                {t("vendorSignup.duplicateCheckUnavailable")}
+              </Text>
+            </View>
           ) : null}
 
           <Text style={labelStyle}>{t("vendorSignup.contactName")} *</Text>
@@ -371,7 +363,7 @@ export default function SignupVendorScreen() {
             testID="vendor-signup-submit"
             onPress={onSubmit}
             loading={busy}
-            disabled={busy || !isValid || checkPending || blockedByDuplicate}
+            disabled={busy || !isValid || blockedByDuplicate}
             height={50}
             style={styles.submit}
           >

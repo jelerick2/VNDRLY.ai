@@ -148,3 +148,35 @@ export async function localGetObject(
     acl: meta?.acl ?? null,
   };
 }
+
+export async function localGetObjectAcl(objectPath: string): Promise<ObjectAclPolicy | null> {
+  const entityId = objectPathToEntityId(objectPath);
+  if (!entityId) return null;
+  return (await readMeta(resolveEntityFile(entityId)))?.acl ?? null;
+}
+
+export async function localDeleteObject(objectPath: string): Promise<void> {
+  const entityId = objectPathToEntityId(objectPath);
+  if (!entityId) throw new Error("Invalid object path");
+  const file = resolveEntityFile(entityId);
+  await Promise.all([
+    fsp.rm(file, { force: true }),
+    fsp.rm(metaFile(file), { force: true }),
+  ]);
+}
+
+export async function localListUploadsOlderThan(cutoff: Date): Promise<string[]> {
+  const dir = resolveEntityFile("uploads");
+  try {
+    const names = await fsp.readdir(dir);
+    const paths: string[] = [];
+    for (const name of names) {
+      if (name.endsWith(".meta.json")) continue;
+      const stat = await fsp.stat(resolveEntityFile(`uploads/${name}`));
+      if (stat.mtime < cutoff) paths.push(`/objects/uploads/${name}`);
+    }
+    return paths;
+  } catch {
+    return [];
+  }
+}

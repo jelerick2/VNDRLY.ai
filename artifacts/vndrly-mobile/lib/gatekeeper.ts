@@ -23,8 +23,7 @@ export type GatekeeperSubmitResult =
   | { ok: false; reason: "missing-name" | "no-host" | "location-denied" };
 
 export async function fetchGatekeeperVisits(): Promise<ActiveVisit[]> {
-  const rows = await apiFetch<Array<ActiveVisit & { checkOutTime?: string | null }>>("/api/visits");
-  return rows.filter((row) => !row.checkOutTime);
+  return apiFetch<Array<ActiveVisit & { checkOutTime?: string | null }>>("/api/visits?activeOnly=true&limit=1000");
 }
 
 export async function fetchAssignedGateSites(): Promise<AssignedGateSitesResponse> {
@@ -32,7 +31,38 @@ export async function fetchAssignedGateSites(): Promise<AssignedGateSitesRespons
 }
 
 export async function fetchGatekeeperHistory(fromIso: string): Promise<ActiveVisit[]> {
-  return apiFetch(`/api/visits?from=${encodeURIComponent(fromIso)}`);
+  return fetchVisitPages(`from=${encodeURIComponent(fromIso)}`);
+}
+
+export async function fetchGatekeeperRecentVisits(): Promise<ActiveVisit[]> {
+  return fetchVisitPages("");
+}
+
+async function fetchVisitPages(prefix: string): Promise<ActiveVisit[]> {
+  const rows: ActiveVisit[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const query = [prefix, `limit=${pageSize}`, `offset=${offset}`].filter(Boolean).join("&");
+    const page = await apiFetch<ActiveVisit[]>(`/api/visits?${query}`);
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
+export async function readGatePlate(objectPath: string): Promise<string | null> {
+  const result = await apiFetch<{ plate: string | null }>("/api/visits/gate/read-plate", {
+    method: "POST",
+    body: JSON.stringify({ objectPath }),
+  });
+  return result.plate;
+}
+
+export async function deleteGateEvidence(objectPath: string | null): Promise<void> {
+  if (!objectPath) return;
+  await apiFetch("/api/storage/uploads", {
+    method: "DELETE",
+    body: JSON.stringify({ objectPath }),
+  });
 }
 
 export async function gatekeeperCheckOut(visitId: number): Promise<void> {

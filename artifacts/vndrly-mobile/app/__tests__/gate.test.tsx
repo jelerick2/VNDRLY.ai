@@ -61,17 +61,21 @@ vi.mock("@/lib/auth", () => ({
 const {
   fetchSiteContextMock,
   fetchGatekeeperVisitsMock,
+  fetchGatekeeperRecentVisitsMock,
   fetchAssignedGateSitesMock,
   submitGatekeeperVisitMock,
   gatekeeperCheckOutMock,
   captureAndUploadImageMock,
+  readGatePlateMock,
 } = vi.hoisted(() => ({
   fetchSiteContextMock: vi.fn(),
   fetchGatekeeperVisitsMock: vi.fn(),
+  fetchGatekeeperRecentVisitsMock: vi.fn(),
   fetchAssignedGateSitesMock: vi.fn(),
   submitGatekeeperVisitMock: vi.fn(),
   gatekeeperCheckOutMock: vi.fn(),
   captureAndUploadImageMock: vi.fn(),
+  readGatePlateMock: vi.fn(),
 }));
 
 vi.mock("@/lib/guest", () => ({
@@ -79,10 +83,13 @@ vi.mock("@/lib/guest", () => ({
 }));
 
 vi.mock("@/lib/gatekeeper", () => ({
+  deleteGateEvidence: vi.fn(async () => undefined),
   fetchGatekeeperVisits: (...a: unknown[]) => fetchGatekeeperVisitsMock(...a),
+  fetchGatekeeperRecentVisits: (...a: unknown[]) => fetchGatekeeperRecentVisitsMock(...a),
   fetchAssignedGateSites: (...a: unknown[]) => fetchAssignedGateSitesMock(...a),
   submitGatekeeperVisit: (...a: unknown[]) => submitGatekeeperVisitMock(...a),
   gatekeeperCheckOut: (...a: unknown[]) => gatekeeperCheckOutMock(...a),
+  readGatePlate: (...a: unknown[]) => readGatePlateMock(...a),
 }));
 
 vi.mock("@/lib/photos", () => ({
@@ -172,6 +179,8 @@ const FLYWHEEL_SITE = {
 beforeEach(() => {
   vi.clearAllMocks();
   fetchGatekeeperVisitsMock.mockResolvedValue([]);
+  fetchGatekeeperRecentVisitsMock.mockResolvedValue([]);
+  readGatePlateMock.mockResolvedValue(null);
   fetchAssignedGateSitesMock.mockResolvedValue({
     sites: [FLYWHEEL_SITE],
     defaultSite: FLYWHEEL_SITE,

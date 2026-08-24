@@ -42,6 +42,18 @@ export class ObjectStorageService {
     return obj;
   }
 
+  async getStoredObjectAcl(objectPath: string): Promise<ObjectAclPolicy | null> {
+    return getObjectStore().getObjectAcl(objectPath);
+  }
+
+  async deleteStoredObject(objectPath: string): Promise<void> {
+    await getObjectStore().deleteObject(objectPath);
+  }
+
+  async listUploadsOlderThan(cutoff: Date): Promise<string[]> {
+    return getObjectStore().listUploadsOlderThan(cutoff);
+  }
+
   async getPublicObject(relativePath: string): Promise<StoredObject | null> {
     return getObjectStore().getPublicObject(relativePath);
   }

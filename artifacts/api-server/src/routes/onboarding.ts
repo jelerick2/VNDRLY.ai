@@ -230,14 +230,20 @@ router.post("/onboarding/partner", async (req: Request, res: Response): Promise<
         },
         tx,
       );
-      return { partner, user, membershipId };
+      const [progress] = await tx
+        .insert(onboardingProgressTable)
+        .values({
+          orgType: "partner",
+          partnerId: partner.id,
+          currentStep: "platform-eula",
+          completedSteps: ["company-basics"],
+          skippedSteps: [],
+          payload: {},
+        })
+        .returning();
+      return { partner, user, membershipId, progress };
     });
     const { membershipId } = result;
-    const progress = await ensureProgressRow({
-      orgType: "partner",
-      partnerId: result.partner.id,
-      defaultStep: "company-basics",
-    });
 
     const cookie = buildSessionCookie({
       user: result.user,
@@ -261,7 +267,7 @@ router.post("/onboarding/partner", async (req: Request, res: Response): Promise<
       orgType: "partner",
       orgId: result.partner.id,
       userId: result.user.id,
-      progress: serializeProgress(progress),
+      progress: serializeProgress(result.progress),
     });
   } catch (err) {
     logger.error({ err }, "createPartnerOnboarding failed");
@@ -351,14 +357,20 @@ router.post("/onboarding/vendor", async (req: Request, res: Response): Promise<v
         },
         tx,
       );
-      return { vendor, user, membershipId };
+      const [progress] = await tx
+        .insert(onboardingProgressTable)
+        .values({
+          orgType: "vendor",
+          vendorId: vendor.id,
+          currentStep: "platform-eula",
+          completedSteps: ["company-basics"],
+          skippedSteps: [],
+          payload: {},
+        })
+        .returning();
+      return { vendor, user, membershipId, progress };
     });
     const { membershipId } = result;
-    const progress = await ensureProgressRow({
-      orgType: "vendor",
-      vendorId: result.vendor.id,
-      defaultStep: "company-basics",
-    });
 
     const cookie = buildSessionCookie({
       user: result.user,
@@ -379,7 +391,7 @@ router.post("/onboarding/vendor", async (req: Request, res: Response): Promise<v
       orgType: "vendor",
       orgId: result.vendor.id,
       userId: result.user.id,
-      progress: serializeProgress(progress),
+      progress: serializeProgress(result.progress),
     });
   } catch (err) {
     // Race-condition fallback: a concurrent insert slipped past the
