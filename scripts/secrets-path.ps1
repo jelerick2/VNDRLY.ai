@@ -6,11 +6,11 @@ function Get-VndrlySecretsDir {
     return $env:VNDRLY_SECRETS_DIR
   }
 
-  $home = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+  $userProfileRoot = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
   $candidates = @(
     (Join-Path (Split-Path $RepoRoot -Parent) "API Keys and Secrets"),
-    (Join-Path $home "OneDrive\Documents\DEV\API Keys and Secrets"),
-    (Join-Path $home "Documents\DEV\API Keys and Secrets"),
+    (Join-Path $userProfileRoot "OneDrive\Documents\DEV\API Keys and Secrets"),
+    (Join-Path $userProfileRoot "Documents\DEV\API Keys and Secrets"),
     "C:\Users\john\OneDrive\Documents\DEV\API Keys and Secrets"
   )
 
