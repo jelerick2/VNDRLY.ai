@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
-  DeviceEventEmitter,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -40,7 +39,8 @@ import {
   submitGatekeeperVisit,
 } from "@/lib/gatekeeper";
 import { captureAndUploadImage } from "@/lib/photos";
-import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
+import { matchGateCheckoutVisits, parseGateVoiceCommand } from "@/lib/gate-voice-entry";
+import { subscribeGateVoiceEntry } from "@/lib/gate-voice-launch";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import { createPttRecorder, PttMicPermissionError, type PttRecorder } from "@/lib/ptt";
 import { buildHostOptions } from "@/lib/visitorCheckin";
@@ -92,6 +92,8 @@ export default function GatekeeperScreen() {
   const [busy, setBusy] = useState(false);
   const [activeNameField, setActiveNameField] = useState<DriverNameField | null>(null);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceCheckInPending, setVoiceCheckInPending] = useState(false);
+  const [voiceCheckoutMatches, setVoiceCheckoutMatches] = useState<ActiveVisit[]>([]);
 
   const activeVisits = useQuery({
     queryKey: ["gatekeeper-visits"],
@@ -178,7 +180,8 @@ export default function GatekeeperScreen() {
     try {
       const { uri, durationSeconds } = await recorder.stop();
       if (durationSeconds < 0.4) return;
-      const fill = parseGateVoiceEntry(await transcribeAskVRecording(uri));
+      const command = parseGateVoiceCommand(await transcribeAskVRecording(uri));
+      const fill = command.fill;
       if (!Object.keys(fill).length) {
         Alert.alert(t("visitor.error"), t("gatekeeper.voiceNotUnderstood"));
         return;
@@ -190,6 +193,15 @@ export default function GatekeeperScreen() {
       if (fill.purpose) setPurpose(fill.purpose);
       if (fill.duration) setDuration(fill.duration);
       setActiveNameField(null);
+      if (command.intent === "check-out") {
+        const matches = matchGateCheckoutVisits(activeVisits.data ?? [], fill);
+        setVoiceCheckInPending(false);
+        setVoiceCheckoutMatches(matches);
+        if (matches.length === 0) Alert.alert(t("visitor.error"), t("gatekeeper.voiceNoCheckoutMatch"));
+      } else {
+        setVoiceCheckoutMatches([]);
+        setVoiceCheckInPending(true);
+      }
     } catch (error) {
       Alert.alert(
         t("visitor.error"),
@@ -218,12 +230,9 @@ export default function GatekeeperScreen() {
     }
   };
 
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener("vndrly:gate-voice", () => {
-      void startGateVoiceEntry();
-    });
-    return () => subscription.remove();
-  }, [voiceListening]);
+  useEffect(() => subscribeGateVoiceEntry(() => {
+    void startGateVoiceEntry();
+  }), [voiceListening]);
 
   useEffect(() => () => {
     if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
@@ -241,6 +250,8 @@ export default function GatekeeperScreen() {
     setVehiclePhotoUrl(null);
     setHostKey(null);
     setActiveNameField(null);
+    setVoiceCheckInPending(false);
+    setVoiceCheckoutMatches([]);
   };
 
   const onLookupSite = () => {
@@ -383,6 +394,37 @@ export default function GatekeeperScreen() {
             ) : (
               <Text style={[styles.muted, { color: colors.mutedForeground }]}>{t("gatekeeper.noActive")}</Text>
             )}
+            {voiceCheckoutMatches.length > 0 ? (
+              <View style={[styles.voiceConfirm, { borderColor: colors.primary }]}>
+                <Text style={[styles.voiceConfirmTitle, { color: colors.foreground }]}>
+                  {voiceCheckoutMatches.length === 1
+                    ? t("gatekeeper.voiceConfirmCheckOut")
+                    : t("gatekeeper.voiceChooseCheckout")}
+                </Text>
+                {voiceCheckoutMatches.map((visit) => (
+                  <TouchableOpacity
+                    key={visit.id}
+                    testID={`gate-voice-confirm-checkout-${visit.id}`}
+                    disabled={busy}
+                    onPress={() => {
+                      setVoiceCheckoutMatches([]);
+                      void onCheckOut(visit.id);
+                    }}
+                    style={[styles.voiceActionButton, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.voiceActionText}>
+                      {t("gatekeeper.voiceCheckOutRecord", {
+                        name: `${visit.firstName ?? ""} ${visit.lastName ?? ""}`.trim(),
+                        plate: visit.vehiclePlate ?? "",
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity testID="gate-voice-cancel-checkout" onPress={() => setVoiceCheckoutMatches([])}>
+                  <Text style={[styles.voiceCancelText, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
 
           <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
@@ -391,6 +433,27 @@ export default function GatekeeperScreen() {
               <View style={[styles.voiceStatus, { borderColor: colors.primary }]}>
                 <Feather name="mic" size={18} color={colors.primary} />
                 <Text style={[styles.voiceStatusText, { color: colors.primary }]}>{t("gatekeeper.voiceListening")}</Text>
+              </View>
+            ) : null}
+            {voiceCheckInPending ? (
+              <View style={[styles.voiceConfirm, { borderColor: colors.primary }]}>
+                <Text style={[styles.voiceConfirmTitle, { color: colors.foreground }]}>{t("gatekeeper.voiceConfirmCheckIn")}</Text>
+                <View style={styles.voiceConfirmActions}>
+                  <TouchableOpacity testID="gate-voice-cancel-checkin" onPress={() => setVoiceCheckInPending(false)}>
+                    <Text style={[styles.voiceCancelText, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="gate-voice-confirm-checkin"
+                    disabled={busy}
+                    onPress={() => {
+                      setVoiceCheckInPending(false);
+                      void onCheckIn();
+                    }}
+                    style={[styles.voiceActionButton, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.voiceActionText}>{t("gatekeeper.voiceConfirm")}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : null}
             <View style={styles.twoCol}>
@@ -579,4 +642,10 @@ const styles = StyleSheet.create({
   suggestionName: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   voiceStatus: { alignItems: "center", borderRadius: 10, borderWidth: 1, flexDirection: "row", gap: 8, padding: 10 },
   voiceStatusText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  voiceConfirm: { borderRadius: 10, borderWidth: 1, gap: 10, padding: 12 },
+  voiceConfirmTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  voiceConfirmActions: { alignItems: "center", flexDirection: "row", justifyContent: "flex-end", gap: 14 },
+  voiceActionButton: { borderRadius: 9, paddingHorizontal: 14, paddingVertical: 10 },
+  voiceActionText: { color: "#FFFFFF", fontFamily: "Inter_600SemiBold", fontSize: 13, textAlign: "center" },
+  voiceCancelText: { fontFamily: "Inter_600SemiBold", fontSize: 13, padding: 8, textAlign: "center" },
 });

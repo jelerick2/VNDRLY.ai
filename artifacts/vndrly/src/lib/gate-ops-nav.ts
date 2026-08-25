@@ -1,8 +1,8 @@
-export type NavItem = {
+export type NavItem<TIcon = unknown> = {
   href: string;
   label: string;
   key: string;
-  icon?: unknown;
+  icon: TIcon;
 };
 
 export type GateLogViewer = {
@@ -18,23 +18,23 @@ export function canViewGateLog(user: GateLogViewer | null | undefined): boolean 
   return role == null || role === "office" || role === "both";
 }
 
-export function gateLogNavAnchorKey(items: Pick<NavItem, "key">[]): string {
+export function gateLogNavAnchorKey(items: Array<Pick<NavItem, "key">>): string {
   if (items.some((item) => item.key === "crew-map")) return "crew-map";
   if (items.some((item) => item.key === "site-map")) return "site-map";
   return "tracking";
 }
 
-export function withGateLogNav(
-  items: NavItem[],
+export function withGateLogNav<TIcon>(
+  items: Array<NavItem<TIcon>>,
   opts: {
     user: GateLogViewer | null | undefined;
     gatekeepingEnabled: boolean;
     label: string;
-    icon?: unknown;
+    icon: TIcon;
   },
-): NavItem[] {
+): Array<NavItem<TIcon>> {
   if (!canViewGateLog(opts.user) || !opts.gatekeepingEnabled) return items;
-  const item: NavItem = {
+  const item: NavItem<TIcon> = {
     href: "/gate-log",
     label: opts.label,
     key: "gate-log",

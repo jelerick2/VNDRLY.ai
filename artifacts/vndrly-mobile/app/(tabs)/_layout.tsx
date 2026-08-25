@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router, Slot, usePathname } from "expo-router";
 import React from "react";
-import { DeviceEventEmitter, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/useColors";
 import { crewMapTabVisible, homeTabTitleKey, isForemanEmployeeUser, isGatekeeperUser } from "@/lib/mobile-viewer";
 import { useTabBadges } from "@/lib/tabBadges";
+import { requestGateVoiceEntry } from "@/lib/gate-voice-launch";
 
 type TabItem = {
   badge?: number;
@@ -122,7 +123,7 @@ export default function TabLayout() {
               accessibilityState={active ? { selected: true } : undefined}
               onPress={() => {
                 router.push(tab.href as never);
-                if (tab.voiceEntry) setTimeout(() => DeviceEventEmitter.emit("vndrly:gate-voice"), 250);
+                if (tab.voiceEntry) requestGateVoiceEntry();
               }}
               style={styles.tabItem}
             >

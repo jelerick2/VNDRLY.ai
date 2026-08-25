@@ -5,6 +5,8 @@ const PLATE_STOPWORDS = new Set([
   "EXP", "EXPIRES", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY",
   "JUN", "JUL", "AUG", "SEP", "OCT",
 ]);
+const OCR_NARRATION_WORDS = new Set(["LICENSE", "PLATE", "TAG", "VISIBLE", "VEHICLE"]);
+const NO_PLATE_RESPONSE = /(?:\bno\b.{0,32}\b(?:license\s+plate|plate|tag)\b)|(?:\b(?:license\s+plate|plate|tag)\b.{0,32}\b(?:not\s+visible|cannot\s+be\s+(?:read|seen)|unreadable)\b)/i;
 
 function formatPlateValue(raw: string): string {
   return raw.toUpperCase().replace(/[^A-Z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -45,11 +47,14 @@ export function extractPlateCandidate(text: string): string | null {
     /* fall through to noisy OCR text */
   }
 
+  if (NO_PLATE_RESPONSE.test(text)) return null;
+
   let bestPlate: string | null = null;
   let bestScore = Number.NEGATIVE_INFINITY;
   const consider = (raw: string) => {
     const formatted = formatPlateValue(raw);
     const compact = compactPlate(formatted);
+    if (OCR_NARRATION_WORDS.has(compact)) return;
     if (!isPlausiblePlate(compact)) return;
     const score = scorePlate(compact);
     if (score > bestScore) {

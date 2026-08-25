@@ -24,6 +24,7 @@ import {
   Bot,
   MailCheck,
   ClipboardList,
+  type LucideIcon,
 } from "lucide-react";
 import React, { Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -53,7 +54,7 @@ import {
   shouldUseLayeredPortalLogo,
 } from "@/lib/portal-branding";
 import { OnboardingProgressBanner } from "@/components/finish-setup-widget";
-import { withGateLogNav, canViewGateLog } from "@/lib/gate-ops-nav";
+import { withGateLogNav, canViewGateLog, type NavItem } from "@/lib/gate-ops-nav";
 import { visitsApi } from "@/lib/visits-api";
 
 const AssistantLauncher = React.lazy(() =>
@@ -93,7 +94,7 @@ function useNavItems(user: {
   const statementsItem = { href: "/statement", label: t("nav.statements"), icon: ScrollText, key: "statements" };
   const billsItem = { href: "/bills-to-pay", label: t("nav.billsToPay"), icon: Wallet, key: "bills-to-pay" };
   const reportsItem = { href: "/reports", label: t("nav.reports"), icon: BookOpen, key: "reports" };
-  const wrap = (items: Array<{ href: string; label: string; key: string; icon?: unknown }>) =>
+  const wrap = (items: Array<NavItem<LucideIcon>>) =>
     withGateLogNav(items, {
       user,
       gatekeepingEnabled: gateEnabled.data?.enabled === true,

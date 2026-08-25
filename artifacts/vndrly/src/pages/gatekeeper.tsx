@@ -28,8 +28,8 @@ import {
   type GateMemoryField,
   type GateMemorySuggestion,
 } from "@/lib/gate-entry-memory";
-import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
-import { listAllVisits, visitsApi, type SiteContext } from "@/lib/visits-api";
+import { matchGateCheckoutVisits, parseGateVoiceCommand } from "@/lib/gate-voice-entry";
+import { listAllVisits, visitsApi, type SiteContext, type VisitorRow } from "@/lib/visits-api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -122,6 +122,8 @@ export default function GatekeeperPage() {
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceCheckInPending, setVoiceCheckInPending] = useState(false);
+  const [voiceCheckoutMatches, setVoiceCheckoutMatches] = useState<VisitorRow[]>([]);
   const recognitionRef = useRef<GateSpeechRecognition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeMemoryField, setActiveMemoryField] = useState<GateMemoryField | null>(null);
@@ -236,12 +238,23 @@ export default function GatekeeperPage() {
     recognition.lang = "en-US";
     recognition.onresult = (event) => {
       const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index][0].transcript).join(" ");
-      const fill = parseGateVoiceEntry(transcript);
+      const command = parseGateVoiceCommand(transcript);
+      const fill = command.fill;
       if (Object.keys(fill).length === 0) {
         setError(t("gatekeeper.voiceNotUnderstood"));
         return;
       }
       applyEntryDraft({ ...entryDraft, ...fill });
+      if (command.intent === "check-out") {
+        const matches = matchGateCheckoutVisits(visits.data ?? [], fill);
+        setVoiceCheckInPending(false);
+        setVoiceCheckoutMatches(matches);
+        if (matches.length === 0) setError(t("gatekeeper.voiceNoCheckoutMatch"));
+        else setError(null);
+        return;
+      }
+      setVoiceCheckoutMatches([]);
+      setVoiceCheckInPending(true);
       setError(null);
     };
     recognition.onerror = () => setError(t("gatekeeper.voiceNotUnderstood"));
@@ -262,7 +275,7 @@ export default function GatekeeperPage() {
       window.removeEventListener("vndrly:gate-voice", launch);
       recognitionRef.current?.stop();
     };
-  }, [entryDraft]);
+  }, [entryDraft, visits.data]);
 
   const hosts = useMemo(() => {
     if (!site.data) return [];
@@ -318,6 +331,8 @@ export default function GatekeeperPage() {
     setMemoryDeleting(false);
     setPlateOcrStatus("idle");
     setOcrPlate(null);
+    setVoiceCheckInPending(false);
+    setVoiceCheckoutMatches([]);
   };
 
   const usePreviousPlateDetails = () => {
@@ -512,6 +527,37 @@ export default function GatekeeperPage() {
                 </div>
               ))
             )}
+            {voiceCheckoutMatches.length > 0 && (
+              <div className={`${CARD_INNER_TILE_CLASS} space-y-3 border-[color:var(--brand-primary)]`} data-testid="gate-voice-checkout-confirmation">
+                <p className="text-sm font-semibold text-foreground">
+                  {voiceCheckoutMatches.length === 1
+                    ? t("gatekeeper.voiceConfirmCheckOut")
+                    : t("gatekeeper.voiceChooseCheckout")}
+                </p>
+                <div className="space-y-2">
+                  {voiceCheckoutMatches.map((visit) => (
+                    <AmberButton
+                      key={visit.id}
+                      className="w-full"
+                      disabled={busy}
+                      data-testid={`button-gate-voice-checkout-${visit.id}`}
+                      onClick={() => {
+                        setVoiceCheckoutMatches([]);
+                        void checkOut(visit.id);
+                      }}
+                    >
+                      {t("gatekeeper.voiceCheckOutRecord", {
+                        name: `${visit.firstName ?? ""} ${visit.lastName ?? ""}`.trim(),
+                        plate: visit.vehiclePlate ?? "",
+                      })}
+                    </AmberButton>
+                  ))}
+                </div>
+                <BlueButton className="w-full" onClick={() => setVoiceCheckoutMatches([])}>
+                  {t("common.cancel")}
+                </BlueButton>
+              </div>
+            )}
             <div className="border-t-2 border-gray-300 pt-3 dark:border-gray-400">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-foreground">{t("gatekeeper.gateLog")}</p>
@@ -533,6 +579,24 @@ export default function GatekeeperPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {error && <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+            {voiceCheckInPending && (
+              <div className={`${CARD_INNER_TILE_CLASS} space-y-3 border-[color:var(--brand-primary)]`} data-testid="gate-voice-checkin-confirmation">
+                <p className="text-sm font-semibold text-foreground">{t("gatekeeper.voiceConfirmCheckIn")}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <BlueButton onClick={() => setVoiceCheckInPending(false)}>{t("common.cancel")}</BlueButton>
+                  <AmberButton
+                    disabled={busy || !site.data}
+                    data-testid="button-gate-voice-confirm-checkin"
+                    onClick={() => {
+                      setVoiceCheckInPending(false);
+                      void checkIn();
+                    }}
+                  >
+                    {t("gatekeeper.voiceConfirm")}
+                  </AmberButton>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>{t("gatekeeper.firstName")} *</Label>

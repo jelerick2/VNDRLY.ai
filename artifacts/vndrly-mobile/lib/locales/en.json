@@ -65,7 +65,13 @@
   "gatekeeper": {
     "voiceEntry": "Voice",
     "voiceListening": "Listening for gate entry details…",
-    "voiceNotUnderstood": "I couldn't understand that. Say: plate ABC123, driver Bob Villa.",
+    "voiceNotUnderstood": "I couldn't understand that. Say: Bob Villa checking out, or plate ABC123 checking out.",
+    "voiceConfirmCheckIn": "Review the filled record, then confirm this check-in.",
+    "voiceConfirmCheckOut": "Confirm this visitor is checking out.",
+    "voiceChooseCheckout": "More than one active visit matched. Choose the record to check out.",
+    "voiceCheckOutRecord": "Check out {{name}} · {{plate}}",
+    "voiceNoCheckoutMatch": "No active gate entry matched that name or plate.",
+    "voiceConfirm": "Confirm",
     "tab": "Gate",
     "portal": "Gate Portal",
     "subtitle": "Track vehicle and visitor traffic at site locations.",
@@ -1740,7 +1746,6 @@
     "duplicateWarningSuggestion": "Did you mean: ",
     "duplicateConfirmLabel": "I'm sure this is a different company — sign up anyway.",
     "duplicateConfirmRequired": "Please confirm this is a different company before continuing.",
-    "duplicateChecking": "Checking for similar vendors…",
     "duplicateCheckUnavailable": "Similar-name checking is temporarily unavailable. You can still create your account.",
     "duplicateHardWarningTitle": "A vendor named \"{{name}}\" already exists.",
     "duplicateHardWarningBody": "Pick a different name to continue. If this is the same company, sign in to your existing account instead."
