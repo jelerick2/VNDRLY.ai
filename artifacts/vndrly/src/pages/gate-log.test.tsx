@@ -148,7 +148,7 @@ describe("Gate Log page", () => {
 
   it("shows live visitors, staff hours, search, charts, and recommendations", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("gate-log-page")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("gate-log-on-site")).toBeTruthy());
     expect(screen.getByTestId("gate-log-on-site").textContent).toContain("Sam Visitor");
     expect(screen.getByTestId("gate-log-staff").textContent).toContain("Riley Gate");
     expect(screen.getByTestId("gate-log-staff").textContent).toContain("Winchester");

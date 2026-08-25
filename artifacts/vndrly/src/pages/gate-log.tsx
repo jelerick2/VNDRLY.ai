@@ -54,7 +54,6 @@ export default function GateLogPage() {
   const brand = useBrand();
   const iconStyle = { color: brand.isOrgBranded ? brand.primary : "#f59e0b" };
   const [query, setQuery] = useState("");
-  const now = useMemo(() => new Date(), [ops.dataUpdatedAt]);
 
   const ops = useQuery({
     queryKey: [...OPS_KEY],
@@ -62,6 +61,7 @@ export default function GateLogPage() {
     refetchInterval: 30_000,
     retry: false,
   });
+  const now = useMemo(() => new Date(), [ops.dataUpdatedAt]);
 
   const visits = ops.data?.visits ?? [];
   const live = useGateLiveMonitor({

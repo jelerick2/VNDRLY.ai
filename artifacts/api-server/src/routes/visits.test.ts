@@ -204,6 +204,7 @@ function makeQuery(tableName: string) {
       limitN = n;
       return q;
     },
+    offset: () => q,
     then: (resolve: any, reject?: any) =>
       Promise.resolve(run()).then(resolve, reject),
     catch: (reject: any) => Promise.resolve(run()).catch(reject),

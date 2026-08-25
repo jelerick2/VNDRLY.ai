@@ -35,6 +35,7 @@ import { enforceVisitsRateLimit } from "../lib/visits-rate-limit";
 import { enforceGateOcrRateLimit } from "../lib/gate-ocr-rate-limit";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { officeMayAccessGateOps, sessionHasGateOpsScope } from "../lib/gate-ops-access";
+import { isGeofenceBypassActive } from "../lib/geo";
 import {
   AUTH_GUEST_REQUIRED,
   AUTH_GUEST_EXPIRED,
