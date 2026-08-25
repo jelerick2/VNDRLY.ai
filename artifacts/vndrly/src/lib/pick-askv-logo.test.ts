@@ -7,6 +7,7 @@ import askVBlue from "@assets/askv/AskV_VNDRLY_Blue_v1.png";
 import askVRed from "@assets/askv/AskV_VNDRLY_Red_v3.png";
 import askVWinchester from "@assets/askv/AskV_VNDRLY_Winchester_v2.png";
 import askVFlywheel from "@assets/askv/AskV_VNDRLY_flywheel_Blue_v1.png";
+import askVMidcon from "@assets/askv/AskV_VNDRLY_midcon_Blue_v1.png";
 
 import { ASKV_DEFAULT_SRC, ASKV_IDLE_SRC, pickAskVLogo, pickAskVLogoIdle } from "./pick-askv-logo";
 
@@ -21,6 +22,10 @@ describe("pickAskVLogo", () => {
 
   it("uses the custom Flywheel cutout by org name", () => {
     expect(pickAskVLogo("#D80B0B", "Flywheel Energy")).toBe(askVFlywheel);
+  });
+
+  it("uses the custom Midcon cutout by org name", () => {
+    expect(pickAskVLogo("#D80B0B", "Midcon Solutions")).toBe(askVMidcon);
   });
 
   it("uses VNDRLY amber v3 by org name", () => {

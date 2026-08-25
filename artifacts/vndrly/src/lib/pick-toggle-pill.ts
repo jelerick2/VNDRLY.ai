@@ -118,6 +118,7 @@ export function pickTogglePillSrc(
   if (isWinchesterBrand(brandName)) return PILL_BRAND.winchester;
   const name = brandName?.toLowerCase() ?? "";
   if (name.includes("flywheel")) return PILL_BRAND.flywheel;
+  if (name.includes("midcon")) return PILL_BRAND.midcon;
   if (name.includes("baker")) return PILL_BRAND.baker;
   if (name.includes("vndrly")) return PILL_BRAND.vndrly;
   if (!brandColor) return NEUTRAL_TOGGLE_PILL_SRC;

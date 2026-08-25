@@ -19,6 +19,7 @@ import pinkSquare from "@assets/button-palette/900x229_pink_square.png";
 import bakerTealSquare from "@assets/button-palette/900x229_baker_teal_button.png";
 import winchesterTanSquare from "@assets/button-palette/900x229_tan_square-v4.png";
 import flywheelBlueSquare from "@assets/button-palette/900x229_flywheel_blue_square-v2.png";
+import midconBlueSquare from "@assets/button-palette/900x229_midcon_blue_square-v2.png";
 
 /** Universal light-grey idle square — every brand at rest. */
 export const LOGIN_IDLE_SQUARE_SRC = idleSquare;
@@ -99,6 +100,10 @@ function isFlywheelBrand(name: string | null | undefined): boolean {
   return !!name?.toLowerCase().includes("flywheel");
 }
 
+function isMidconBrand(name: string | null | undefined): boolean {
+  return !!name?.toLowerCase().includes("midcon");
+}
+
 /** Active/hover square for login CTAs. */
 export function pickLoginSquareActive(
   brandColor: string | null | undefined,
@@ -107,6 +112,7 @@ export function pickLoginSquareActive(
   if (isBakerBrand(brandName)) return bakerTealSquare;
   if (isWinchesterBrand(brandName)) return winchesterTanSquare;
   if (isFlywheelBrand(brandName)) return flywheelBlueSquare;
+  if (isMidconBrand(brandName)) return midconBlueSquare;
   if (!brandColor) return VNDRLY_DEFAULT_SRC;
   const rgb = hexToRgb(brandColor);
   if (!rgb) return VNDRLY_DEFAULT_SRC;
