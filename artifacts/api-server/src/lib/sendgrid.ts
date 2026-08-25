@@ -655,6 +655,42 @@ export async function sendPasswordResetEmail(
   });
 }
 
+export async function sendEmailVerificationEmail(
+  toEmail: string,
+  verificationUrl: string,
+  displayName: string,
+): Promise<{ messageId: string | undefined }> {
+  const safeName = escapeHtml(displayName || "there");
+  const safeUrl = escapeHtml(verificationUrl);
+  return sendSendGridMail({
+    to: toEmail,
+    subject: "Confirm your VNDRLY email",
+    categories: ["email_verification"],
+    html: `
+      <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111827;">
+        <div style="background:#111827;color:#f59e0b;padding:16px 20px;border-radius:8px 8px 0 0;">
+          <div style="font-weight:700;font-size:18px;">VNDRLY</div>
+          <div style="color:#fef3c7;font-size:12px;">Email verification</div>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-top:0;padding:20px;border-radius:0 0 8px 8px;">
+          <p>Hi ${safeName},</p>
+          <p>Confirm this email address to finish verifying your VNDRLY account.</p>
+          <p style="margin:24px 0;">
+            <a href="${safeUrl}" style="background:#f59e0b;color:#111827;text-decoration:none;font-weight:700;padding:12px 18px;border-radius:6px;display:inline-block;">Confirm email</a>
+          </p>
+          <p>If the button does not work, copy and paste this link into your browser:</p>
+          <p style="word-break:break-all;color:#374151;">${safeUrl}</p>
+          <p style="color:#6b7280;font-size:12px;margin-top:24px;">This link expires in 24 hours. If you did not create this account, you can ignore this email.</p>
+        </div>
+      </div>`,
+    text:
+      `Hi ${displayName || "there"},\n\n` +
+      "Confirm this email address to finish verifying your VNDRLY account.\n\n" +
+      `Confirm your email here: ${verificationUrl}\n\n` +
+      "This link expires in 24 hours. If you did not create this account, you can ignore this email.",
+  });
+}
+
 // ─── Admin-issued temporary password ─────────────────────────────
 //
 // Sent when an org admin (system / partner / vendor) resets a user's

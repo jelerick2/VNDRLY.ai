@@ -20,7 +20,7 @@ export type GatekeeperVisitInput = {
 
 export type GatekeeperSubmitResult =
   | { ok: true; visitId: number }
-  | { ok: false; reason: "missing-name" | "no-host" | "location-denied" };
+  | { ok: false; reason: "missing-name" | "missing-plate" | "no-host" | "location-denied" };
 
 export async function fetchGatekeeperVisits(): Promise<ActiveVisit[]> {
   return apiFetch<Array<ActiveVisit & { checkOutTime?: string | null }>>("/api/visits?activeOnly=true&limit=1000");
@@ -90,6 +90,7 @@ export async function submitGatekeeperVisit(
   if (!input.firstName.trim() || !input.lastName.trim()) {
     return { ok: false, reason: "missing-name" };
   }
+  if (!input.vehiclePlate.trim()) return { ok: false, reason: "missing-plate" };
   const host = buildHostOptions(input.ctx).find((o) => o.key === input.hostKey);
   if (!host) return { ok: false, reason: "no-host" };
 

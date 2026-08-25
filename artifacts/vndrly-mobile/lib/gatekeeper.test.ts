@@ -45,6 +45,7 @@ const baseCtx: SiteContext = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  apiFetchMock.mockReset();
   requestForegroundPermissionsAsyncMock.mockResolvedValue({ status: "granted" });
   getCurrentPositionAsyncMock.mockResolvedValue({
     coords: { latitude: 1.23, longitude: 4.56 },
@@ -71,6 +72,22 @@ describe("fetchGatekeeperHistory", () => {
 });
 
 describe("submitGatekeeperVisit", () => {
+  it("requires a license plate before requesting location", async () => {
+    const { submitGatekeeperVisit } = await import("./gatekeeper");
+    const result = await submitGatekeeperVisit({
+      ctx: baseCtx,
+      hostKey: "partner:7",
+      firstName: "Jordan",
+      lastName: "Hale",
+      company: "Peak Energy",
+      vehiclePlate: "",
+      purpose: "Water haul",
+      durationStr: "45",
+    });
+    expect(result).toEqual({ ok: false, reason: "missing-plate" });
+    expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
+  });
+
   it("posts tag and vehicle photo URLs and omits phone and email", async () => {
     const { submitGatekeeperVisit } = await import("./gatekeeper");
 

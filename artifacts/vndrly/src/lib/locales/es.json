@@ -4762,11 +4762,15 @@
     "recMix": "Mezcla contratista vs empleado — cuánto tráfico es cuadrilla del proveedor frente a visitantes de terceros."
   },
   "gateNav": {
+    "voice": "Entrada por voz",
     "gate": "Portería",
     "history": "Historial",
     "aria": "Navegación del portal de portería"
   },
   "gatekeeper": {
+    "voiceListening": "Escuchando: diga la matrícula, el nombre del conductor, la empresa, el propósito y la duración.",
+    "voiceUnavailable": "La entrada por voz no es compatible con este navegador.",
+    "voiceNotUnderstood": "No pude entender la entrada. Inténtelo de nuevo y diga: matrícula ABC123, conductor Bob Villa.",
     "portal": "Portal de portería",
     "title": "Portería",
     "subtitle": "Registre la entrada y salida de visitantes en el sitio actual.",
@@ -4811,7 +4815,7 @@
     "photoTooLarge": "Esa foto es demasiado grande.",
     "photoUploadFailed": "La carga de la foto falló.",
     "photoFinalizeFailed": "No se pudo finalizar la carga de la foto.",
-    "requiredFields": "Se requieren nombre, apellido, sitio y anfitrión.",
+    "requiredFields": "Se requieren nombre, apellido, matrícula, sitio y anfitrión.",
     "checkInFailed": "El registro de entrada falló.",
     "checkOutFailed": "El registro de salida falló.",
     "liveCheckedIn": "{{name}} acaba de entrar",

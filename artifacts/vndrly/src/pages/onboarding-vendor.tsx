@@ -10,39 +10,21 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle } from "lucide-react";
 import OnboardingStepper, { type StepperStep } from "@/components/onboarding-stepper";
 import OnboardingVerificationBanner from "@/components/onboarding-verification-banner";
-import LanguageToggle from "@/components/language-toggle";
-import {
-  OnboardingBrandHeader,
-  type OnboardingBrandPreview,
-} from "@/components/onboarding-brand-header";
+import { OnboardingPageShell } from "@/components/onboarding-page-shell";
+import { OnboardingBrandHeader, type OnboardingBrandPreview } from "@/components/onboarding-brand-header";
 import { OnboardingBrandFields } from "@/components/onboarding-brand-fields";
 import { OnboardingAccountCreatedDialog } from "@/components/onboarding-account-created-dialog";
-import {
-  OnboardingPlatformEulaStep,
-  type PlatformEulaAcceptanceValue,
-} from "@/components/onboarding-platform-eula-step";
-import {
-  OnboardingLegalConsentStep,
-  type OnboardingLegalConsentValue,
-} from "@/components/onboarding-legal-consent-step";
+import { OnboardingPlatformEulaStep, type PlatformEulaAcceptanceValue } from "@/components/onboarding-platform-eula-step";
+import { OnboardingLegalConsentStep, type OnboardingLegalConsentValue } from "@/components/onboarding-legal-consent-step";
 import { PLATFORM_EULA_VERSION } from "@workspace/platform-eula";
 import { LEGAL_POLICY_VERSION } from "@/lib/legal-docs";
-import { brandStyleVars, DEFAULT_BRAND } from "@/hooks/use-brand";
+import { DEFAULT_BRAND } from "@/hooks/use-brand";
 import { onboardingApi } from "@/lib/onboarding-api";
 import { uploadOnboardingLogo } from "@/lib/onboarding-logo-upload";
 import { handlePhoneInput, stripPhone } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 
-type StepKey =
-  | "company-basics"
-  | "platform-eula"
-  | "legal-consent"
-  | "tax-ids"
-  | "work-types"
-  | "compliance"
-  | "rates"
-  | "branding"
-  | "first-employee";
+type StepKey = "company-basics" | "platform-eula" | "legal-consent" | "tax-ids" | "work-types" | "compliance" | "rates" | "branding" | "first-employee";
 
 // Spec'd vendor wizard. The first 6 steps are must-haves: a vendor cannot
 // transact without tax IDs, work types, COI, rates, or a field employee.
@@ -72,16 +54,37 @@ const STEPS: (StepperStep & { key: StepKey })[] = [
 const REQUIRED_STEPS = new Set<StepKey>(["company-basics", "platform-eula", "legal-consent"]);
 
 interface VendorPayload {
-  taxIds?: { federalTaxId?: string; stateTaxId?: string; physicalAddress?: string; billingAddress?: string };
+  taxIds?: {
+    federalTaxId?: string;
+    stateTaxId?: string;
+    physicalAddress?: string;
+    billingAddress?: string;
+  };
   serviceArea?: { operatingRadiusMiles?: number };
   workTypeIds?: number[];
-  compliance?: { carrier?: string; policyNumber?: string; expirationDate?: string; documentUrl?: string; coverageNotes?: string };
-  rates?: { hourlyRate?: string; dailyOtHours?: string; weeklyOtHours?: string; overtimeMultiplier?: string };
+  compliance?: {
+    carrier?: string;
+    policyNumber?: string;
+    expirationDate?: string;
+    documentUrl?: string;
+    coverageNotes?: string;
+  };
+  rates?: {
+    hourlyRate?: string;
+    dailyOtHours?: string;
+    weeklyOtHours?: string;
+    overtimeMultiplier?: string;
+  };
   eDeliveryConsent?: boolean;
   branding?: { brandPrimaryColor?: string; logoUrl?: string };
   platformEula?: { accepted?: boolean; version?: string };
   legalConsent?: { accepted?: boolean; smsOptIn?: boolean; version?: string };
-  firstEmployee?: { firstName?: string; lastName?: string; email?: string; phone?: string };
+  firstEmployee?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  };
 }
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -123,14 +126,30 @@ export default function OnboardingVendor() {
   const [nameMatchesLoading, setNameMatchesLoading] = useState(false);
   const [nameCheckUnavailable, setNameCheckUnavailable] = useState(false);
   const [confirmDifferentVendor, setConfirmDifferentVendor] = useState(false);
-  const [taxIds, setTaxIds] = useState({ federalTaxId: "", stateTaxId: "", physicalAddress: "", billingAddress: "" });
+  const [taxIds, setTaxIds] = useState({
+    federalTaxId: "",
+    stateTaxId: "",
+    physicalAddress: "",
+    billingAddress: "",
+  });
   const [selectedWtIds, setSelectedWtIds] = useState<number[]>([]);
   // Operating radius in miles. Used to auto-match the vendor to nearby
   // partner sites in the marketplace. Default 50 mi mirrors the
   // analogous setting in the legacy admin form.
   const [serviceRadius, setServiceRadius] = useState<string>("50");
-  const [compliance, setCompliance] = useState({ carrier: "", policyNumber: "", expirationDate: "", documentUrl: "", coverageNotes: "" });
-  const [rates, setRates] = useState({ hourlyRate: "", dailyOtHours: "8", weeklyOtHours: "40", overtimeMultiplier: "1.5" });
+  const [compliance, setCompliance] = useState({
+    carrier: "",
+    policyNumber: "",
+    expirationDate: "",
+    documentUrl: "",
+    coverageNotes: "",
+  });
+  const [rates, setRates] = useState({
+    hourlyRate: "",
+    dailyOtHours: "8",
+    weeklyOtHours: "40",
+    overtimeMultiplier: "1.5",
+  });
   // 1099 e-delivery consent is a tri-state in our payload (undefined =
   // not asked). The form forces a yes/no choice via radios so we save
   // an explicit boolean, never undefined.
@@ -138,7 +157,10 @@ export default function OnboardingVendor() {
   // Vendor branding (should-have): drives the in-app vendor portal
   // colour and the vendor logo on invoices. Both fields are optional;
   // skipping this step adds it to the dashboard's Finish-setup widget.
-  const [vendorBranding, setVendorBranding] = useState({ brandPrimaryColor: "", logoUrl: "" });
+  const [vendorBranding, setVendorBranding] = useState({
+    brandPrimaryColor: "",
+    logoUrl: "",
+  });
   const [platformEula, setPlatformEula] = useState<PlatformEulaAcceptanceValue>({
     accepted: false,
     version: PLATFORM_EULA_VERSION,
@@ -148,7 +170,12 @@ export default function OnboardingVendor() {
     smsOptIn: false,
     version: LEGAL_POLICY_VERSION,
   });
-  const [firstEmp, setFirstEmp] = useState({ firstName: "", lastName: "", email: "", phone: "" });
+  const [firstEmp, setFirstEmp] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+  });
   const [showAccountCreated, setShowAccountCreated] = useState(false);
 
   const currentStep = STEPS[stepIndex];
@@ -283,25 +310,21 @@ export default function OnboardingVendor() {
     const controller = new AbortController();
     const handle = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `${BASE}/api/vendors/check-name?name=${encodeURIComponent(trimmed)}`,
-          { credentials: "include", signal: controller.signal },
-        );
+        const res = await fetch(`${BASE}/api/vendors/check-name?name=${encodeURIComponent(trimmed)}`, { credentials: "include", signal: controller.signal });
         if (controller.signal.aborted) return;
         if (!res.ok) {
           setNameMatches([]);
           setNameCheckUnavailable(true);
           return;
         }
-        const data = (await res.json()) as { matches?: { name: string; score: number }[] };
+        const data = (await res.json()) as {
+          matches?: { name: string; score: number }[];
+        };
         if (controller.signal.aborted) return;
         setNameMatches(Array.isArray(data.matches) ? data.matches : []);
         setNameCheckUnavailable(false);
       } catch (err) {
-        if (
-          controller.signal.aborted ||
-          (err instanceof DOMException && err.name === "AbortError")
-        ) {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
           return;
         }
         setNameMatches([]);
@@ -317,8 +340,7 @@ export default function OnboardingVendor() {
   }, [basics.name, orgId]);
 
   const trimmedBasicsName = basics.name.trim();
-  const namePassesDuplicateCheck =
-    orgId !== null || nameMatches.length === 0 || confirmDifferentVendor;
+  const namePassesDuplicateCheck = orgId !== null || nameMatches.length === 0 || confirmDifferentVendor;
 
   // Load work-types catalog the moment we have a session (i.e. after
   // signup). Failing softly is OK — the user can retry by reloading.
@@ -360,7 +382,10 @@ export default function OnboardingVendor() {
 
   const submitBasics = async () => {
     if (!basics.name.trim() || !basics.contactName.trim() || !basics.contactEmail.trim()) {
-      toast({ title: "Please fill in name, contact, and email.", variant: "destructive" });
+      toast({
+        title: "Please fill in name, contact, and email.",
+        variant: "destructive",
+      });
       return;
     }
     const phoneDigits = stripPhone(basics.contactPhone);
@@ -369,7 +394,10 @@ export default function OnboardingVendor() {
       return;
     }
     if (basics.password.length < 8) {
-      toast({ title: "Password must be at least 8 characters.", variant: "destructive" });
+      toast({
+        title: "Password must be at least 8 characters.",
+        variant: "destructive",
+      });
       return;
     }
     if (basics.password !== basics.confirm) {
@@ -409,10 +437,7 @@ export default function OnboardingVendor() {
     }
   };
 
-  const uploadLogo = async (
-    file: File,
-    _slot: "horizontal" | "square",
-  ): Promise<void> => {
+  const uploadLogo = async (file: File, _slot: "horizontal" | "square"): Promise<void> => {
     setLoading(true);
     try {
       const finalUrl = await uploadOnboardingLogo(file, "public");
@@ -433,11 +458,22 @@ export default function OnboardingVendor() {
         credentials: "include",
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
       });
       if (!r.ok) throw new Error("Could not get upload URL");
-      const { uploadURL, objectPath } = (await r.json()) as { uploadURL: string; objectPath: string };
-      const put = await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const { uploadURL, objectPath } = (await r.json()) as {
+        uploadURL: string;
+        objectPath: string;
+      };
+      const put = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
       if (!put.ok) throw new Error("Upload failed");
       const fin = await fetch(`${BASE}/api/storage/uploads/finalize`, {
         method: "POST",
@@ -446,7 +482,9 @@ export default function OnboardingVendor() {
         body: JSON.stringify({ objectURL: uploadURL, visibility: "private" }),
       });
       if (!fin.ok) throw new Error("Finalize failed");
-      const { objectPath: finalPath } = (await fin.json()) as { objectPath: string };
+      const { objectPath: finalPath } = (await fin.json()) as {
+        objectPath: string;
+      };
       const path = finalPath || objectPath;
       const finalUrl = path.startsWith("/") ? `${BASE}/api/storage${path}` : path;
       setCompliance((c) => ({ ...c, documentUrl: finalUrl }));
@@ -613,8 +651,7 @@ export default function OnboardingVendor() {
 
   const prevStep = () => setStepIndex((i) => Math.max(0, i - 1));
 
-  const toggleWt = (id: number) =>
-    setSelectedWtIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleWt = (id: number) => setSelectedWtIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const buildPayloadPatch = useMemo<() => Partial<VendorPayload>>(() => {
     return () => {
@@ -635,9 +672,7 @@ export default function OnboardingVendor() {
           // and complete onboarding without explicit IRS consent.
           // The client-side step validation already blocks `undefined`,
           // so by the time we get here it should be a real boolean.
-          return typeof eDeliveryConsent === "boolean"
-            ? { rates, eDeliveryConsent }
-            : { rates };
+          return typeof eDeliveryConsent === "boolean" ? { rates, eDeliveryConsent } : { rates };
         case "branding":
           return {
             branding: {
@@ -681,12 +716,8 @@ export default function OnboardingVendor() {
   }, [workTypes]);
 
   const brandPreview = useMemo((): OnboardingBrandPreview | null => {
-    const primary =
-      vendorBranding.brandPrimaryColor.trim() ||
-      payload.branding?.brandPrimaryColor?.trim() ||
-      "";
-    const logo =
-      vendorBranding.logoUrl.trim() || payload.branding?.logoUrl?.trim() || "";
+    const primary = vendorBranding.brandPrimaryColor.trim() || payload.branding?.brandPrimaryColor?.trim() || "";
+    const logo = vendorBranding.logoUrl.trim() || payload.branding?.logoUrl?.trim() || "";
     if (!primary && !logo) return null;
     return {
       name: basics.name.trim() || null,
@@ -708,34 +739,18 @@ export default function OnboardingVendor() {
   }, [brandPreview]);
 
   return (
-    <div
-      className="min-h-screen bg-gray-50 px-4 py-8 relative"
-      style={brandStyleVars(pageBrand)}
-    >
-      <div className="absolute top-4 right-4 z-20">
-        <LanguageToggle variant="light" />
-      </div>
-      <div className="max-w-2xl mx-auto">
-        <OnboardingBrandHeader
-          title="Vendor Onboarding"
-          subtitle="A short setup flow so you can start taking work."
-          preview={brandPreview}
-          onBack={() =>
-            stepIndex === 0 ? navigate("/signup") : prevStep()
-          }
-        />
+    <OnboardingPageShell brand={pageBrand}>
+      <div className="rounded-2xl border border-white/25 bg-white/95 p-5 shadow-2xl backdrop-blur-xl mb-4">
+        <OnboardingBrandHeader title="Vendor Onboarding" subtitle="A short setup flow so you can start taking work." preview={brandPreview} onBack={() => (stepIndex === 0 ? navigate("/signup") : prevStep())} />
 
         {/* Email-verification banner — appears once an account
-            exists. Hidden on the anonymous step-1 visit so it doesn't
-            confuse first-time signups. */}
-        {orgId && verification && (
-          <OnboardingVerificationBanner
-            email={verification.email}
-            emailVerifiedAt={verification.emailVerifiedAt}
-          />
-        )}
+              exists. Hidden on the anonymous step-1 visit so it doesn't
+              confuse first-time signups. */}
+        {orgId && verification && <OnboardingVerificationBanner email={verification.email} emailVerifiedAt={verification.emailVerifiedAt} />}
+      </div>
 
-        <Card><CardContent className="p-6 pt-6">
+      <Card className="border-2 border-[color:var(--brand-primary)]/70 bg-white/95 shadow-2xl backdrop-blur-xl">
+        <CardContent className="p-6 pt-6">
           <OnboardingStepper steps={STEPS} currentIndex={stepIndex} completedKeys={completed} skippedKeys={skipped} className="mb-8" />
 
           {currentStep.key === "company-basics" && (
@@ -745,31 +760,19 @@ export default function OnboardingVendor() {
                 <Label>Company Name *</Label>
                 <Input value={basics.name} onChange={(e) => setBasics({ ...basics, name: e.target.value })} placeholder="e.g. Smith Welding LLC" data-testid="input-company-name" />
                 {!orgId && nameMatches.length > 0 && (
-                  <div
-                    role="alert"
-                    data-testid="vendor-onboarding-duplicate-warning"
-                    className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-                  >
+                  <div role="alert" data-testid="vendor-onboarding-duplicate-warning" className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
                       <div className="flex-1 space-y-1.5">
-                        <p className="font-medium">
-                          This name looks similar to an existing vendor — please contact us first.
-                        </p>
+                        <p className="font-medium">This name looks similar to an existing vendor — please contact us first.</p>
                         <ul className="space-y-0.5">
                           {nameMatches.map((m) => (
                             <li key={m.name}>Did you mean {m.name}?</li>
                           ))}
                         </ul>
                         <label className="mt-1 flex items-center gap-2 text-amber-900">
-                          <Checkbox
-                            data-testid="vendor-onboarding-confirm-different"
-                            checked={confirmDifferentVendor}
-                            onCheckedChange={(c) => setConfirmDifferentVendor(c === true)}
-                          />
-                          <span>
-                            I'm sure this is a different vendor — create it anyway.
-                          </span>
+                          <Checkbox data-testid="vendor-onboarding-confirm-different" checked={confirmDifferentVendor} onCheckedChange={(c) => setConfirmDifferentVendor(c === true)} />
+                          <span>I'm sure this is a different vendor — create it anyway.</span>
                         </label>
                       </div>
                     </div>
@@ -796,7 +799,17 @@ export default function OnboardingVendor() {
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input value={basics.contactPhone} onChange={(e) => setBasics({ ...basics, contactPhone: handlePhoneInput(e.target.value) })} placeholder="(555) 123-4567" data-testid="input-contact-phone" />
+                <Input
+                  value={basics.contactPhone}
+                  onChange={(e) =>
+                    setBasics({
+                      ...basics,
+                      contactPhone: handlePhoneInput(e.target.value),
+                    })
+                  }
+                  placeholder="(555) 123-4567"
+                  data-testid="input-contact-phone"
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -843,19 +856,13 @@ export default function OnboardingVendor() {
               <p className="text-sm text-gray-500">Tell us how far you'll travel and what work you do — partners use this to match you to nearby jobs.</p>
               <div>
                 <Label>Operating radius (miles) *</Label>
-                <Input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={serviceRadius}
-                  onChange={(e) => setServiceRadius(e.target.value)}
-                  data-testid="input-service-radius"
-                  className="max-w-[160px]"
-                />
+                <Input type="number" step="1" min="1" value={serviceRadius} onChange={(e) => setServiceRadius(e.target.value)} data-testid="input-service-radius" className="max-w-[160px]" />
                 <p className="text-xs text-gray-500 mt-1">How far from your physical address you'll accept work.</p>
               </div>
               {workTypes.length === 0 ? (
-                <p className="text-sm text-gray-400" data-testid="work-types-loading">Loading the work-types catalog…</p>
+                <p className="text-sm text-gray-400" data-testid="work-types-loading">
+                  Loading the work-types catalog…
+                </p>
               ) : (
                 <div className="space-y-4 max-h-[420px] overflow-y-auto pr-2">
                   {wtByCategory.map(([cat, items]) => (
@@ -863,11 +870,7 @@ export default function OnboardingVendor() {
                       <p className="text-xs font-semibold uppercase text-gray-500 mb-1">{cat}</p>
                       <div className="grid grid-cols-2 gap-2">
                         {items.map((wt) => (
-                          <label
-                            key={wt.id}
-                            className="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50"
-                            data-testid={`work-type-option-${wt.id}`}
-                          >
+                          <label key={wt.id} className="flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50" data-testid={`work-type-option-${wt.id}`}>
                             <Checkbox checked={selectedWtIds.includes(wt.id)} onCheckedChange={() => toggleWt(wt.id)} />
                             <span className="text-sm">{wt.name}</span>
                           </label>
@@ -898,23 +901,36 @@ export default function OnboardingVendor() {
                 </div>
                 <div>
                   <Label>Policy number *</Label>
-                  <Input value={compliance.policyNumber} onChange={(e) => setCompliance({ ...compliance, policyNumber: e.target.value })} data-testid="input-insurance-policy" />
+                  <Input
+                    value={compliance.policyNumber}
+                    onChange={(e) =>
+                      setCompliance({
+                        ...compliance,
+                        policyNumber: e.target.value,
+                      })
+                    }
+                    data-testid="input-insurance-policy"
+                  />
                 </div>
               </div>
               <div>
                 <Label>Expiration date *</Label>
-                <Input type="date" value={compliance.expirationDate} onChange={(e) => setCompliance({ ...compliance, expirationDate: e.target.value })} data-testid="input-insurance-expiration" />
+                <Input
+                  type="date"
+                  value={compliance.expirationDate}
+                  onChange={(e) =>
+                    setCompliance({
+                      ...compliance,
+                      expirationDate: e.target.value,
+                    })
+                  }
+                  data-testid="input-insurance-expiration"
+                />
               </div>
               <div>
                 <Label>COI document *</Label>
                 <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept="application/pdf,image/*"
-                    onChange={(e) => e.target.files?.[0] && uploadDoc(e.target.files[0])}
-                    data-testid="input-coi-file"
-                    className="text-sm"
-                  />
+                  <input type="file" accept="application/pdf,image/*" onChange={(e) => e.target.files?.[0] && uploadDoc(e.target.files[0])} data-testid="input-coi-file" className="text-sm" />
                   {compliance.documentUrl && (
                     <a href={compliance.documentUrl} target="_blank" rel="noreferrer" className="text-xs underline text-blue-600" data-testid="link-coi-preview">
                       View uploaded
@@ -924,7 +940,17 @@ export default function OnboardingVendor() {
               </div>
               <div>
                 <Label>Coverage notes</Label>
-                <Textarea value={compliance.coverageNotes} onChange={(e) => setCompliance({ ...compliance, coverageNotes: e.target.value })} placeholder="e.g. $1M general liability, $5M umbrella" data-testid="input-insurance-notes" />
+                <Textarea
+                  value={compliance.coverageNotes}
+                  onChange={(e) =>
+                    setCompliance({
+                      ...compliance,
+                      coverageNotes: e.target.value,
+                    })
+                  }
+                  placeholder="e.g. $1M general liability, $5M umbrella"
+                  data-testid="input-insurance-notes"
+                />
               </div>
             </div>
           )}
@@ -935,78 +961,35 @@ export default function OnboardingVendor() {
               <p className="text-sm text-gray-500">Set your baseline hourly rate and overtime rules. You can override these per-employee later.</p>
               <div>
                 <Label>Baseline hourly rate (USD) *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={rates.hourlyRate}
-                  onChange={(e) => setRates({ ...rates, hourlyRate: e.target.value })}
-                  placeholder="e.g. 45.00"
-                  data-testid="input-hourly-rate"
-                />
+                <Input type="number" step="0.01" min="0" value={rates.hourlyRate} onChange={(e) => setRates({ ...rates, hourlyRate: e.target.value })} placeholder="e.g. 45.00" data-testid="input-hourly-rate" />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label>Daily OT after (hours) *</Label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={rates.dailyOtHours}
-                    onChange={(e) => setRates({ ...rates, dailyOtHours: e.target.value })}
-                    data-testid="input-daily-ot"
-                  />
+                  <Input type="number" step="0.5" min="0" value={rates.dailyOtHours} onChange={(e) => setRates({ ...rates, dailyOtHours: e.target.value })} data-testid="input-daily-ot" />
                 </div>
                 <div>
                   <Label>Weekly OT after (hours) *</Label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={rates.weeklyOtHours}
-                    onChange={(e) => setRates({ ...rates, weeklyOtHours: e.target.value })}
-                    data-testid="input-weekly-ot"
-                  />
+                  <Input type="number" step="0.5" min="0" value={rates.weeklyOtHours} onChange={(e) => setRates({ ...rates, weeklyOtHours: e.target.value })} data-testid="input-weekly-ot" />
                 </div>
                 <div>
                   <Label>OT multiplier *</Label>
-                  <Input
-                    type="number"
-                    step="0.05"
-                    min="1"
-                    value={rates.overtimeMultiplier}
-                    onChange={(e) => setRates({ ...rates, overtimeMultiplier: e.target.value })}
-                    data-testid="input-ot-multiplier"
-                  />
+                  <Input type="number" step="0.05" min="1" value={rates.overtimeMultiplier} onChange={(e) => setRates({ ...rates, overtimeMultiplier: e.target.value })} data-testid="input-ot-multiplier" />
                   <p className="text-xs text-gray-500 mt-1">Federal default is 1.5×.</p>
                 </div>
               </div>
               <div className="border-t pt-4">
                 <Label>1099-NEC delivery preference *</Label>
-                <p className="text-xs text-gray-500 mb-2">
-                  IRS rules require explicit consent before we can deliver year-end tax forms electronically. You can change this later.
-                </p>
+                <p className="text-xs text-gray-500 mb-2">IRS rules require explicit consent before we can deliver year-end tax forms electronically. You can change this later.</p>
                 <div className="flex flex-col gap-2">
                   <label className="flex items-start gap-2 cursor-pointer" data-testid="radio-edelivery-yes">
-                    <input
-                      type="radio"
-                      className="mt-1"
-                      name="edelivery"
-                      checked={eDeliveryConsent === true}
-                      onChange={() => setEDeliveryConsent(true)}
-                    />
+                    <input type="radio" className="mt-1" name="edelivery" checked={eDeliveryConsent === true} onChange={() => setEDeliveryConsent(true)} />
                     <span className="text-sm">
                       <strong>Send my 1099 electronically</strong> — I consent to receive the form as a downloadable PDF instead of by mail.
                     </span>
                   </label>
                   <label className="flex items-start gap-2 cursor-pointer" data-testid="radio-edelivery-no">
-                    <input
-                      type="radio"
-                      className="mt-1"
-                      name="edelivery"
-                      checked={eDeliveryConsent === false}
-                      onChange={() => setEDeliveryConsent(false)}
-                    />
+                    <input type="radio" className="mt-1" name="edelivery" checked={eDeliveryConsent === false} onChange={() => setEDeliveryConsent(false)} />
                     <span className="text-sm">
                       <strong>Mail me a paper 1099</strong> — send the form to my physical address each January.
                     </span>
@@ -1016,30 +999,14 @@ export default function OnboardingVendor() {
             </div>
           )}
 
-          {currentStep.key === "platform-eula" && (
-            <OnboardingPlatformEulaStep
-              value={platformEula}
-              onChange={setPlatformEula}
-              disabled={loading}
-            />
-          )}
+          {currentStep.key === "platform-eula" && <OnboardingPlatformEulaStep value={platformEula} onChange={setPlatformEula} disabled={loading} />}
 
-          {currentStep.key === "legal-consent" && (
-            <OnboardingLegalConsentStep
-              value={legalConsent}
-              onChange={setLegalConsent}
-              disabled={loading}
-            />
-          )}
+          {currentStep.key === "legal-consent" && <OnboardingLegalConsentStep value={legalConsent} onChange={setLegalConsent} disabled={loading} />}
 
           {currentStep.key === "branding" && (
             <div className="space-y-4" data-testid="step-branding-body">
               <h2 className="text-lg font-semibold text-gray-900">Make it yours</h2>
-              <p className="text-sm text-gray-500">
-                Upload your logo and pick your brand color — the header above
-                updates live. We&apos;ll suggest colors from your logo. This step
-                is optional; skip it and finish anytime from the dashboard.
-              </p>
+              <p className="text-sm text-gray-500">Upload your logo and pick your brand color — the header above updates live. We&apos;ll suggest colors from your logo. This step is optional; skip it and finish anytime from the dashboard.</p>
               <OnboardingBrandFields
                 variant="vendor"
                 value={vendorBranding}
@@ -1076,7 +1043,16 @@ export default function OnboardingVendor() {
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input value={firstEmp.phone} onChange={(e) => setFirstEmp({ ...firstEmp, phone: handlePhoneInput(e.target.value) })} data-testid="input-emp-phone" />
+                <Input
+                  value={firstEmp.phone}
+                  onChange={(e) =>
+                    setFirstEmp({
+                      ...firstEmp,
+                      phone: handlePhoneInput(e.target.value),
+                    })
+                  }
+                  data-testid="input-emp-phone"
+                />
               </div>
             </div>
           )}
@@ -1084,13 +1060,7 @@ export default function OnboardingVendor() {
           <div className="mt-8 flex items-center justify-end gap-3">
             <div className="flex items-center gap-2">
               {stepIndex > 0 && !REQUIRED_STEPS.has(currentStep.key as StepKey) && (
-                <OnboardingPillButton
-                  tone="secondary"
-                  onClick={skipStep}
-                  disabled={loading}
-                  data-testid="button-skip"
-                  className="px-5"
-                >
+                <OnboardingPillButton tone="secondary" onClick={skipStep} disabled={loading} data-testid="button-skip" className="px-5">
                   {t("onboardingActions.skipForNow")}
                 </OnboardingPillButton>
               )}
@@ -1099,23 +1069,12 @@ export default function OnboardingVendor() {
                   to the dashboard, where the Finish-setup widget
                   surfaces a Resume CTA. */}
               {stepIndex > 0 && (
-                <OnboardingPillButton
-                  tone="secondary"
-                  onClick={saveAndQuit}
-                  disabled={loading}
-                  data-testid="button-save-and-quit"
-                  className="px-5"
-                >
+                <OnboardingPillButton tone="secondary" onClick={saveAndQuit} disabled={loading} data-testid="button-save-and-quit" className="px-5">
                   {t("onboardingActions.saveAndQuit")}
                 </OnboardingPillButton>
               )}
               {stepIndex === 0 ? (
-                <OnboardingPillButton
-                  onClick={submitBasics}
-                  disabled={loading || !namePassesDuplicateCheck}
-                  data-testid="button-create-account"
-                  className="px-6"
-                >
+                <OnboardingPillButton onClick={submitBasics} disabled={loading || !namePassesDuplicateCheck} data-testid="button-create-account" className="px-6">
                   {loading ? "Creating…" : "Create account"}
                 </OnboardingPillButton>
               ) : stepIndex === STEPS.length - 1 ? (
@@ -1129,20 +1088,13 @@ export default function OnboardingVendor() {
               )}
             </div>
           </div>
-        </CardContent></Card>
+        </CardContent>
+      </Card>
 
-        <p className="text-center text-xs text-gray-500 mt-4">
-          Step {stepIndex + 1} of {STEPS.length}. Your progress is saved automatically.
-        </p>
-      </div>
-
-      <OnboardingAccountCreatedDialog
-        open={showAccountCreated}
-        orgType="vendor"
-        companyName={basics.name.trim()}
-        onContinue={() => setShowAccountCreated(false)}
-        onGoToDashboard={() => navigate("/")}
-      />
-    </div>
+      <p className="mx-auto mt-4 w-fit rounded-full border border-white/15 bg-black/45 px-4 py-1.5 text-center text-xs text-white/85 backdrop-blur-sm">
+        Step {stepIndex + 1} of {STEPS.length}. Your progress is saved automatically.
+      </p>
+      <OnboardingAccountCreatedDialog open={showAccountCreated} orgType="vendor" companyName={basics.name.trim()} onContinue={() => setShowAccountCreated(false)} onGoToDashboard={() => navigate("/")} />
+    </OnboardingPageShell>
   );
 }

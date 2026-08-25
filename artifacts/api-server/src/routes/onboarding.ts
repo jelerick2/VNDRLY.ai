@@ -33,6 +33,7 @@ import { getAppOrigin } from "../lib/appOrigin";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { absoluteUploadUrl } from "../lib/uploadUrl";
 import { normalizeVendorName } from "../lib/vendor-match";
+import { sendEmailVerificationEmail } from "../lib/sendgrid";
 
 import { sendValidationFailed } from "../lib/validation-error";
 const onboardingObjectStorageService = new ObjectStorageService();
@@ -158,8 +159,22 @@ async function issueAndEmailVerification(args: {
     return { tokenIssued: false, emailSent: false };
   }
 
-  logger.debug({ userId: args.userId, email: args.email }, "verify-email: outbound email disabled");
-  return { tokenIssued: true, emailSent: false };
+  const verificationUrl = `${getAppOrigin()}/api/onboarding/verify-email/${token}`;
+  try {
+    const { messageId } = await sendEmailVerificationEmail(
+      args.email,
+      verificationUrl,
+      args.displayName,
+    );
+    logger.info(
+      { userId: args.userId, messageId },
+      "verify-email: verification email accepted by SendGrid",
+    );
+    return { tokenIssued: true, emailSent: true };
+  } catch (err) {
+    logger.warn({ err, userId: args.userId }, "verify-email: send failed");
+    return { tokenIssued: true, emailSent: false };
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────

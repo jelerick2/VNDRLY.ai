@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router, Slot, usePathname } from "expo-router";
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { DeviceEventEmitter, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
@@ -17,6 +17,7 @@ type TabItem = {
   key: string;
   label: string;
   visible: boolean;
+  voiceEntry?: boolean;
 };
 
 export default function TabLayout() {
@@ -32,6 +33,14 @@ export default function TabLayout() {
 
   const tabs = ([
     { key: "askv", href: "/(tabs)/askv", label: t("tabs.askv"), icon: "zap", visible: true },
+    {
+      key: "gate-voice",
+      href: "/(tabs)/gate",
+      label: t("gatekeeper.voiceEntry"),
+      icon: "mic",
+      visible: isGatekeeper,
+      voiceEntry: true,
+    },
     {
       key: "gate",
       href: "/(tabs)/gate",
@@ -111,7 +120,10 @@ export default function TabLayout() {
               key={tab.key}
               accessibilityRole="button"
               accessibilityState={active ? { selected: true } : undefined}
-              onPress={() => router.push(tab.href as never)}
+              onPress={() => {
+                router.push(tab.href as never);
+                if (tab.voiceEntry) setTimeout(() => DeviceEventEmitter.emit("vndrly:gate-voice"), 250);
+              }}
               style={styles.tabItem}
             >
               <View>

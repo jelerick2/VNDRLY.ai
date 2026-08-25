@@ -13,38 +13,21 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle } from "lucide-react";
 import OnboardingStepper, { type StepperStep } from "@/components/onboarding-stepper";
 import OnboardingVerificationBanner from "@/components/onboarding-verification-banner";
-import LanguageToggle from "@/components/language-toggle";
-import {
-  OnboardingBrandHeader,
-  type OnboardingBrandPreview,
-} from "@/components/onboarding-brand-header";
+import { OnboardingPageShell } from "@/components/onboarding-page-shell";
+import { OnboardingBrandHeader, type OnboardingBrandPreview } from "@/components/onboarding-brand-header";
 import { OnboardingBrandFields } from "@/components/onboarding-brand-fields";
 import { OnboardingAccountCreatedDialog } from "@/components/onboarding-account-created-dialog";
-import {
-  OnboardingPlatformEulaStep,
-  type PlatformEulaAcceptanceValue,
-} from "@/components/onboarding-platform-eula-step";
-import {
-  OnboardingLegalConsentStep,
-  type OnboardingLegalConsentValue,
-} from "@/components/onboarding-legal-consent-step";
+import { OnboardingPlatformEulaStep, type PlatformEulaAcceptanceValue } from "@/components/onboarding-platform-eula-step";
+import { OnboardingLegalConsentStep, type OnboardingLegalConsentValue } from "@/components/onboarding-legal-consent-step";
 import { PLATFORM_EULA_VERSION } from "@workspace/platform-eula";
 import { LEGAL_POLICY_VERSION } from "@/lib/legal-docs";
-import { brandStyleVars, DEFAULT_BRAND } from "@/hooks/use-brand";
+import { DEFAULT_BRAND } from "@/hooks/use-brand";
 import { onboardingApi } from "@/lib/onboarding-api";
 import { uploadOnboardingLogo } from "@/lib/onboarding-logo-upload";
 import { handlePhoneInput, stripPhone } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 
-type StepKey =
-  | "company-basics"
-  | "platform-eula"
-  | "legal-consent"
-  | "branding"
-  | "first-site"
-  | "tax-billing"
-  | "preferences"
-  | "invite-team";
+type StepKey = "company-basics" | "platform-eula" | "legal-consent" | "branding" | "first-site" | "tax-billing" | "preferences" | "invite-team";
 
 const STEPS: (StepperStep & { key: StepKey })[] = [
   { key: "company-basics", label: "Company Basics" },
@@ -72,8 +55,18 @@ interface PartnerPayload {
   brandAccentColor?: string;
   logoUrl?: string;
   logoSquareUrl?: string;
-  firstSite?: { name?: string; address?: string; siteCode?: string; siteRadiusMeters?: number };
-  taxBilling?: { federalTaxId?: string; stateTaxId?: string; physicalAddress?: string; billingAddress?: string };
+  firstSite?: {
+    name?: string;
+    address?: string;
+    siteCode?: string;
+    siteRadiusMeters?: number;
+  };
+  taxBilling?: {
+    federalTaxId?: string;
+    stateTaxId?: string;
+    physicalAddress?: string;
+    billingAddress?: string;
+  };
   // Should-have operating preferences (hours-of-operation copy on the
   // visitor portal + default vendor-matching radius).
   preferences?: { hoursOfOperation?: string; operatingRadiusMiles?: number };
@@ -143,14 +136,27 @@ export default function OnboardingPartner() {
   });
 
   // Step 3 — First site.
-  const [firstSite, setFirstSite] = useState({ name: "", address: "", siteCode: "", siteRadiusMeters: 1609 });
+  const [firstSite, setFirstSite] = useState({
+    name: "",
+    address: "",
+    siteCode: "",
+    siteRadiusMeters: 1609,
+  });
 
   // Step 4 — Tax & billing. Spec calls out federal AND state IDs and
   // BOTH a physical and billing address.
-  const [taxBilling, setTaxBilling] = useState({ federalTaxId: "", stateTaxId: "", physicalAddress: "", billingAddress: "" });
+  const [taxBilling, setTaxBilling] = useState({
+    federalTaxId: "",
+    stateTaxId: "",
+    physicalAddress: "",
+    billingAddress: "",
+  });
 
   // Step 5 — Operating preferences (should-have).
-  const [preferences, setPreferences] = useState({ hoursOfOperation: "", operatingRadiusMiles: "" });
+  const [preferences, setPreferences] = useState({
+    hoursOfOperation: "",
+    operatingRadiusMiles: "",
+  });
 
   // Step 6 — Invite team.
   const [inviteText, setInviteText] = useState("");
@@ -234,10 +240,7 @@ export default function OnboardingPartner() {
         if (p.preferences) {
           setPreferences({
             hoursOfOperation: p.preferences.hoursOfOperation ?? "",
-            operatingRadiusMiles:
-              typeof p.preferences.operatingRadiusMiles === "number"
-                ? String(p.preferences.operatingRadiusMiles)
-                : "",
+            operatingRadiusMiles: typeof p.preferences.operatingRadiusMiles === "number" ? String(p.preferences.operatingRadiusMiles) : "",
           });
         }
         if (p.inviteEmails && p.inviteEmails.length > 0) {
@@ -279,25 +282,21 @@ export default function OnboardingPartner() {
     const controller = new AbortController();
     const handle = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `${BASE}/api/partners/check-name?name=${encodeURIComponent(trimmed)}`,
-          { credentials: "include", signal: controller.signal },
-        );
+        const res = await fetch(`${BASE}/api/partners/check-name?name=${encodeURIComponent(trimmed)}`, { credentials: "include", signal: controller.signal });
         if (controller.signal.aborted) return;
         if (!res.ok) {
           setNameMatches([]);
           setNameCheckUnavailable(true);
           return;
         }
-        const data = (await res.json()) as { matches?: { name: string; score: number }[] };
+        const data = (await res.json()) as {
+          matches?: { name: string; score: number }[];
+        };
         if (controller.signal.aborted) return;
         setNameMatches(Array.isArray(data.matches) ? data.matches : []);
         setNameCheckUnavailable(false);
       } catch (err) {
-        if (
-          controller.signal.aborted ||
-          (err instanceof DOMException && err.name === "AbortError")
-        ) {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
           return;
         }
         setNameMatches([]);
@@ -313,28 +312,16 @@ export default function OnboardingPartner() {
   }, [basics.name, orgId]);
 
   const trimmedBasicsName = basics.name.trim();
-  const namePassesDuplicateCheck =
-    orgId !== null || nameMatches.length === 0 || confirmDifferentPartner;
+  const namePassesDuplicateCheck = orgId !== null || nameMatches.length === 0 || confirmDifferentPartner;
 
-  const persist = async (next: {
-    currentStep?: StepKey;
-    completedKey?: StepKey;
-    skippedKey?: StepKey;
-    payloadPatch?: Partial<PartnerPayload>;
-  }) => {
+  const persist = async (next: { currentStep?: StepKey; completedKey?: StepKey; skippedKey?: StepKey; payloadPatch?: Partial<PartnerPayload> }) => {
     if (!orgId) return;
-    const newCompleted = next.completedKey
-      ? Array.from(new Set([...completed, next.completedKey]))
-      : completed;
+    const newCompleted = next.completedKey ? Array.from(new Set([...completed, next.completedKey])) : completed;
     // When a step transitions from skipped → completed, drop it from
     // skipped so the dashboard's Finish-setup widget stops showing it
     // as outstanding.
-    const skippedAfterRemoval = next.completedKey
-      ? skipped.filter((s) => s !== next.completedKey)
-      : skipped;
-    const newSkipped = next.skippedKey
-      ? Array.from(new Set([...skippedAfterRemoval, next.skippedKey]))
-      : skippedAfterRemoval;
+    const skippedAfterRemoval = next.completedKey ? skipped.filter((s) => s !== next.completedKey) : skipped;
+    const newSkipped = next.skippedKey ? Array.from(new Set([...skippedAfterRemoval, next.skippedKey])) : skippedAfterRemoval;
     const newPayload = next.payloadPatch ? { ...payload, ...next.payloadPatch } : payload;
     setCompleted(newCompleted);
     setSkipped(newSkipped);
@@ -350,7 +337,10 @@ export default function OnboardingPartner() {
   // ─── Step 1: create the account ─────────────────────────────────
   const submitBasics = async () => {
     if (!basics.name.trim() || !basics.contactName.trim() || !basics.contactEmail.trim()) {
-      toast({ title: "Please fill in name, contact, and email.", variant: "destructive" });
+      toast({
+        title: "Please fill in name, contact, and email.",
+        variant: "destructive",
+      });
       return;
     }
     const phoneDigits = stripPhone(basics.contactPhone);
@@ -359,7 +349,10 @@ export default function OnboardingPartner() {
       return;
     }
     if (basics.password.length < 8) {
-      toast({ title: "Password must be at least 8 characters.", variant: "destructive" });
+      toast({
+        title: "Password must be at least 8 characters.",
+        variant: "destructive",
+      });
       return;
     }
     if (basics.password !== basics.confirm) {
@@ -406,16 +399,9 @@ export default function OnboardingPartner() {
     setLoading(true);
     try {
       const finalUrl = await uploadOnboardingLogo(file, "public");
-      setBranding((b) =>
-        slot === "square"
-          ? { ...b, logoSquareUrl: finalUrl }
-          : { ...b, logoUrl: finalUrl },
-      );
+      setBranding((b) => (slot === "square" ? { ...b, logoSquareUrl: finalUrl } : { ...b, logoUrl: finalUrl }));
       toast({
-        title:
-          slot === "square"
-            ? "Square logo uploaded."
-            : "Horizontal logo uploaded.",
+        title: slot === "square" ? "Square logo uploaded." : "Horizontal logo uploaded.",
       });
     } catch (err) {
       toast({ title: (err as Error).message, variant: "destructive" });
@@ -514,8 +500,7 @@ export default function OnboardingPartner() {
       const radius = Number(preferences.operatingRadiusMiles);
       patch.preferences = {
         hoursOfOperation: preferences.hoursOfOperation.trim() || undefined,
-        operatingRadiusMiles:
-          Number.isFinite(radius) && radius > 0 ? Math.round(radius) : undefined,
+        operatingRadiusMiles: Number.isFinite(radius) && radius > 0 ? Math.round(radius) : undefined,
       };
     } else if (currentStep.key === "invite-team") {
       patch.inviteEmails = inviteEmails;
@@ -566,7 +551,10 @@ export default function OnboardingPartner() {
         window.location.assign(`${BASE}/`);
         return;
       }
-      await persist({ currentStep: STEPS[stepIndex + 1].key, skippedKey: currentStep.key as StepKey });
+      await persist({
+        currentStep: STEPS[stepIndex + 1].key,
+        skippedKey: currentStep.key as StepKey,
+      });
       setStepIndex((i) => i + 1);
     } catch (err) {
       toast({ title: (err as Error).message, variant: "destructive" });
@@ -614,16 +602,8 @@ export default function OnboardingPartner() {
   );
 
   const brandPreview = useMemo((): OnboardingBrandPreview | null => {
-    const primary =
-      branding.brandPrimaryColor.trim() ||
-      payload.brandPrimaryColor?.trim() ||
-      "";
-    const logo =
-      branding.logoSquareUrl.trim() ||
-      branding.logoUrl.trim() ||
-      payload.logoSquareUrl?.trim() ||
-      payload.logoUrl?.trim() ||
-      "";
+    const primary = branding.brandPrimaryColor.trim() || payload.brandPrimaryColor?.trim() || "";
+    const logo = branding.logoSquareUrl.trim() || branding.logoUrl.trim() || payload.logoSquareUrl?.trim() || payload.logoUrl?.trim() || "";
     if (!primary && !logo) return null;
     return {
       name: basics.name.trim() || null,
@@ -647,41 +627,19 @@ export default function OnboardingPartner() {
   }, [brandPreview, branding.brandAccentColor]);
 
   return (
-    <div
-      className="min-h-screen bg-gray-50 px-4 py-8 relative"
-      style={brandStyleVars(pageBrand)}
-    >
-      <div className="absolute top-4 right-4 z-20">
-        <LanguageToggle variant="light" />
-      </div>
-      <div className="max-w-2xl mx-auto">
-        <OnboardingBrandHeader
-          title="Partner Onboarding"
-          subtitle="Get your team set up in 5 quick steps."
-          preview={brandPreview}
-          onBack={() =>
-            stepIndex === 0 ? navigate("/signup") : prevStep()
-          }
-        />
+    <OnboardingPageShell brand={pageBrand}>
+      <div className="rounded-2xl border border-white/25 bg-white/95 p-5 shadow-2xl backdrop-blur-xl mb-4">
+        <OnboardingBrandHeader title="Partner Onboarding" subtitle="Get your team set up in 5 quick steps." preview={brandPreview} onBack={() => (stepIndex === 0 ? navigate("/signup") : prevStep())} />
 
         {/* Email-verification banner — appears once an account
-            exists. Hidden on the anonymous step-1 visit so it doesn't
-            confuse first-time signups. */}
-        {orgId && verification && (
-          <OnboardingVerificationBanner
-            email={verification.email}
-            emailVerifiedAt={verification.emailVerifiedAt}
-          />
-        )}
+              exists. Hidden on the anonymous step-1 visit so it doesn't
+              confuse first-time signups. */}
+        {orgId && verification && <OnboardingVerificationBanner email={verification.email} emailVerifiedAt={verification.emailVerifiedAt} />}
+      </div>
 
-        <Card><CardContent className="p-6 pt-6">
-          <OnboardingStepper
-            steps={STEPS}
-            currentIndex={stepIndex}
-            completedKeys={completed}
-            skippedKeys={skipped}
-            className="mb-8"
-          />
+      <Card className="border-2 border-[color:var(--brand-primary)]/70 bg-white/95 shadow-2xl backdrop-blur-xl">
+        <CardContent className="p-6 pt-6">
+          <OnboardingStepper steps={STEPS} currentIndex={stepIndex} completedKeys={completed} skippedKeys={skipped} className="mb-8" />
 
           {currentStep.key === "company-basics" && (
             <div className="space-y-4" data-testid="step-company-basics-body">
@@ -690,31 +648,19 @@ export default function OnboardingPartner() {
                 <Label>Company Name *</Label>
                 <Input value={basics.name} onChange={(e) => setBasics({ ...basics, name: e.target.value })} placeholder="e.g. Exxon Energy" data-testid="input-company-name" />
                 {!orgId && nameMatches.length > 0 && (
-                  <div
-                    role="alert"
-                    data-testid="partner-onboarding-duplicate-warning"
-                    className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-                  >
+                  <div role="alert" data-testid="partner-onboarding-duplicate-warning" className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
                       <div className="flex-1 space-y-1.5">
-                        <p className="font-medium">
-                          This name looks similar to an existing partner — please contact us first.
-                        </p>
+                        <p className="font-medium">This name looks similar to an existing partner — please contact us first.</p>
                         <ul className="space-y-0.5">
                           {nameMatches.map((m) => (
                             <li key={m.name}>Did you mean {m.name}?</li>
                           ))}
                         </ul>
                         <label className="mt-1 flex items-center gap-2 text-amber-900">
-                          <Checkbox
-                            data-testid="partner-onboarding-confirm-different"
-                            checked={confirmDifferentPartner}
-                            onCheckedChange={(c) => setConfirmDifferentPartner(c === true)}
-                          />
-                          <span>
-                            I'm sure this is a different partner — create it anyway.
-                          </span>
+                          <Checkbox data-testid="partner-onboarding-confirm-different" checked={confirmDifferentPartner} onCheckedChange={(c) => setConfirmDifferentPartner(c === true)} />
+                          <span>I'm sure this is a different partner — create it anyway.</span>
                         </label>
                       </div>
                     </div>
@@ -741,7 +687,17 @@ export default function OnboardingPartner() {
               </div>
               <div>
                 <Label>Phone</Label>
-                <Input value={basics.contactPhone} onChange={(e) => setBasics({ ...basics, contactPhone: handlePhoneInput(e.target.value) })} placeholder="(555) 123-4567" data-testid="input-contact-phone" />
+                <Input
+                  value={basics.contactPhone}
+                  onChange={(e) =>
+                    setBasics({
+                      ...basics,
+                      contactPhone: handlePhoneInput(e.target.value),
+                    })
+                  }
+                  placeholder="(555) 123-4567"
+                  data-testid="input-contact-phone"
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -757,31 +713,14 @@ export default function OnboardingPartner() {
             </div>
           )}
 
-          {currentStep.key === "platform-eula" && (
-            <OnboardingPlatformEulaStep
-              value={platformEula}
-              onChange={setPlatformEula}
-              disabled={loading}
-            />
-          )}
+          {currentStep.key === "platform-eula" && <OnboardingPlatformEulaStep value={platformEula} onChange={setPlatformEula} disabled={loading} />}
 
-          {currentStep.key === "legal-consent" && (
-            <OnboardingLegalConsentStep
-              value={legalConsent}
-              onChange={setLegalConsent}
-              disabled={loading}
-            />
-          )}
+          {currentStep.key === "legal-consent" && <OnboardingLegalConsentStep value={legalConsent} onChange={setLegalConsent} disabled={loading} />}
 
           {currentStep.key === "branding" && (
             <div className="space-y-4" data-testid="step-branding-body">
               <h2 className="text-lg font-semibold text-gray-900">Make it yours</h2>
-              <p className="text-sm text-gray-500">
-                Upload your logo and pick brand colors — the header above
-                updates live on visitor posters, tickets, and your portal.
-                We&apos;ll suggest colors from your logo. This step is optional;
-                you can skip and finish anytime from the dashboard.
-              </p>
+              <p className="text-sm text-gray-500">Upload your logo and pick brand colors — the header above updates live on visitor posters, tickets, and your portal. We&apos;ll suggest colors from your logo. This step is optional; you can skip and finish anytime from the dashboard.</p>
               <OnboardingBrandFields
                 variant="partner"
                 value={branding}
@@ -821,7 +760,12 @@ export default function OnboardingPartner() {
                   type="number"
                   min={1}
                   value={firstSite.siteRadiusMeters}
-                  onChange={(e) => setFirstSite({ ...firstSite, siteRadiusMeters: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setFirstSite({
+                      ...firstSite,
+                      siteRadiusMeters: Number(e.target.value),
+                    })
+                  }
                   placeholder="152"
                   data-testid="input-site-radius"
                 />
@@ -837,20 +781,59 @@ export default function OnboardingPartner() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Federal Tax ID (EIN) *</Label>
-                  <Input value={taxBilling.federalTaxId} onChange={(e) => setTaxBilling({ ...taxBilling, federalTaxId: e.target.value })} placeholder="XX-XXXXXXX" data-testid="input-federal-tax-id" />
+                  <Input
+                    value={taxBilling.federalTaxId}
+                    onChange={(e) =>
+                      setTaxBilling({
+                        ...taxBilling,
+                        federalTaxId: e.target.value,
+                      })
+                    }
+                    placeholder="XX-XXXXXXX"
+                    data-testid="input-federal-tax-id"
+                  />
                 </div>
                 <div>
                   <Label>State Tax ID *</Label>
-                  <Input value={taxBilling.stateTaxId} onChange={(e) => setTaxBilling({ ...taxBilling, stateTaxId: e.target.value })} data-testid="input-state-tax-id" />
+                  <Input
+                    value={taxBilling.stateTaxId}
+                    onChange={(e) =>
+                      setTaxBilling({
+                        ...taxBilling,
+                        stateTaxId: e.target.value,
+                      })
+                    }
+                    data-testid="input-state-tax-id"
+                  />
                 </div>
               </div>
               <div>
                 <Label>Physical address *</Label>
-                <Textarea value={taxBilling.physicalAddress} onChange={(e) => setTaxBilling({ ...taxBilling, physicalAddress: e.target.value })} placeholder="Street, city, state, ZIP — your headquarters location" data-testid="input-physical-address" />
+                <Textarea
+                  value={taxBilling.physicalAddress}
+                  onChange={(e) =>
+                    setTaxBilling({
+                      ...taxBilling,
+                      physicalAddress: e.target.value,
+                    })
+                  }
+                  placeholder="Street, city, state, ZIP — your headquarters location"
+                  data-testid="input-physical-address"
+                />
               </div>
               <div>
                 <Label>Billing address *</Label>
-                <Textarea value={taxBilling.billingAddress} onChange={(e) => setTaxBilling({ ...taxBilling, billingAddress: e.target.value })} placeholder="Where invoices should be mailed (use the same as physical if applicable)" data-testid="input-billing-address" />
+                <Textarea
+                  value={taxBilling.billingAddress}
+                  onChange={(e) =>
+                    setTaxBilling({
+                      ...taxBilling,
+                      billingAddress: e.target.value,
+                    })
+                  }
+                  placeholder="Where invoices should be mailed (use the same as physical if applicable)"
+                  data-testid="input-billing-address"
+                />
               </div>
             </div>
           )}
@@ -863,7 +846,12 @@ export default function OnboardingPartner() {
                 <Label>Hours of operation</Label>
                 <Textarea
                   value={preferences.hoursOfOperation}
-                  onChange={(e) => setPreferences({ ...preferences, hoursOfOperation: e.target.value })}
+                  onChange={(e) =>
+                    setPreferences({
+                      ...preferences,
+                      hoursOfOperation: e.target.value,
+                    })
+                  }
                   placeholder="e.g. Mon–Fri 6am–6pm, Sat 8am–noon"
                   rows={3}
                   data-testid="input-hours-of-operation"
@@ -875,7 +863,12 @@ export default function OnboardingPartner() {
                   type="number"
                   min={1}
                   value={preferences.operatingRadiusMiles}
-                  onChange={(e) => setPreferences({ ...preferences, operatingRadiusMiles: e.target.value })}
+                  onChange={(e) =>
+                    setPreferences({
+                      ...preferences,
+                      operatingRadiusMiles: e.target.value,
+                    })
+                  }
                   placeholder="50"
                   className="max-w-[180px]"
                   data-testid="input-operating-radius-miles"
@@ -889,16 +882,11 @@ export default function OnboardingPartner() {
             <div className="space-y-4" data-testid="step-invite-team-body">
               <h2 className="text-lg font-semibold text-gray-900">Invite your team (optional)</h2>
               <p className="text-sm text-gray-500">Paste one or more email addresses (separated by commas, spaces, or new lines). They'll get an invite link to join your account.</p>
-              <Textarea
-                value={inviteText}
-                onChange={(e) => setInviteText(e.target.value)}
-                placeholder="alice@company.com, bob@company.com"
-                rows={5}
-                data-testid="input-invite-emails"
-              />
+              <Textarea value={inviteText} onChange={(e) => setInviteText(e.target.value)} placeholder="alice@company.com, bob@company.com" rows={5} data-testid="input-invite-emails" />
               {inviteEmails.length > 0 && (
                 <p className="text-sm text-gray-700">
-                  {inviteEmails.length} email{inviteEmails.length === 1 ? "" : "s"} ready to invite.
+                  {inviteEmails.length} email
+                  {inviteEmails.length === 1 ? "" : "s"} ready to invite.
                 </p>
               )}
             </div>
@@ -916,59 +904,32 @@ export default function OnboardingPartner() {
                   to the dashboard, where the Finish-setup widget
                   surfaces a Resume CTA. */}
               {stepIndex > 0 && (
-                <PngPillButton
-                  onClick={saveAndQuit}
-                  disabled={loading}
-                  data-testid="button-save-and-quit"
-                  className="px-4 h-10"
-                >
+                <PngPillButton onClick={saveAndQuit} disabled={loading} data-testid="button-save-and-quit" className="px-4 h-10">
                   {t("onboardingActions.saveAndQuit")}
                 </PngPillButton>
               )}
               {stepIndex === 0 ? (
-                <PngPillButton color="blue"
-                  onClick={submitBasics}
-                  disabled={loading || !namePassesDuplicateCheck}
-                  data-testid="button-create-account"
-                  className="px-6 h-10"
-                >
+                <PngPillButton color="blue" onClick={submitBasics} disabled={loading || !namePassesDuplicateCheck} data-testid="button-create-account" className="px-6 h-10">
                   {loading ? "Creating…" : "Create account"}
                 </PngPillButton>
               ) : stepIndex === STEPS.length - 1 ? (
-                <PngPillButton color="blue"
-                  onClick={() => finish({ payloadPatch: { inviteEmails } })}
-                  disabled={loading}
-                  data-testid="button-finish"
-                  className="px-6 h-10"
-                >
+                <PngPillButton color="blue" onClick={() => finish({ payloadPatch: { inviteEmails } })} disabled={loading} data-testid="button-finish" className="px-6 h-10">
                   {loading ? "Finishing…" : "Finish setup"}
                 </PngPillButton>
               ) : (
-                <PngPillButton color="blue"
-                  onClick={() => nextStep({ payloadPatch: currentStepPatch() })}
-                  disabled={loading}
-                  data-testid="button-next"
-                  className="px-6 h-10"
-                >
+                <PngPillButton color="blue" onClick={() => nextStep({ payloadPatch: currentStepPatch() })} disabled={loading} data-testid="button-next" className="px-6 h-10">
                   {loading ? "Saving…" : "Continue"}
                 </PngPillButton>
               )}
             </div>
           </div>
-        </CardContent></Card>
+        </CardContent>
+      </Card>
 
-        <p className="text-center text-xs text-gray-500 mt-4">
-          Step {stepIndex + 1} of {STEPS.length}. Your progress is saved automatically.
-        </p>
-      </div>
-
-      <OnboardingAccountCreatedDialog
-        open={showAccountCreated}
-        orgType="partner"
-        companyName={basics.name.trim()}
-        onContinue={() => setShowAccountCreated(false)}
-        onGoToDashboard={() => navigate("/")}
-      />
-    </div>
+      <p className="mx-auto mt-4 w-fit rounded-full border border-white/15 bg-black/45 px-4 py-1.5 text-center text-xs text-white/85 backdrop-blur-sm">
+        Step {stepIndex + 1} of {STEPS.length}. Your progress is saved automatically.
+      </p>
+      <OnboardingAccountCreatedDialog open={showAccountCreated} orgType="partner" companyName={basics.name.trim()} onContinue={() => setShowAccountCreated(false)} onGoToDashboard={() => navigate("/")} />
+    </OnboardingPageShell>
   );
 }

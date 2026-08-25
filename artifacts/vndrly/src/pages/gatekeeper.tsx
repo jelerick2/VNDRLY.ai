@@ -28,6 +28,7 @@ import {
   type GateMemoryField,
   type GateMemorySuggestion,
 } from "@/lib/gate-entry-memory";
+import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
 import { listAllVisits, visitsApi, type SiteContext } from "@/lib/visits-api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -38,6 +39,17 @@ function evidenceUrl(path: string): string {
 
 type Coordinates = { latitude: number; longitude: number };
 type Translate = (key: string) => string;
+
+type GateSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: { results: { [index: number]: { [index: number]: { transcript: string } }; length: number } }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
 
 function currentPosition(required: boolean, t: Translate): Promise<Coordinates | undefined> {
   return new Promise((resolve, reject) => {
@@ -109,6 +121,8 @@ export default function GatekeeperPage() {
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const recognitionRef = useRef<GateSpeechRecognition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeMemoryField, setActiveMemoryField] = useState<GateMemoryField | null>(null);
   const [memoryDeleting, setMemoryDeleting] = useState(false);
@@ -203,6 +217,52 @@ export default function GatekeeperPage() {
     setMemoryDeleting(false);
     applyEntryDraft(mergeGateFill(entryDraft, pickSuggestionFill(suggestion)));
   };
+
+  const startGateVoiceEntry = () => {
+    const win = window as typeof window & {
+      SpeechRecognition?: new () => GateSpeechRecognition;
+      webkitSpeechRecognition?: new () => GateSpeechRecognition;
+    };
+    const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
+    if (!Recognition) {
+      setError(t("gatekeeper.voiceUnavailable"));
+      return;
+    }
+    recognitionRef.current?.stop();
+    const recognition = new Recognition();
+    recognitionRef.current = recognition;
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+    recognition.onresult = (event) => {
+      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index][0].transcript).join(" ");
+      const fill = parseGateVoiceEntry(transcript);
+      if (Object.keys(fill).length === 0) {
+        setError(t("gatekeeper.voiceNotUnderstood"));
+        return;
+      }
+      applyEntryDraft({ ...entryDraft, ...fill });
+      setError(null);
+    };
+    recognition.onerror = () => setError(t("gatekeeper.voiceNotUnderstood"));
+    recognition.onend = () => setVoiceListening(false);
+    setError(null);
+    setVoiceListening(true);
+    recognition.start();
+  };
+
+  useEffect(() => {
+    const launch = () => startGateVoiceEntry();
+    window.addEventListener("vndrly:gate-voice", launch);
+    if (sessionStorage.getItem("vndrly:gate-voice-pending") === "1") {
+      sessionStorage.removeItem("vndrly:gate-voice-pending");
+      window.setTimeout(launch, 50);
+    }
+    return () => {
+      window.removeEventListener("vndrly:gate-voice", launch);
+      recognitionRef.current?.stop();
+    };
+  }, [entryDraft]);
 
   const hosts = useMemo(() => {
     if (!site.data) return [];
@@ -308,7 +368,7 @@ export default function GatekeeperPage() {
   const checkIn = async () => {
     const context = site.data;
     const host = hosts.find((candidate) => candidate.key === hostKey);
-    if (!context || !host || !firstName.trim() || !lastName.trim()) {
+    if (!context || !host || !firstName.trim() || !lastName.trim() || !vehiclePlate.trim()) {
       setError(t("gatekeeper.requiredFields"));
       return;
     }
@@ -377,6 +437,7 @@ export default function GatekeeperPage() {
           <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("gatekeeper.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.subtitle")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.handsFreeHint")}</p>
+          {voiceListening && <p className="mt-1 text-sm font-medium text-[color:var(--brand-primary)]">{t("gatekeeper.voiceListening")}</p>}
         </div>
         <Link
           href="/gate/history"
@@ -512,7 +573,7 @@ export default function GatekeeperPage() {
                 />
               </div>
               <div>
-                <Label>{t("gatekeeper.vehiclePlate")}</Label>
+                <Label>{t("gatekeeper.vehiclePlate")} *</Label>
                 <GateMemoryInput
                   value={vehiclePlate}
                   suggestions={activeMemoryField === "vehiclePlate" ? memory.suggestions : []}

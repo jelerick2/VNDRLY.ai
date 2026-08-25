@@ -192,6 +192,30 @@ describe("evaluateGateMemory", () => {
     });
   });
 
+  it("suggests a different company driver even when the truck prefilled the last driver", () => {
+    const bobVilla = visit({
+      id: 20,
+      firstName: "Bob",
+      lastName: "Villa",
+      company: "Peak Energy",
+      vehiclePlate: "OK-4412",
+    });
+    const bonnieWest = visit({
+      id: 21,
+      firstName: "Bonnie",
+      lastName: "West",
+      company: "Peak Energy",
+      vehiclePlate: "TX-9911",
+      checkInTime: "2026-08-23T10:00:00Z",
+    });
+    const result = evaluateGateMemory({
+      visits: [bobVilla, bonnieWest],
+      draft: draft({ firstName: "Bo", company: "Peak Energy", vehiclePlate: "OK-4412" }),
+      activeField: "firstName",
+    });
+    expect(result.suggestions.map((row) => row.label)).toEqual(["Bonnie West", "Bob Villa"]);
+  });
+
   it("does not fill a person when the name prefix is ambiguous", () => {
     const jordanLee = visit({
       id: 5,

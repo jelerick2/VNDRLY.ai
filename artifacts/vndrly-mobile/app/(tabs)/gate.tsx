@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -28,7 +29,7 @@ import {
   resolveAssignedGateSites,
   shouldApplyDefaultGateSite,
 } from "@/lib/gate-default-site";
-import { fetchSiteContext, type SiteContext } from "@/lib/guest";
+import { fetchSiteContext, type ActiveVisit, type SiteContext } from "@/lib/guest";
 import {
   fetchAssignedGateSites,
   deleteGateEvidence,
@@ -39,7 +40,35 @@ import {
   submitGatekeeperVisit,
 } from "@/lib/gatekeeper";
 import { captureAndUploadImage } from "@/lib/photos";
+import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
+import { transcribeAskVRecording } from "@/lib/askv-transcribe";
+import { createPttRecorder, PttMicPermissionError, type PttRecorder } from "@/lib/ptt";
 import { buildHostOptions } from "@/lib/visitorCheckin";
+
+type DriverNameField = "firstName" | "lastName";
+
+function driverSuggestions(
+  visits: ActiveVisit[],
+  field: DriverNameField | null,
+  query: string,
+  company: string,
+): ActiveVisit[] {
+  if (!field || !query.trim()) return [];
+  const needle = query.trim().toLowerCase();
+  const companyNeedle = company.trim().toLowerCase();
+  const seen = new Set<string>();
+  return [...visits]
+    .sort((a, b) => Date.parse(b.checkInTime) - Date.parse(a.checkInTime))
+    .filter((visit) => {
+      if (!(visit[field] ?? "").trim().toLowerCase().startsWith(needle)) return false;
+      if (companyNeedle && !(visit.company ?? "").trim().toLowerCase().startsWith(companyNeedle)) return false;
+      const key = `${(visit.firstName ?? "").trim().toLowerCase()}|${(visit.lastName ?? "").trim().toLowerCase()}|${(visit.company ?? "").trim().toLowerCase()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 6);
+}
 
 export default function GatekeeperScreen() {
   const colors = useColors();
@@ -47,6 +76,8 @@ export default function GatekeeperScreen() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const appliedDefault = useRef(false);
+  const voiceRecorderRef = useRef<PttRecorder | null>(null);
+  const voiceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [siteCode, setSiteCode] = useState("");
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [hostKey, setHostKey] = useState<string | null>(null);
@@ -59,6 +90,8 @@ export default function GatekeeperScreen() {
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeNameField, setActiveNameField] = useState<DriverNameField | null>(null);
+  const [voiceListening, setVoiceListening] = useState(false);
 
   const activeVisits = useQuery({
     queryKey: ["gatekeeper-visits"],
@@ -115,6 +148,87 @@ export default function GatekeeperScreen() {
     styles.input,
     { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card },
   ];
+  const matchingDrivers = useMemo(
+    () => driverSuggestions(
+      recentVisits.data ?? [],
+      activeNameField,
+      activeNameField === "firstName" ? firstName : lastName,
+      company,
+    ),
+    [activeNameField, company, firstName, lastName, recentVisits.data],
+  );
+
+  const useDriver = (visit: ActiveVisit) => {
+    setFirstName(visit.firstName ?? "");
+    setLastName(visit.lastName ?? "");
+    setCompany(visit.company ?? company);
+    if (!vehiclePlate.trim()) setVehiclePlate((visit.vehiclePlate ?? "").toUpperCase());
+    if (!purpose.trim()) setPurpose(visit.purpose ?? "");
+    if (duration === "60" && visit.expectedDurationMinutes) setDuration(String(visit.expectedDurationMinutes));
+    setActiveNameField(null);
+  };
+
+  const finishGateVoiceEntry = async () => {
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    voiceTimerRef.current = null;
+    const recorder = voiceRecorderRef.current;
+    voiceRecorderRef.current = null;
+    setVoiceListening(false);
+    if (!recorder) return;
+    try {
+      const { uri, durationSeconds } = await recorder.stop();
+      if (durationSeconds < 0.4) return;
+      const fill = parseGateVoiceEntry(await transcribeAskVRecording(uri));
+      if (!Object.keys(fill).length) {
+        Alert.alert(t("visitor.error"), t("gatekeeper.voiceNotUnderstood"));
+        return;
+      }
+      if (fill.firstName) setFirstName(fill.firstName);
+      if (fill.lastName) setLastName(fill.lastName);
+      if (fill.company) setCompany(fill.company);
+      if (fill.vehiclePlate) setVehiclePlate(fill.vehiclePlate);
+      if (fill.purpose) setPurpose(fill.purpose);
+      if (fill.duration) setDuration(fill.duration);
+      setActiveNameField(null);
+    } catch (error) {
+      Alert.alert(
+        t("visitor.error"),
+        error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
+      );
+    } finally {
+      await recorder.dispose();
+    }
+  };
+
+  const startGateVoiceEntry = async () => {
+    if (voiceListening) return;
+    try {
+      await voiceRecorderRef.current?.dispose();
+      const recorder = await createPttRecorder();
+      voiceRecorderRef.current = recorder;
+      await recorder.start();
+      setVoiceListening(true);
+      voiceTimerRef.current = setTimeout(() => void finishGateVoiceEntry(), 6500);
+    } catch (error) {
+      voiceRecorderRef.current = null;
+      Alert.alert(
+        t("visitor.error"),
+        error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
+      );
+    }
+  };
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener("vndrly:gate-voice", () => {
+      void startGateVoiceEntry();
+    });
+    return () => subscription.remove();
+  }, [voiceListening]);
+
+  useEffect(() => () => {
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    void voiceRecorderRef.current?.dispose();
+  }, []);
 
   const resetForm = () => {
     setFirstName("");
@@ -126,6 +240,7 @@ export default function GatekeeperScreen() {
     setPlatePhotoUrl(null);
     setVehiclePhotoUrl(null);
     setHostKey(null);
+    setActiveNameField(null);
   };
 
   const onLookupSite = () => {
@@ -195,6 +310,8 @@ export default function GatekeeperScreen() {
         const message =
           result.reason === "missing-name"
             ? t("gatekeeper.nameRequired")
+            : result.reason === "missing-plate"
+              ? t("gatekeeper.plateRequired")
             : result.reason === "no-host"
               ? t("visitor.pickHost")
               : t("visitor.locationDenied");
@@ -270,20 +387,57 @@ export default function GatekeeperScreen() {
 
           <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("gatekeeper.newEntry")}</Text>
+            {voiceListening ? (
+              <View style={[styles.voiceStatus, { borderColor: colors.primary }]}>
+                <Feather name="mic" size={18} color={colors.primary} />
+                <Text style={[styles.voiceStatusText, { color: colors.primary }]}>{t("gatekeeper.voiceListening")}</Text>
+              </View>
+            ) : null}
             <View style={styles.twoCol}>
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.firstName")} *</Text>
-                <TextInput testID="gate-first-name" value={firstName} onChangeText={setFirstName} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+                <TextInput
+                  testID="gate-first-name"
+                  value={firstName}
+                  onFocus={() => setActiveNameField("firstName")}
+                  onChangeText={(value) => { setActiveNameField("firstName"); setFirstName(value); }}
+                  style={inputStyle}
+                  placeholderTextColor={colors.mutedForeground}
+                />
               </View>
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.lastName")} *</Text>
-                <TextInput testID="gate-last-name" value={lastName} onChangeText={setLastName} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+                <TextInput
+                  testID="gate-last-name"
+                  value={lastName}
+                  onFocus={() => setActiveNameField("lastName")}
+                  onChangeText={(value) => { setActiveNameField("lastName"); setLastName(value); }}
+                  style={inputStyle}
+                  placeholderTextColor={colors.mutedForeground}
+                />
               </View>
             </View>
+            {matchingDrivers.length > 0 ? (
+              <View style={[styles.suggestions, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                {matchingDrivers.map((visit) => (
+                  <TouchableOpacity
+                    key={`${visit.firstName}-${visit.lastName}-${visit.company ?? ""}-${visit.id}`}
+                    testID={`gate-driver-suggestion-${visit.id}`}
+                    onPress={() => useDriver(visit)}
+                    style={[styles.suggestionRow, { borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.suggestionName, { color: colors.foreground }]}>{visit.firstName} {visit.lastName}</Text>
+                    <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                      {[visit.company, visit.vehiclePlate].filter(Boolean).join(" - ")}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.company")}</Text>
             <TextInput value={company} onChangeText={setCompany} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
-            <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.vehiclePlate")}</Text>
-            <TextInput value={vehiclePlate} onChangeText={setVehiclePlate} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.vehiclePlate")} *</Text>
+            <TextInput value={vehiclePlate} onChangeText={(value) => setVehiclePlate(value.toUpperCase())} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
             <View style={styles.twoCol}>
               <TouchableOpacity
                 testID="gate-capture-tag-photo"
@@ -420,4 +574,9 @@ const styles = StyleSheet.create({
   visitText: { flex: 1, minWidth: 0 },
   visitName: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   muted: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
+  suggestions: { borderRadius: 10, borderWidth: 1, overflow: "hidden" },
+  suggestionRow: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 9 },
+  suggestionName: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  voiceStatus: { alignItems: "center", borderRadius: 10, borderWidth: 1, flexDirection: "row", gap: 8, padding: 10 },
+  voiceStatusText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
 });

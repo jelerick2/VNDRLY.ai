@@ -63,6 +63,9 @@
     "notifications": "Notifications"
   },
   "gatekeeper": {
+    "voiceEntry": "Voice",
+    "voiceListening": "Listening for gate entry details…",
+    "voiceNotUnderstood": "I couldn't understand that. Say: plate ABC123, driver Bob Villa.",
     "tab": "Gate",
     "portal": "Gate Portal",
     "subtitle": "Track vehicle and visitor traffic at site locations.",
@@ -70,6 +73,7 @@
     "noActive": "No active gate entries.",
     "newEntry": "New gate entry",
     "nameRequired": "First name and last name are required.",
+    "plateRequired": "A license plate is required.",
     "checkedInTitle": "Checked in",
     "checkedInBody": "Gate entry recorded.",
     "tagPhoto": "Tag photo",

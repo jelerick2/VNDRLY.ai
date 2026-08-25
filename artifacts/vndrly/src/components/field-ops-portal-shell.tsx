@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { LogOut, Menu, type LucideIcon } from "lucide-react";
+import { LogOut, Menu, Mic, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -51,6 +51,7 @@ export interface FieldOpsTabDef {
   labelKey: string;
   testId: string;
   match: (path: string) => boolean;
+  voiceEntry?: boolean;
 }
 
 interface FieldOpsPortalShellProps {
@@ -67,7 +68,7 @@ export function FieldOpsPortalShell({
   navAriaKey,
 }: FieldOpsPortalShellProps) {
   const { t } = useTranslation();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const brand = useBrand();
   const branded = brand.isOrgBranded;
@@ -231,6 +232,35 @@ export function FieldOpsPortalShell({
           {tabs.map((tab) => {
             const isActive = tab.match(location);
             const Icon = tab.icon;
+            if (tab.voiceEntry) {
+              return (
+                <div key={tab.href} className="flex justify-center py-3">
+                  <SidebarButton
+                    isActive={false}
+                    activeOnHover
+                    onClick={() => {
+                      const launch = () => window.dispatchEvent(new Event("vndrly:gate-voice"));
+                      if (!location.startsWith("/gate") || location.startsWith("/gate/history")) {
+                        sessionStorage.setItem("vndrly:gate-voice-pending", "1");
+                        setLocation("/gate");
+                      } else launch();
+                      setSidebarOpen(false);
+                    }}
+                    testId={tab.testId}
+                    branded={branded}
+                    brandPrimary={brand.primary}
+                    brandAccent={brand.accent}
+                    className="h-32 w-32"
+                    solidIdleText
+                  >
+                    <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-sm">
+                      <Mic className="h-10 w-10" />
+                      {t(tab.labelKey)}
+                    </span>
+                  </SidebarButton>
+                </div>
+              );
+            }
             return (
               <Link key={tab.href} href={tab.href} onClick={() => setSidebarOpen(false)}>
                 <SidebarButton
@@ -349,6 +379,7 @@ export function FieldOpsPortalShell({
             {tabs.map((tab) => {
               const active = tab.match(location);
               const Icon = tab.icon;
+              if (tab.voiceEntry) return null;
               return (
                 <li key={tab.href} className="flex-1">
                   <Link

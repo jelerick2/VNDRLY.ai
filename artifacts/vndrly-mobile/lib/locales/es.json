@@ -63,6 +63,9 @@
     "notifications": "Notificaciones"
   },
   "gatekeeper": {
+    "voiceEntry": "Voz",
+    "voiceListening": "Escuchando los datos de entrada…",
+    "voiceNotUnderstood": "No pude entender. Diga: matrícula ABC123, conductor Bob Villa.",
     "tab": "Entrada",
     "portal": "Portal de Entrada",
     "subtitle": "Registra el trafico de vehiculos y visitantes en las ubicaciones.",
@@ -70,6 +73,7 @@
     "noActive": "No hay entradas activas.",
     "newEntry": "Nueva entrada",
     "nameRequired": "Nombre y apellido son obligatorios.",
+    "plateRequired": "Se requiere una matrícula.",
     "checkedInTitle": "Entrada registrada",
     "checkedInBody": "Registro de entrada guardado.",
     "tagPhoto": "Foto de placa",

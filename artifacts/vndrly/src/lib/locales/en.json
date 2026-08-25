@@ -4762,11 +4762,15 @@
     "recMix": "Contractor vs employee mix — how much traffic is vendor crew versus third-party visitors."
   },
   "gateNav": {
+    "voice": "Voice entry",
     "gate": "Gate",
     "history": "History",
     "aria": "Gate portal navigation"
   },
   "gatekeeper": {
+    "voiceListening": "Listening — say the plate, driver name, company, purpose, and duration.",
+    "voiceUnavailable": "Voice entry is not supported in this browser.",
+    "voiceNotUnderstood": "I couldn't understand the gate entry. Try again and say: plate ABC123, driver Bob Villa.",
     "portal": "Gate portal",
     "title": "Gate",
     "subtitle": "Check visitors in and out at the current site.",
@@ -4811,7 +4815,7 @@
     "photoTooLarge": "That photo is too large.",
     "photoUploadFailed": "Photo upload failed.",
     "photoFinalizeFailed": "Photo upload could not be finalized.",
-    "requiredFields": "First name, last name, site, and host are required.",
+    "requiredFields": "Driver first name, last name, license plate, site, and host are required.",
     "checkInFailed": "Gate check-in failed.",
     "checkOutFailed": "Gate check-out failed.",
     "liveCheckedIn": "{{name}} just checked in",

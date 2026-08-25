@@ -1,8 +1,16 @@
 import { type ReactNode } from "react";
-import { History, Shield } from "lucide-react";
+import { History, Mic, Shield } from "lucide-react";
 import { FieldOpsPortalShell, type FieldOpsTabDef } from "@/components/field-ops-portal-shell";
 
 const TABS: FieldOpsTabDef[] = [
+  {
+    href: "/gate",
+    icon: Mic,
+    labelKey: "gateNav.voice",
+    testId: "button-gate-voice",
+    voiceEntry: true,
+    match: () => false,
+  },
   {
     href: "/gate",
     icon: Shield,

@@ -97,11 +97,22 @@ function newestFirst(visits: VisitorRow[]): VisitorRow[] {
   });
 }
 
-function visitMatchesDraft(visit: VisitorRow, draft: GateEntryDraft): boolean {
+function visitMatchesDraft(
+  visit: VisitorRow,
+  draft: GateEntryDraft,
+  activeField: GateMemoryField,
+): boolean {
   if (draft.firstName.trim() && !prefixMatch(visit.firstName, draft.firstName)) return false;
   if (draft.lastName.trim() && !prefixMatch(visit.lastName, draft.lastName)) return false;
   if (draft.company.trim() && !prefixMatch(visit.company, draft.company)) return false;
-  if (draft.vehiclePlate.trim() && !platePrefix(visit.vehiclePlate, draft.vehiclePlate)) return false;
+  // A truck can have different drivers. While finding a driver, use the known
+  // company but do not let the truck's last plate/driver pairing hide coworkers.
+  if (
+    activeField !== "firstName"
+    && activeField !== "lastName"
+    && draft.vehiclePlate.trim()
+    && !platePrefix(visit.vehiclePlate, draft.vehiclePlate)
+  ) return false;
   return true;
 }
 
@@ -290,7 +301,7 @@ export function evaluateGateMemory(input: {
     return { suggestions: [], fill: null };
   }
 
-  const matches = newestFirst(visits.filter((visit) => visitMatchesDraft(visit, draft)));
+  const matches = newestFirst(visits.filter((visit) => visitMatchesDraft(visit, draft, activeField)));
   const suggestionSource = activeField === "company"
     ? uniqueBy(matches.filter((visit) => (visit.company ?? "").trim()), (visit) => norm(visit.company))
     : matches;
