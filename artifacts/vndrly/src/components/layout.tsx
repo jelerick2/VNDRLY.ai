@@ -23,8 +23,10 @@ import {
   Flag,
   Bot,
   MailCheck,
+  ClipboardList,
 } from "lucide-react";
 import React, { Suspense, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { PngPillButton as PillButton } from "@/components/png-pill-rollover";
 import { useAuth } from "@/hooks/use-auth";
@@ -51,6 +53,8 @@ import {
   shouldUseLayeredPortalLogo,
 } from "@/lib/portal-branding";
 import { OnboardingProgressBanner } from "@/components/finish-setup-widget";
+import { withGateLogNav, canViewGateLog } from "@/lib/gate-ops-nav";
+import { visitsApi } from "@/lib/visits-api";
 
 const AssistantLauncher = React.lazy(() =>
   import("@/components/assistant-panel").then((mod) => ({
@@ -59,8 +63,20 @@ const AssistantLauncher = React.lazy(() =>
 );
 const AskVVoiceController = React.lazy(() => import("@/components/askv-voice-controller"));
 
-function useNavItems(user: { role: string; vendorId: number | null; partnerId: number | null } | null) {
+function useNavItems(user: {
+  role: string;
+  vendorId: number | null;
+  partnerId: number | null;
+  vendorRole?: string | null;
+} | null) {
   const { t } = useTranslation();
+  const gateEnabled = useQuery({
+    queryKey: ["gate-log-enabled"],
+    queryFn: () => visitsApi.gateEnabled(),
+    enabled: canViewGateLog(user),
+    staleTime: 60_000,
+    retry: false,
+  });
   const baseNavItems = [
     { href: "/", label: t("nav.dashboard"), icon: LayoutDashboard, key: "dashboard" },
     { href: "/partners", label: t("nav.partners"), icon: Handshake, key: "partners" },
@@ -77,9 +93,16 @@ function useNavItems(user: { role: string; vendorId: number | null; partnerId: n
   const statementsItem = { href: "/statement", label: t("nav.statements"), icon: ScrollText, key: "statements" };
   const billsItem = { href: "/bills-to-pay", label: t("nav.billsToPay"), icon: Wallet, key: "bills-to-pay" };
   const reportsItem = { href: "/reports", label: t("nav.reports"), icon: BookOpen, key: "reports" };
+  const wrap = (items: Array<{ href: string; label: string; key: string; icon?: unknown }>) =>
+    withGateLogNav(items, {
+      user,
+      gatekeepingEnabled: gateEnabled.data?.enabled === true,
+      label: t("nav.gateLog"),
+      icon: ClipboardList,
+    });
   if (!user) return [...baseNavItems, crewMapItem];
   if (user.role === "vendor" && user.vendorId) {
-    return [
+    return wrap([
       ...baseNavItems.map((item) =>
         item.href === "/vendors" ? { ...item, href: `/vendors/${user.vendorId}`, label: t("nav.vendor") } : item
       ),
@@ -90,10 +113,10 @@ function useNavItems(user: { role: string; vendorId: number | null; partnerId: n
       reportsItem,
       { href: "/vendor-catalog", label: t("nav.yourServices"), icon: ShoppingCart, key: "vendor-catalog" },
       { href: `/analytics/vendor/${user.vendorId}`, label: t("nav.analytics"), icon: BarChart3, key: "analytics" },
-    ];
+    ]);
   }
   if (user.role === "partner" && user.partnerId) {
-    return [
+    return wrap([
       ...baseNavItems.map((item) =>
         item.href === "/partners" ? { ...item, href: `/partners/${user.partnerId}`, label: t("nav.partner") } : item
       ),
@@ -106,10 +129,10 @@ function useNavItems(user: { role: string; vendorId: number | null; partnerId: n
       reportsItem,
       { href: "/partner-catalog", label: t("nav.partnerCatalog"), icon: ShoppingCart, key: "partner-catalog" },
       { href: `/analytics/partner/${user.partnerId}`, label: t("nav.analytics"), icon: BarChart3, key: "analytics" },
-    ];
+    ]);
   }
   if (user.role === "admin") {
-    return [
+    return wrap([
       ...baseNavItems,
       crewMapItem,
       { href: "/site-map", label: t("nav.siteMap"), icon: MapIcon, key: "site-map" },
@@ -142,7 +165,7 @@ function useNavItems(user: { role: string; vendorId: number | null; partnerId: n
       // T-record source on every IRS 1099 FIRE submission. See
       // artifacts/api-server/src/routes/fireTransmitterSettings.ts.
       { href: "/admin/1099-transmitter", label: "1099 transmitter", icon: FileText, key: "admin-1099-transmitter" },
-    ];
+    ]);
   }
   return baseNavItems;
 }

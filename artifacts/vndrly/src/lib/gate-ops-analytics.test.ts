@@ -1,0 +1,147 @@
+import { describe, expect, it } from "vitest";
+import type { VisitorRow } from "./visits-api";
+import {
+  buildGateOpsAnalytics,
+  buildGateStaffHours,
+  dwellMinutes,
+} from "./gate-ops-analytics";
+
+function visit(overrides: Partial<VisitorRow> & Pick<VisitorRow, "id" | "checkInTime">): VisitorRow {
+  return {
+    firstName: "Pat",
+    lastName: "Visitor",
+    company: "Acme Pump",
+    phone: null,
+    email: null,
+    vehiclePlate: "OK-GATE1",
+    platePhotoUrl: null,
+    vehiclePhotoUrl: null,
+    purpose: "Delivery",
+    expectedDurationMinutes: 60,
+    hostType: "partner",
+    hostPartnerId: 1,
+    hostVendorId: null,
+    hostPartnerName: "Flywheel Energy",
+    hostVendorName: null,
+    siteLocationId: 10,
+    siteName: "Flywheel Energy Spur",
+    siteCode: "SITE-B40D77D2",
+    checkOutTime: null,
+    autoCheckedOut: false,
+    checkInLatitude: null,
+    checkInLongitude: null,
+    ...overrides,
+  };
+}
+
+describe("dwellMinutes", () => {
+  it("uses checkout when present and now when the visitor is still on site", () => {
+    const now = new Date("2026-08-25T15:00:00.000Z");
+    expect(
+      dwellMinutes(
+        visit({
+          id: 1,
+          checkInTime: "2026-08-25T14:00:00.000Z",
+          checkOutTime: "2026-08-25T14:30:00.000Z",
+        }),
+        now,
+      ),
+    ).toBe(30);
+    expect(
+      dwellMinutes(visit({ id: 2, checkInTime: "2026-08-25T14:00:00.000Z" }), now),
+    ).toBe(60);
+  });
+});
+
+describe("buildGateOpsAnalytics", () => {
+  it("rolls live counts, dwell, daily volume, peak hour, and overdue visits", () => {
+    const now = new Date("2026-08-25T18:00:00.000Z");
+    const stats = buildGateOpsAnalytics(
+      [
+        visit({
+          id: 1,
+          checkInTime: "2026-08-25T14:00:00.000Z",
+          checkOutTime: "2026-08-25T15:00:00.000Z",
+          company: "Acme Pump",
+        }),
+        visit({
+          id: 2,
+          firstName: "Sam",
+          company: "Solo Trucking",
+          checkInTime: "2026-08-25T14:10:00.000Z",
+          expectedDurationMinutes: 30,
+        }),
+        visit({
+          id: 3,
+          company: "Acme Pump",
+          vehiclePlate: "OK-GATE2",
+          checkInTime: "2026-08-24T20:00:00.000Z",
+          checkOutTime: "2026-08-24T21:00:00.000Z",
+          autoCheckedOut: true,
+        }),
+      ],
+      now,
+    );
+
+    expect(stats.onSiteNow).toBe(1);
+    expect(stats.overdueNow).toBe(1);
+    expect(stats.autoCheckedOut).toBe(1);
+    expect(stats.uniquePlates).toBe(2);
+    expect(stats.topCompanies[0]).toEqual({ name: "Acme Pump", count: 2 });
+    expect(stats.visitsByDay.find((d) => d.day === "2026-08-25")?.checkIns).toBe(2);
+    expect(stats.visitsByHour.find((h) => h.hour === 14)?.count).toBe(2);
+    expect(stats.avgDwellMinutes).toBe(60);
+  });
+});
+
+describe("buildGateStaffHours", () => {
+  it("counts booth days/hours from recorded visits and clocked hours from check-ins", () => {
+    const now = new Date("2026-08-25T18:00:00.000Z");
+    const rows = buildGateStaffHours({
+      now,
+      staff: [
+        {
+          employeeId: 7,
+          userId: 70,
+          firstName: "Riley",
+          lastName: "Gate",
+          vendorName: "Winchester",
+        },
+      ],
+      visits: [
+        {
+          recordedByUserId: 70,
+          checkInTime: "2026-08-25T13:00:00.000Z",
+          checkOutTime: "2026-08-25T17:00:00.000Z",
+        },
+        {
+          recordedByUserId: 70,
+          checkInTime: "2026-08-24T14:00:00.000Z",
+          checkOutTime: "2026-08-24T16:00:00.000Z",
+        },
+      ],
+      checkIns: [
+        {
+          employeeId: 7,
+          checkInAt: "2026-08-25T12:00:00.000Z",
+          checkOutAt: "2026-08-25T18:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(rows).toEqual([
+      {
+        employeeId: 7,
+        userId: 70,
+        name: "Riley Gate",
+        vendorName: "Winchester",
+        daysWorked: 2,
+        visitsProcessed: 2,
+        hoursWorked: 6,
+        hoursClocked: 6,
+        hoursOnBooth: 6,
+        lastSeenAt: "2026-08-25T18:00:00.000Z",
+      },
+    ]);
+  });
+});

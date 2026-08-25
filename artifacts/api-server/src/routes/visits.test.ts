@@ -78,6 +78,7 @@ const tables = {
     "checkOutLatitude",
     "checkOutLongitude",
     "autoCheckedOut",
+    "recordedByUserId",
     "safetyAcknowledgedAt",
     "createdAt",
     "expiresAt",
@@ -100,6 +101,21 @@ const tables = {
     "vendorId",
   ]),
   users: tableTag("users", ["id", "partnerId", "vendorId"]),
+  vendorPeople: tableTag("vendorPeople", [
+    "id",
+    "vendorId",
+    "vendorRole",
+    "firstName",
+    "lastName",
+    "userId",
+    "deletedAt",
+  ]),
+  ticketCheckIns: tableTag("ticketCheckIns", [
+    "id",
+    "employeeId",
+    "checkInAt",
+    "checkOutAt",
+  ]),
 };
 
 const fixtures: Record<string, Row[]> = {
@@ -110,6 +126,8 @@ const fixtures: Record<string, Row[]> = {
   vendors: [],
   siteWorkAssignments: [],
   users: [],
+  vendorPeople: [],
+  ticketCheckIns: [],
 };
 
 const idCounters: Record<string, number> = {};
@@ -268,6 +286,8 @@ vi.mock("@workspace/db", () => {
     vendorsTable: tables.vendors,
     siteWorkAssignmentsTable: tables.siteWorkAssignments,
     usersTable: tables.users,
+    vendorPeopleTable: tables.vendorPeople,
+    ticketCheckInsTable: tables.ticketCheckIns,
     // Task #51 — referenced by unread-comments.ts subqueries.
     commentReadReceiptsTable: tableTag("commentReadReceipts", []),
     hotlistCommentsTable: tableTag("hotlistComments", []),
@@ -993,6 +1013,7 @@ describe("gatekeeper visit workflow", () => {
         longitude: site.longitude,
       });
     expectStatus(checkIn, 201);
+    expect(fixtures.siteVisits[0].recordedByUserId).toBe(10);
 
     fixtures.siteVisits[0].siteName = site.name;
     const list = await request(app).get("/api/visits").set("Cookie", cookie);
@@ -1043,6 +1064,20 @@ describe("gatekeeper visit workflow", () => {
       });
     expect(response.status).toBe(403);
     expect(response.body.code).toBe("visit.no_access");
+  });
+
+  it("lets office staff read the gate ops bundle and blocks booth operators", async () => {
+    const { vendor } = seedScenario();
+    const office = await request(app)
+      .get("/api/visits/gate/ops")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "office" }));
+    expectStatus(office, 200);
+    expect(office.body).toMatchObject({ enabled: expect.any(Boolean), visits: expect.any(Array), staff: expect.any(Array) });
+
+    const booth = await request(app)
+      .get("/api/visits/gate/ops")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }));
+    expect(booth.status).toBe(403);
   });
 });
 

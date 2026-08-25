@@ -55,6 +55,7 @@ const VisitorEntryPage = lazy(() => import("@/pages/visitor-entry"));
 const GatekeeperPage = lazy(() => import("@/pages/gatekeeper"));
 const GateHistoryPage = lazy(() => import("@/pages/gate-history"));
 const VisitorsPage = lazy(() => import("@/pages/visitors"));
+const GateLogPage = lazy(() => import("@/pages/gate-log"));
 const FieldHome = lazy(() => import("@/pages/field-home"));
 const ForemanHome = lazy(() => import("@/pages/foreman-home"));
 const ForemanCrews = lazy(() => import("@/pages/foreman-crews"));
@@ -152,6 +153,7 @@ function AdminRoutes() {
         <Route path="/crew-map">{() => <CrewMapPage />}</Route>
         <Route path="/crew-map/:id">{(params) => <CrewReplayPage employeeId={parseInt(params.id)} />}</Route>
         <Route path="/site-map" component={SiteMapPage} />
+        <Route path="/gate-log" component={GateLogPage} />
         <Route path="/catalog" component={Catalog} />
         <Route path="/catalog-health" component={CatalogHealth} />
         <Route path="/partner-catalog" component={PartnerCatalog} />

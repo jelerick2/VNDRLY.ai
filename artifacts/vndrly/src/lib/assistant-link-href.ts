@@ -15,6 +15,7 @@ const SCREEN_PATH: Record<string, string> = {
   catalog: "/catalog",
   "crew-map": "/crew-map",
   "site-map": "/site-map",
+  "gate-log": "/gate-log",
   visitors: "/visitors",
   notifications: "/notifications",
   "notification-preferences": "/notifications/preferences",

@@ -166,6 +166,29 @@ export const visitsApi = {
     jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
   readPlate: (input: { objectPath: string }) =>
     jf<{ plate: string | null }>(`/api/visits/gate/read-plate`, { method: "POST", body: JSON.stringify(input) }),
+  gateEnabled: () => jf<{ enabled: boolean }>(`/api/visits/gate/enabled`),
+  gateOps: () =>
+    jf<{
+      enabled: boolean;
+      visits: VisitorRow[];
+      staff: {
+        employeeId: number;
+        userId: number | null;
+        firstName: string;
+        lastName: string;
+        vendorName: string | null;
+      }[];
+      recordedVisits: {
+        recordedByUserId: number | null;
+        checkInTime: string;
+        checkOutTime: string | null;
+      }[];
+      checkIns: {
+        employeeId: number;
+        checkInAt: string;
+        checkOutAt: string | null;
+      }[];
+    }>(`/api/visits/gate/ops`),
 };
 
 export async function listAllVisits(params?: { siteLocationId?: number; from?: string; to?: string; activeOnly?: boolean }): Promise<VisitorRow[]> {

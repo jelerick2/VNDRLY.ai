@@ -9,7 +9,7 @@ export const KNOWLEDGE_DOCS: KnowledgeDoc[] = [
     id: "nav-overview",
     title: "App navigation overview",
     roles: ["any"],
-    body: `VNDRLY's web app uses a left sidebar with role-aware links. Admins see Dashboard (includes the Hotlist jobs panel), Partners, Vendors, Field Employees, Site Locations, Tracking (tickets), Crew Map, Visitors, Invoices, Statements, Reports, and Platform Catalog (Catalog Health is linked from the catalog page). Partners see their Partner page, Site Locations, Tracking, Site Map, Visitors, Bills to Pay, Statements, Reports, Partner Catalog, and Analytics. Vendors see their Vendor page, Site Locations, Tracking, Crew Map, Visitors, Invoices, Statements, Reports, Your Services (vendor catalog), and Analytics. Field employees use the separate field portal for on-the-go mobile work — see the field portal home doc.`,
+    body: `VNDRLY's web app uses a left sidebar with role-aware links. Admins see Dashboard (includes the Hotlist jobs panel), Partners, Vendors, Field Employees, Site Locations, Tracking (tickets), Crew Map, Gate Log (when the company staffs a gate), Visitors, Invoices, Statements, Reports, and Platform Catalog (Catalog Health is linked from the catalog page). Partners see their Partner page, Site Locations, Tracking, Site Map, Gate Log (when the company staffs a gate), Visitors, Bills to Pay, Statements, Reports, Partner Catalog, and Analytics. Vendors see their Vendor page, Site Locations, Tracking, Crew Map, Gate Log (office/both, when the company staffs a gate), Visitors, Invoices, Statements, Reports, Your Services (vendor catalog), and Analytics. Field employees use the separate field portal for on-the-go mobile work — see the field portal home doc.`,
   },
   {
     id: "ask-vndrly",
@@ -128,6 +128,12 @@ export const KNOWLEDGE_DOCS: KnowledgeDoc[] = [
     title: "Site Map (partner)",
     roles: ["partner"],
     body: `/site-map shows any field employees currently within a quarter mile of one of your partner sites. Useful to see who's actually on-site right now.`,
+  },
+  {
+    id: "gate-log",
+    title: "Gate Log (office)",
+    roles: ["admin", "partner", "vendor"],
+    body: `/gate-log is the office live log for companies that staff a gate. It sits under Crew Map (or Site Map for partners) and is hidden from field, foreman, and booth gatekeepers, who use the Gate portal instead. Use it for who is on site now, 30-day history with search, gate employee days and hours worked, and charts for daily volume, peak hour, site mix, dwell, overdue visits, auto check-out, unique plates, and top companies. /visitors remains the simpler visit list.`,
   },
   {
     id: "background-tracking",

@@ -56,6 +56,7 @@ export const siteVisitsTable = pgTable(
     checkOutLatitude: doublePrecision("check_out_latitude"),
     checkOutLongitude: doublePrecision("check_out_longitude"),
     autoCheckedOut: boolean("auto_checked_out").notNull().default(false),
+    recordedByUserId: integer("recorded_by_user_id"),
 
     safetyAcknowledgedAt: timestamp("safety_acknowledged_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

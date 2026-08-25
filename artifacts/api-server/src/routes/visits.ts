@@ -9,6 +9,8 @@ import {
   partnersTable,
   vendorsTable,
   siteWorkAssignmentsTable,
+  vendorPeopleTable,
+  ticketCheckInsTable,
 } from "@workspace/db";
 import { notifyUsers, findPartnerUserIds, findVendorUserIds, findPartnerVisitNotifierUserIds, findVendorVisitNotifierUserIds } from "./notifications";
 import {
@@ -32,7 +34,7 @@ import { SESSION_SECRET } from "../lib/session";
 import { enforceVisitsRateLimit } from "../lib/visits-rate-limit";
 import { enforceGateOcrRateLimit } from "../lib/gate-ocr-rate-limit";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { isGeofenceBypassActive } from "../lib/geo";
+import { officeMayAccessGateOps, sessionHasGateOpsScope } from "../lib/gate-ops-access";
 import {
   AUTH_GUEST_REQUIRED,
   AUTH_GUEST_EXPIRED,
@@ -392,6 +394,194 @@ function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number):
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+async function requireOfficeGateOpsSession(req: any, res: any): Promise<Session | null> {
+  const session = getStaffSession(req);
+  if (!session) {
+    res.status(401).json({ message: "Login required", code: AUTH_REQUIRED });
+    return null;
+  }
+  if (!officeMayAccessGateOps(session) || !sessionHasGateOpsScope(session)) {
+    res.status(403).json({ message: "Office gate log access required", code: VISIT_NO_ACCESS });
+    return null;
+  }
+  return session;
+}
+
+const GATE_OPS_DAYS = 30;
+
+async function loadAssignedSiteIds(vendorId: number): Promise<number[]> {
+  const assignments = await db
+    .select({ siteLocationId: siteWorkAssignmentsTable.siteLocationId })
+    .from(siteWorkAssignmentsTable)
+    .where(eq(siteWorkAssignmentsTable.vendorId, vendorId));
+  return [...new Set(assignments.map((row) => row.siteLocationId))];
+}
+
+async function loadPartnerSiteIds(partnerId: number): Promise<number[]> {
+  const sites = await db
+    .select({ id: siteLocationsTable.id })
+    .from(siteLocationsTable)
+    .where(eq(siteLocationsTable.partnerId, partnerId));
+  return sites.map((row) => row.id);
+}
+
+const visitListProjection = {
+  id: siteVisitsTable.id,
+  firstName: siteVisitsTable.firstName,
+  lastName: siteVisitsTable.lastName,
+  company: siteVisitsTable.company,
+  phone: siteVisitsTable.phone,
+  email: siteVisitsTable.email,
+  vehiclePlate: siteVisitsTable.vehiclePlate,
+  platePhotoUrl: siteVisitsTable.platePhotoUrl,
+  vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
+  purpose: siteVisitsTable.purpose,
+  expectedDurationMinutes: siteVisitsTable.expectedDurationMinutes,
+  hostType: siteVisitsTable.hostType,
+  hostPartnerId: siteVisitsTable.hostPartnerId,
+  hostVendorId: siteVisitsTable.hostVendorId,
+  hostPartnerName: partnersTable.name,
+  hostVendorName: vendorsTable.name,
+  siteLocationId: siteVisitsTable.siteLocationId,
+  siteName: siteLocationsTable.name,
+  siteCode: siteLocationsTable.siteCode,
+  checkInTime: siteVisitsTable.checkInTime,
+  checkOutTime: siteVisitsTable.checkOutTime,
+  autoCheckedOut: siteVisitsTable.autoCheckedOut,
+  checkInLatitude: siteVisitsTable.checkInLatitude,
+  checkInLongitude: siteVisitsTable.checkInLongitude,
+  recordedByUserId: siteVisitsTable.recordedByUserId,
+};
+
+async function loadGateOpsBundle(session: Session) {
+  const since = new Date(Date.now() - GATE_OPS_DAYS * 24 * 60 * 60 * 1000);
+  let siteIds: number[] | null = null;
+  const staffConds = [
+    eq(vendorPeopleTable.vendorRole, "gatekeeper"),
+    isNull(vendorPeopleTable.deletedAt),
+  ];
+  if (session.role === "vendor" && session.vendorId) {
+    siteIds = await loadAssignedSiteIds(session.vendorId);
+    staffConds.push(eq(vendorPeopleTable.vendorId, session.vendorId));
+  } else if (session.role === "partner" && session.partnerId) {
+    siteIds = await loadPartnerSiteIds(session.partnerId);
+    const assignedVendorIds = siteIds.length
+      ? [
+          ...new Set(
+            (
+              await db
+                .select({ vendorId: siteWorkAssignmentsTable.vendorId })
+                .from(siteWorkAssignmentsTable)
+                .where(inArray(siteWorkAssignmentsTable.siteLocationId, siteIds))
+            ).map((row) => row.vendorId),
+          ),
+        ]
+      : [];
+    if (assignedVendorIds.length === 0) {
+      staffConds.push(sql`false`);
+    } else {
+      staffConds.push(inArray(vendorPeopleTable.vendorId, assignedVendorIds));
+    }
+  }
+
+  const staffRows = await db
+    .select({
+      employeeId: vendorPeopleTable.id,
+      userId: vendorPeopleTable.userId,
+      firstName: vendorPeopleTable.firstName,
+      lastName: vendorPeopleTable.lastName,
+      vendorName: vendorsTable.name,
+    })
+    .from(vendorPeopleTable)
+    .innerJoin(vendorsTable, eq(vendorsTable.id, vendorPeopleTable.vendorId))
+    .where(and(...staffConds));
+
+  const visitConds = [sql`${siteVisitsTable.checkInTime} >= ${since}`];
+  if (siteIds) {
+    if (siteIds.length === 0) {
+      return { enabled: session.role === "admin", visits: [], staff: staffRows, recordedVisits: [], checkIns: [] };
+    }
+    visitConds.push(inArray(siteVisitsTable.siteLocationId, siteIds));
+  }
+
+  const visits = await db
+    .select(visitListProjection)
+    .from(siteVisitsTable)
+    .leftJoin(siteLocationsTable, eq(siteLocationsTable.id, siteVisitsTable.siteLocationId))
+    .leftJoin(partnersTable, eq(partnersTable.id, siteVisitsTable.hostPartnerId))
+    .leftJoin(vendorsTable, eq(vendorsTable.id, siteVisitsTable.hostVendorId))
+    .where(and(...visitConds))
+    .orderBy(desc(siteVisitsTable.checkInTime))
+    .limit(2000);
+
+  const employeeIds = staffRows.map((row) => row.employeeId);
+  const checkIns = employeeIds.length
+    ? await db
+        .select({
+          employeeId: ticketCheckInsTable.employeeId,
+          checkInAt: ticketCheckInsTable.checkInAt,
+          checkOutAt: ticketCheckInsTable.checkOutAt,
+        })
+        .from(ticketCheckInsTable)
+        .where(
+          and(
+            inArray(ticketCheckInsTable.employeeId, employeeIds),
+            sql`${ticketCheckInsTable.checkInAt} >= ${since}`,
+          ),
+        )
+    : [];
+
+  const enabled = session.role === "admin" || staffRows.length > 0 || visits.length > 0;
+  return {
+    enabled,
+    visits,
+    staff: staffRows,
+    recordedVisits: visits.map((visit) => ({
+      recordedByUserId: visit.recordedByUserId ?? null,
+      checkInTime: visit.checkInTime,
+      checkOutTime: visit.checkOutTime,
+    })),
+    checkIns,
+  };
+}
+
+// ---------- GET /api/visits/gate/ops (office live log + staff hours) ----------
+router.get("/visits/gate/enabled", async (req, res): Promise<void> => {
+  const session = await requireOfficeGateOpsSession(req, res);
+  if (!session) return;
+  const bundle = await loadGateOpsBundle(session);
+  res.json({ enabled: bundle.enabled });
+});
+
+router.get("/visits/gate/ops", async (req, res): Promise<void> => {
+  const session = await requireOfficeGateOpsSession(req, res);
+  if (!session) return;
+  const bundle = await loadGateOpsBundle(session);
+  res.json({
+    enabled: bundle.enabled,
+    visits: bundle.visits.map(({ recordedByUserId: _recordedByUserId, ...visit }) => ({
+      ...visit,
+      checkInTime: visit.checkInTime instanceof Date ? visit.checkInTime.toISOString() : visit.checkInTime,
+      checkOutTime:
+        visit.checkOutTime instanceof Date ? visit.checkOutTime.toISOString() : visit.checkOutTime,
+    })),
+    staff: bundle.staff,
+    recordedVisits: bundle.recordedVisits.map((row) => ({
+      recordedByUserId: row.recordedByUserId,
+      checkInTime: row.checkInTime instanceof Date ? row.checkInTime.toISOString() : row.checkInTime,
+      checkOutTime:
+        row.checkOutTime instanceof Date
+          ? row.checkOutTime.toISOString()
+          : row.checkOutTime,
+    })),
+    checkIns: bundle.checkIns.map((row) => ({
+      employeeId: row.employeeId,
+      checkInAt: row.checkInAt instanceof Date ? row.checkInAt.toISOString() : row.checkInAt,
+      checkOutAt: row.checkOutAt instanceof Date ? row.checkOutAt.toISOString() : row.checkOutAt,
+    })),
+  });
+});
+
 // ---------- GET /api/visits/gate/assigned-sites (gatekeeper current location) ----------
 router.get("/visits/gate/assigned-sites", async (req, res): Promise<void> => {
   const session = await requireGatekeeperSession(req, res);
@@ -595,6 +785,7 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
       checkInLongitude: b.longitude,
       safetyAcknowledgedAt: new Date(),
       expiresAt,
+      recordedByUserId: session.userId ?? null,
     })
     .returning();
 
