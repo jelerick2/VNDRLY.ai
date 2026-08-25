@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pickTogglePillSrc } from "./pick-toggle-pill";
 
-const midconPill = require("../../../attached_assets/pills/pill_midcon_blue.png");
+const midconPill = require("@/assets/pills/pill_midcon_blue.png");
 
 describe("Midcon mobile brand pill", () => {
   it("uses the custom Midcon pill regardless of the fallback brand color", () => {

@@ -7,8 +7,8 @@ import vndrlyPill from "@/assets/pills/pill_vndrly.png";
 import whitePill from "@/assets/pills/pill_white.png";
 import winchesterPill from "@/assets/pills/pill_winchester.png";
 
-const flywheelPill = require("../../../attached_assets/pills/pill_flywheel_blue.png");
-const midconPill = require("../../../attached_assets/pills/pill_midcon_blue.png");
+const flywheelPill = require("@/assets/pills/pill_flywheel_blue.png");
+const midconPill = require("@/assets/pills/pill_midcon_blue.png");
 
 type PaletteEntry = { hex: string; src: number };
 
