@@ -1,8 +1,12 @@
+import type { ComponentType } from "react";
+
+export type NavIcon = ComponentType<{ className?: string }>;
+
 export type NavItem = {
   href: string;
   label: string;
   key: string;
-  icon?: unknown;
+  icon?: NavIcon;
 };
 
 export type GateLogViewer = {
@@ -30,7 +34,7 @@ export function withGateLogNav(
     user: GateLogViewer | null | undefined;
     gatekeepingEnabled: boolean;
     label: string;
-    icon?: unknown;
+    icon?: NavIcon;
   },
 ): NavItem[] {
   if (!canViewGateLog(opts.user) || !opts.gatekeepingEnabled) return items;

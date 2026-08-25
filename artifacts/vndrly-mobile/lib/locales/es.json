@@ -1740,7 +1740,6 @@
     "duplicateWarningSuggestion": "¿Quisiste decir: ",
     "duplicateConfirmLabel": "Confirmo que es una empresa distinta — registrarme de todos modos.",
     "duplicateConfirmRequired": "Confirma que es una empresa distinta antes de continuar.",
-    "duplicateChecking": "Buscando proveedores similares…",
     "duplicateCheckUnavailable": "La búsqueda de nombres similares no está disponible temporalmente. Aún puedes crear tu cuenta.",
     "duplicateHardWarningTitle": "Ya existe un proveedor con el nombre \"{{name}}\".",
     "duplicateHardWarningBody": "Elige otro nombre para continuar. Si es la misma empresa, inicia sesión en tu cuenta existente."

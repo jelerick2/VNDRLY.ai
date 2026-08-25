@@ -1,7 +1,7 @@
 const MIN_PLATE_LENGTH = 3;
 const MAX_PLATE_LENGTH = 8;
 const PLATE_STOPWORDS = new Set([
-  "OKLAHOMA", "TEXAS", "KANSAS", "COLORADO", "NEW", "MEXICO", "USA",
+  "OKLAHOMA", "TEXAS", "KANSAS", "COLORADO", "NEW", "MEXICO", "USA", "PLATE", "LICENSE",
   "EXP", "EXPIRES", "NOV", "DEC", "JAN", "FEB", "MAR", "APR", "MAY",
   "JUN", "JUL", "AUG", "SEP", "OCT",
 ]);
@@ -44,6 +44,7 @@ export function extractPlateCandidate(text: string): string | null {
   } catch {
     /* fall through to noisy OCR text */
   }
+  if (/\bno\s+(?:license\s+)?plate\b/i.test(text)) return null;
 
   let bestPlate: string | null = null;
   let bestScore = Number.NEGATIVE_INFINITY;

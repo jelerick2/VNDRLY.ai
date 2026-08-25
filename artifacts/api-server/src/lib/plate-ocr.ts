@@ -11,6 +11,8 @@ const PLATE_STOPWORDS = new Set([
   "NEW",
   "MEXICO",
   "USA",
+  "PLATE",
+  "LICENSE",
   "EXP",
   "EXPIRES",
   "NOV",
@@ -100,6 +102,7 @@ export function extractPlateCandidate(text: string): string | null {
   if (!text.trim()) return null;
   const json = fromJsonPlate(text);
   if (json.hit) return json.plate;
+  if (/\bno\s+(?:license\s+)?plate\b/i.test(text)) return null;
 
   let best: { plate: string; score: number } | null = null;
   for (const token of text.toUpperCase().match(/[A-Z0-9][A-Z0-9-]{1,8}[A-Z0-9]|[A-Z0-9]{3,8}/g) ?? []) {
