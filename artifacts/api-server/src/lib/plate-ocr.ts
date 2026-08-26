@@ -11,6 +11,8 @@ const PLATE_STOPWORDS = new Set([
   "NEW",
   "MEXICO",
   "USA",
+  "PLATE",
+  "LICENSE",
   "EXP",
   "EXPIRES",
   "NOV",
@@ -26,8 +28,6 @@ const PLATE_STOPWORDS = new Set([
   "SEP",
   "OCT",
 ]);
-const OCR_NARRATION_WORDS = new Set(["LICENSE", "PLATE", "TAG", "VISIBLE", "VEHICLE"]);
-const NO_PLATE_RESPONSE = /(?:\bno\b.{0,32}\b(?:license\s+plate|plate|tag)\b)|(?:\b(?:license\s+plate|plate|tag)\b.{0,32}\b(?:not\s+visible|cannot\s+be\s+(?:read|seen)|unreadable)\b)/i;
 
 export class PlateOcrUnavailableError extends Error {
   constructor(message = "Plate reading is not configured") {
@@ -68,7 +68,6 @@ function scorePlate(compact: string): number {
 
 function consider(formatted: string, best: { plate: string; score: number } | null): { plate: string; score: number } | null {
   const compact = compactPlate(formatted);
-  if (OCR_NARRATION_WORDS.has(compact)) return best;
   if (!isPlausiblePlate(compact)) return best;
   const score = scorePlate(compact);
   if (!best || score > best.score) return { plate: formatted, score };
@@ -103,7 +102,7 @@ export function extractPlateCandidate(text: string): string | null {
   if (!text.trim()) return null;
   const json = fromJsonPlate(text);
   if (json.hit) return json.plate;
-  if (NO_PLATE_RESPONSE.test(text)) return null;
+  if (/\bno\s+(?:license\s+)?plate\b/i.test(text)) return null;
 
   let best: { plate: string; score: number } | null = null;
   for (const token of text.toUpperCase().match(/[A-Z0-9][A-Z0-9-]{1,8}[A-Z0-9]|[A-Z0-9]{3,8}/g) ?? []) {

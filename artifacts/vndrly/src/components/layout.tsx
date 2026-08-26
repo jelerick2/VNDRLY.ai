@@ -24,7 +24,6 @@ import {
   Bot,
   MailCheck,
   ClipboardList,
-  type LucideIcon,
 } from "lucide-react";
 import React, { Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -54,7 +53,7 @@ import {
   shouldUseLayeredPortalLogo,
 } from "@/lib/portal-branding";
 import { OnboardingProgressBanner } from "@/components/finish-setup-widget";
-import { withGateLogNav, canViewGateLog, type NavItem } from "@/lib/gate-ops-nav";
+import { withGateLogNav, canViewGateLog } from "@/lib/gate-ops-nav";
 import { visitsApi } from "@/lib/visits-api";
 
 const AssistantLauncher = React.lazy(() =>
@@ -94,7 +93,7 @@ function useNavItems(user: {
   const statementsItem = { href: "/statement", label: t("nav.statements"), icon: ScrollText, key: "statements" };
   const billsItem = { href: "/bills-to-pay", label: t("nav.billsToPay"), icon: Wallet, key: "bills-to-pay" };
   const reportsItem = { href: "/reports", label: t("nav.reports"), icon: BookOpen, key: "reports" };
-  const wrap = (items: Array<NavItem<LucideIcon>>) =>
+  const wrap = (items: Array<{ href: string; label: string; key: string; icon?: React.ComponentType<{ className?: string }> }>) =>
     withGateLogNav(items, {
       user,
       gatekeepingEnabled: gateEnabled.data?.enabled === true,
@@ -335,11 +334,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         >
           {navItems.map((item) => {
             const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
+            const Icon = item.icon;
             return (
               <React.Fragment key={item.href}>
                 <Link href={item.href} onClick={() => setSidebarOpen(false)}>
                   <SidebarButton isActive={isActive} testId={`nav-${item.key}`} branded={branded} brandPrimary={brand.primary} brandAccent={brand.accent}>
-                    <item.icon className="w-4 h-4" />
+                    {Icon && <Icon className="w-4 h-4" />}
                     {item.label}
                   </SidebarButton>
                 </Link>

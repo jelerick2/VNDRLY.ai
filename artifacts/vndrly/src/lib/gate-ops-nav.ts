@@ -1,8 +1,12 @@
-export type NavItem<TIcon = unknown> = {
+import type { ComponentType } from "react";
+
+export type NavIcon = ComponentType<{ className?: string }>;
+
+export type NavItem = {
   href: string;
   label: string;
   key: string;
-  icon: TIcon;
+  icon?: NavIcon;
 };
 
 export type GateLogViewer = {
@@ -24,17 +28,17 @@ export function gateLogNavAnchorKey(items: Array<Pick<NavItem, "key">>): string 
   return "tracking";
 }
 
-export function withGateLogNav<TIcon>(
-  items: Array<NavItem<TIcon>>,
+export function withGateLogNav(
+  items: NavItem[],
   opts: {
     user: GateLogViewer | null | undefined;
     gatekeepingEnabled: boolean;
     label: string;
-    icon: TIcon;
+    icon?: NavIcon;
   },
-): Array<NavItem<TIcon>> {
+): NavItem[] {
   if (!canViewGateLog(opts.user) || !opts.gatekeepingEnabled) return items;
-  const item: NavItem<TIcon> = {
+  const item: NavItem = {
     href: "/gate-log",
     label: opts.label,
     key: "gate-log",
