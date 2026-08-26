@@ -6,6 +6,23 @@ VNDRLY is a full-stack web application designed to streamline oil & gas field op
 ## User Preferences
 I prefer clear, concise explanations and an iterative development approach. Please ask before making any major architectural changes or introducing new external dependencies. I value well-documented code and a focus on maintainability.
 
+### STANDING RULE — RELEASE COMMAND IS END-TO-END AUTHORIZATION
+For this repository, the user's imperative instruction **"commit, push, deploy,
+and ship"** (or an unambiguous equivalent) is one complete release command. It
+remains in effect through troubleshooting and safe retries until the requested
+change is live. Do not pause to request approval again between these stages:
+
+1. Commit the scoped, verified changes.
+2. Push the working branch.
+3. Integrate into `main` with a non-force fast-forward or merge.
+4. Run or allow the configured production web deployment and any
+   fingerprint-compatible Expo OTA workflow.
+5. Monitor the release and verify the live web/Expo result.
+
+This standing authorization never permits a force push/history rewrite,
+destructive database action, credential rotation, or a new native App Store
+binary/submission. Those operations retain their specific approval rules.
+
 ### HARD RULE — NEVER TAKE ACTION WHEN ASKED A QUESTION
 A question is not a request for action. The agent must NEVER infer intent
 from a question and act on it — only answer it. The agent will follow
