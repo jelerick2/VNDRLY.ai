@@ -8,6 +8,13 @@ const workflowUrl = new URL(
 );
 
 const workflow = await readFile(workflowUrl, "utf8");
+const easWorkflow = await readFile(
+  new URL(
+    "../../artifacts/vndrly-mobile/.eas/workflows/mobile-production-ota.yml",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 test("mobile OTA is a manual, guarded iOS production release", () => {
   assert.match(workflow, /^\s*workflow_dispatch:\s*$/m);
@@ -33,4 +40,20 @@ test("mobile OTA cannot bypass validation or mutate production data", () => {
   assert.doesNotMatch(workflow, /DATABASE_URL|\.env\.production/);
   assert.doesNotMatch(workflow, /\b(?:DROP|TRUNCATE|DELETE)\b/i);
   assert.doesNotMatch(workflow, /eas (?:build(?!:)|submit)\b/);
+});
+
+test("EAS publishes iOS OTA only when the installed native fingerprint matches", () => {
+  assert.match(easWorkflow, /^\s*push:\s*$/m);
+  assert.match(easWorkflow, /^\s*- main\s*$/m);
+  assert.match(easWorkflow, /type:\s*fingerprint/);
+  assert.match(easWorkflow, /type:\s*get-build/);
+  assert.match(easWorkflow, /fingerprint_hash:/);
+  assert.match(easWorkflow, /if:[^\n]*build_id/);
+  assert.match(easWorkflow, /type:\s*update/);
+  assert.match(easWorkflow, /channel:\s*production/);
+  assert.match(easWorkflow, /platform:\s*ios/);
+  assert.match(easWorkflow, /before_update:/);
+  assert.match(easWorkflow, /pnpm run typecheck/);
+  assert.match(easWorkflow, /pnpm run test/);
+  assert.doesNotMatch(easWorkflow, /type:\s*(?:build|submit)\b/);
 });

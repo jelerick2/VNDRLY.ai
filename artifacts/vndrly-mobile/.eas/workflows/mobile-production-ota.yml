@@ -1,0 +1,49 @@
+name: Publish production iOS OTA
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - artifacts/vndrly-mobile/**
+      - lib/**
+      - package.json
+      - pnpm-lock.yaml
+
+concurrency:
+  group: vndrly-production-ios-ota
+  cancel_in_progress: false
+
+jobs:
+  fingerprint:
+    name: Calculate production native fingerprint
+    type: fingerprint
+    environment: production
+
+  get_ios_build:
+    name: Find compatible production iOS build
+    needs: [fingerprint]
+    type: get-build
+    params:
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+      platform: ios
+      profile: production
+      distribution: store
+      channel: production
+
+  publish_ios_update:
+    name: Validate and publish production iOS update
+    needs: [get_ios_build]
+    if: ${{ needs.get_ios_build.outputs.build_id }}
+    type: update
+    environment: production
+    params:
+      channel: production
+      platform: ios
+      upload_sentry_sourcemaps: false
+    hooks:
+      before_update:
+        - name: Typecheck mobile app
+          run: pnpm run typecheck -- --pretty false
+        - name: Test mobile app
+          run: pnpm run test
