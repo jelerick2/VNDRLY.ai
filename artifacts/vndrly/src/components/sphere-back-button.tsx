@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { BRANDED_CIRCLE_HOVER_CLASS } from "@/components/branded-circle-chrome";
 import brandSphere from "@assets/VNDRLYai-Button-blank_1777361718577.png";
 import hoverGlossSphere from "@assets/download_1777663665476.png";
 import backIcon from "@assets/Symbol_Arrow_Left_1777371273492.png";
@@ -43,9 +44,11 @@ export default function SphereBackButton({
       aria-hidden="true"
       className={cn(
         "relative inline-block shrink-0 align-middle",
+        BRANDED_CIRCLE_HOVER_CLASS,
         className,
       )}
       style={{ width: size, height: size }}
+      data-testid="sphere-back-circle"
     >
       {/* 1. Brand sphere (bottom) — always visible, tinted with the
           active partner/vendor's primary brand color. */}

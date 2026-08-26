@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { LogOut, Menu, Mic, type LucideIcon } from "lucide-react";
+import { LogOut, Menu, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -10,6 +10,7 @@ import LanguageToggle from "@/components/language-toggle";
 import DarkLightToggle from "@/components/dark-light-toggle";
 import NotificationsBell from "@/components/notifications-bell";
 import SidebarButton from "@/components/sidebar-button";
+import GateVoiceCircleButton from "@/components/gate-voice-circle-button";
 import ReferToVndrlyDialog from "@/components/refer-to-vndrly-dialog";
 import { PoweredByVndrly } from "@/components/powered-by-vndrly";
 import ContextSwitcher from "@/components/context-switcher";
@@ -235,9 +236,7 @@ export function FieldOpsPortalShell({
             if (tab.voiceEntry) {
               return (
                 <div key={tab.href} className="flex justify-center py-3">
-                  <SidebarButton
-                    isActive={false}
-                    activeOnHover
+                  <GateVoiceCircleButton
                     onClick={() => {
                       const launch = () => window.dispatchEvent(new Event("vndrly:gate-voice"));
                       if (!location.startsWith("/gate") || location.startsWith("/gate/history")) {
@@ -247,17 +246,8 @@ export function FieldOpsPortalShell({
                       setSidebarOpen(false);
                     }}
                     testId={tab.testId}
-                    branded={branded}
-                    brandPrimary={brand.primary}
-                    brandAccent={brand.accent}
-                    className="h-32 w-32"
-                    solidIdleText
-                  >
-                    <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-sm">
-                      <Mic className="h-10 w-10" />
-                      {t(tab.labelKey)}
-                    </span>
-                  </SidebarButton>
+                    label={t(tab.labelKey)}
+                  />
                 </div>
               );
             }
