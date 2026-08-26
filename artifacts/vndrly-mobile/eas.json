@@ -54,10 +54,7 @@
       "ios": {
         "appleId": "v@vndrly.ai",
         "ascAppId": "6771456209",
-        "appleTeamId": "CM253WWQW2",
-        "ascApiKeyPath": "../../.local/AuthKey_C7YFYCR72K.p8",
-        "ascApiKeyId": "C7YFYCR72K",
-        "ascApiKeyIssuerId": "0bb5c187-d2b0-4058-91b2-b1cccccaac53"
+        "appleTeamId": "CM253WWQW2"
       },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",
