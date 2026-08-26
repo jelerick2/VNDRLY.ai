@@ -59,4 +59,4 @@ jobs:
         - name: Typecheck mobile app
           run: pnpm run typecheck
         - name: Test mobile app
-          run: pnpm run test
+          run: pnpm exec vitest run --maxWorkers=2
