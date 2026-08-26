@@ -4768,8 +4768,10 @@
     "aria": "Gate portal navigation"
   },
   "gatekeeper": {
-    "voiceListening": "Listening — say the plate, driver name, company, purpose, and duration.",
-    "voiceUnavailable": "Voice entry is not supported in this browser.",
+    "voiceListening": "Listening — say the plate, driver name, company, purpose, and duration, then press the microphone again.",
+    "voiceTranscribing": "Processing voice entry…",
+    "voicePermissionDenied": "Microphone access was denied. Allow it in your browser settings and try again.",
+    "voiceUnavailable": "Voice entry is not available right now.",
     "voiceNotUnderstood": "I couldn't understand that. Try: Bob Villa checking out, or plate ABC123 checking out.",
     "voiceConfirmCheckIn": "Review the filled record, then confirm this check-in.",
     "voiceConfirmCheckOut": "Confirm this visitor is checking out.",

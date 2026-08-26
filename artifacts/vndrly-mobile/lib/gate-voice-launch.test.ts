@@ -1,6 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { requestGateVoiceEntry, subscribeGateVoiceEntry } from "./gate-voice-launch";
+import {
+  requestGateVoiceEntry,
+  setGateVoiceListening,
+  subscribeGateVoiceEntry,
+  subscribeGateVoiceListening,
+} from "./gate-voice-launch";
+
+beforeEach(() => {
+  setGateVoiceListening(false);
+});
 
 describe("gate voice launch", () => {
   it("delivers a request made before the Gate screen subscribes", () => {
@@ -16,6 +25,16 @@ describe("gate voice launch", () => {
     const unsubscribe = subscribeGateVoiceEntry(listener);
     requestGateVoiceEntry();
     expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
+  it("publishes the current listening state to the microphone tab", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeGateVoiceListening(listener);
+    expect(listener).toHaveBeenCalledWith(false);
+
+    setGateVoiceListening(true);
+    expect(listener).toHaveBeenLastCalledWith(true);
     unsubscribe();
   });
 });

@@ -67,6 +67,11 @@ const {
   gatekeeperCheckOutMock,
   captureAndUploadImageMock,
   readGatePlateMock,
+  createPttRecorderMock,
+  recorderStartMock,
+  recorderStopMock,
+  recorderDisposeMock,
+  transcribeAskVRecordingMock,
 } = vi.hoisted(() => ({
   fetchSiteContextMock: vi.fn(),
   fetchGatekeeperVisitsMock: vi.fn(),
@@ -76,6 +81,11 @@ const {
   gatekeeperCheckOutMock: vi.fn(),
   captureAndUploadImageMock: vi.fn(),
   readGatePlateMock: vi.fn(),
+  createPttRecorderMock: vi.fn(),
+  recorderStartMock: vi.fn(),
+  recorderStopMock: vi.fn(),
+  recorderDisposeMock: vi.fn(),
+  transcribeAskVRecordingMock: vi.fn(),
 }));
 
 vi.mock("@/lib/guest", () => ({
@@ -94,6 +104,15 @@ vi.mock("@/lib/gatekeeper", () => ({
 
 vi.mock("@/lib/photos", () => ({
   captureAndUploadImage: (...a: unknown[]) => captureAndUploadImageMock(...a),
+}));
+
+vi.mock("@/lib/ptt", () => ({
+  createPttRecorder: (...a: unknown[]) => createPttRecorderMock(...a),
+  PttMicPermissionError: class PttMicPermissionError extends Error {},
+}));
+
+vi.mock("@/lib/askv-transcribe", () => ({
+  transcribeAskVRecording: (...a: unknown[]) => transcribeAskVRecordingMock(...a),
 }));
 
 vi.mock("@/hooks/use-brand", () => ({
@@ -161,6 +180,7 @@ import { Alert } from "react-native";
 
 import GatekeeperScreen from "../(tabs)/gate";
 import type { SiteContext } from "@/lib/guest";
+import { requestGateVoiceEntry } from "@/lib/gate-voice-launch";
 
 afterEach(() => {
   cleanup();
@@ -181,6 +201,17 @@ beforeEach(() => {
   fetchGatekeeperVisitsMock.mockResolvedValue([]);
   fetchGatekeeperRecentVisitsMock.mockResolvedValue([]);
   readGatePlateMock.mockResolvedValue(null);
+  recorderStartMock.mockResolvedValue(undefined);
+  recorderStopMock.mockResolvedValue({ uri: "file:///gate-command.m4a", durationSeconds: 3 });
+  recorderDisposeMock.mockResolvedValue(undefined);
+  createPttRecorderMock.mockResolvedValue({
+    start: recorderStartMock,
+    stop: recorderStopMock,
+    dispose: recorderDisposeMock,
+  });
+  transcribeAskVRecordingMock.mockResolvedValue(
+    "check in Bob Villa from NewCo plate ABC123 for equipment delivery",
+  );
   fetchAssignedGateSitesMock.mockResolvedValue({
     sites: [FLYWHEEL_SITE],
     defaultSite: FLYWHEEL_SITE,
@@ -235,6 +266,27 @@ function isDisabled(el: HTMLElement): boolean {
 }
 
 describe("GatekeeperScreen", () => {
+  it("records until the mic is pressed again, then fills the record for confirmation", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    renderScreen();
+    await findFirstByTestId("gate-first-name");
+
+    requestGateVoiceEntry();
+    await waitFor(() => expect(recorderStartMock).toHaveBeenCalledTimes(1));
+    expect(recorderStopMock).not.toHaveBeenCalled();
+    expect(screen.getByText("gatekeeper.voiceListening")).toBeTruthy();
+
+    requestGateVoiceEntry();
+    await waitFor(() => expect(recorderStopMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(transcribeAskVRecordingMock).toHaveBeenCalledWith("file:///gate-command.m4a"));
+    expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Bob");
+    expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Villa");
+    expect((firstByTestId("gate-company") as HTMLInputElement).value).toBe("NewCo");
+    expect((firstByTestId("gate-plate") as HTMLInputElement).value).toBe("ABC123");
+    expect((firstByTestId("purpose-input") as HTMLInputElement).value).toBe("equipment delivery");
+    expect(screen.getByText("gatekeeper.voiceConfirmCheckIn")).toBeTruthy();
+  });
+
   it("shows the branded vendor logo in front of Gate Portal", async () => {
     renderScreen();
     await findFirstByTestId("gate-first-name");

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Home, Mic } from "lucide-react";
 
@@ -76,6 +76,7 @@ vi.stubGlobal(
 );
 
 import { FieldOpsPortalShell, type FieldOpsTabDef } from "./field-ops-portal-shell";
+import { setGateVoiceListening } from "@/lib/gate-voice-launch";
 
 const TABS = [
   {
@@ -161,6 +162,7 @@ describe("FieldOpsPortalShell", () => {
     const button = screen.getByTestId("button-gate-voice");
     expect(button.tagName).toBe("BUTTON");
     expect(button.getAttribute("aria-label")).toBe("gateNav.voice");
+    expect(button.getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByTestId("gate-voice-brand-layer").style.backgroundColor).toBe(
       "var(--brand-primary)",
     );
@@ -170,5 +172,9 @@ describe("FieldOpsPortalShell", () => {
     expect(screen.getByTestId("gate-voice-circle").className).toContain(
       "group-hover:scale-[1.04]",
     );
+
+    act(() => setGateVoiceListening(true));
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(button.getAttribute("data-state")).toBe("listening");
   });
 });

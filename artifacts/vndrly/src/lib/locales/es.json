@@ -4768,8 +4768,10 @@
     "aria": "Navegación del portal de portería"
   },
   "gatekeeper": {
-    "voiceListening": "Escuchando: diga la matrícula, el nombre del conductor, la empresa, el propósito y la duración.",
-    "voiceUnavailable": "La entrada por voz no es compatible con este navegador.",
+    "voiceListening": "Escuchando: diga la matrícula, el nombre del conductor, la empresa, el propósito y la duración; después, vuelva a pulsar el micrófono.",
+    "voiceTranscribing": "Procesando la entrada de voz…",
+    "voicePermissionDenied": "Se denegó el acceso al micrófono. Permítalo en la configuración del navegador e inténtelo de nuevo.",
+    "voiceUnavailable": "La entrada por voz no está disponible en este momento.",
     "voiceNotUnderstood": "No pude entender. Inténtelo con: Bob Villa saliendo, o matrícula ABC123 saliendo.",
     "voiceConfirmCheckIn": "Revise el registro completado y confirme esta entrada.",
     "voiceConfirmCheckOut": "Confirme la salida de este visitante.",

@@ -28,7 +28,11 @@ import {
   type GateMemoryField,
   type GateMemorySuggestion,
 } from "@/lib/gate-entry-memory";
+import { createGateAudioSession, pickGateRecordingMimeType, type GateAudioRecorder } from "@/lib/gate-audio-session";
 import { matchGateCheckoutVisits, parseGateVoiceCommand } from "@/lib/gate-voice-entry";
+import { createGateSpeechSession, type GateSpeechRecognition } from "@/lib/gate-speech-session";
+import { setGateVoiceListening, subscribeGateVoiceEntry } from "@/lib/gate-voice-launch";
+import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import { listAllVisits, visitsApi, type SiteContext, type VisitorRow } from "@/lib/visits-api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -39,17 +43,6 @@ function evidenceUrl(path: string): string {
 
 type Coordinates = { latitude: number; longitude: number };
 type Translate = (key: string) => string;
-
-type GateSpeechRecognition = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  onresult: ((event: { results: { [index: number]: { [index: number]: { transcript: string } }; length: number } }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-};
 
 function currentPosition(required: boolean, t: Translate): Promise<Coordinates | undefined> {
   return new Promise((resolve, reject) => {
@@ -122,9 +115,9 @@ export default function GatekeeperPage() {
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceTranscribing, setVoiceTranscribing] = useState(false);
   const [voiceCheckInPending, setVoiceCheckInPending] = useState(false);
   const [voiceCheckoutMatches, setVoiceCheckoutMatches] = useState<VisitorRow[]>([]);
-  const recognitionRef = useRef<GateSpeechRecognition | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeMemoryField, setActiveMemoryField] = useState<GateMemoryField | null>(null);
   const [memoryDeleting, setMemoryDeleting] = useState(false);
@@ -188,6 +181,12 @@ export default function GatekeeperPage() {
     purpose,
     expectedDuration: duration,
   }), [company, duration, firstName, lastName, purpose, vehiclePlate]);
+  const entryDraftRef = useRef(entryDraft);
+  const activeVisitsRef = useRef(activeVisits);
+  const translateRef = useRef(t);
+  entryDraftRef.current = entryDraft;
+  activeVisitsRef.current = activeVisits;
+  translateRef.current = t;
   const memory = useMemo(
     () => evaluateGateMemory({
       visits: recentVisits.data ?? [],
@@ -206,6 +205,31 @@ export default function GatekeeperPage() {
     setPurpose(next.purpose);
     if (next.expectedDuration) setDuration(next.expectedDuration);
   };
+  const applyEntryDraftRef = useRef(applyEntryDraft);
+  applyEntryDraftRef.current = applyEntryDraft;
+  const processVoiceTranscriptRef = useRef<(transcript: string) => void>(() => undefined);
+  processVoiceTranscriptRef.current = (transcript) => {
+    const command = parseGateVoiceCommand(transcript);
+    const fill = command.fill;
+    if (Object.keys(fill).length === 0) {
+      setError(translateRef.current("gatekeeper.voiceNotUnderstood"));
+      return;
+    }
+    const nextDraft = { ...entryDraftRef.current, ...fill };
+    entryDraftRef.current = nextDraft;
+    applyEntryDraftRef.current(nextDraft);
+    if (command.intent === "check-out") {
+      const matches = matchGateCheckoutVisits(activeVisitsRef.current, fill);
+      setVoiceCheckInPending(false);
+      setVoiceCheckoutMatches(matches);
+      if (matches.length === 0) setError(translateRef.current("gatekeeper.voiceNoCheckoutMatch"));
+      else setError(null);
+      return;
+    }
+    setVoiceCheckoutMatches([]);
+    setVoiceCheckInPending(true);
+    setError(null);
+  };
   const onMemoryFieldChange = (field: GateMemoryField, value: string) => {
     const nextValue = field === "vehiclePlate" ? value.toUpperCase() : value;
     setMemoryDeleting(nextValue.length < entryDraft[field].length);
@@ -220,62 +244,93 @@ export default function GatekeeperPage() {
     applyEntryDraft(mergeGateFill(entryDraft, pickSuggestionFill(suggestion)));
   };
 
-  const startGateVoiceEntry = () => {
+  useEffect(() => {
+    let disposed = false;
+    let processing = false;
     const win = window as typeof window & {
       SpeechRecognition?: new () => GateSpeechRecognition;
       webkitSpeechRecognition?: new () => GateSpeechRecognition;
     };
-    const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
-    if (!Recognition) {
-      setError(t("gatekeeper.voiceUnavailable"));
-      return;
-    }
-    recognitionRef.current?.stop();
-    const recognition = new Recognition();
-    recognitionRef.current = recognition;
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = "en-US";
-    recognition.onresult = (event) => {
-      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index][0].transcript).join(" ");
-      const command = parseGateVoiceCommand(transcript);
-      const fill = command.fill;
-      if (Object.keys(fill).length === 0) {
-        setError(t("gatekeeper.voiceNotUnderstood"));
-        return;
+    const publishListening = (listening: boolean) => {
+      if (!disposed) {
+        setVoiceListening(listening);
       }
-      applyEntryDraft({ ...entryDraft, ...fill });
-      if (command.intent === "check-out") {
-        const matches = matchGateCheckoutVisits(visits.data ?? [], fill);
-        setVoiceCheckInPending(false);
-        setVoiceCheckoutMatches(matches);
-        if (matches.length === 0) setError(t("gatekeeper.voiceNoCheckoutMatch"));
-        else setError(null);
-        return;
-      }
-      setVoiceCheckoutMatches([]);
-      setVoiceCheckInPending(true);
-      setError(null);
+      setGateVoiceListening(listening);
     };
-    recognition.onerror = () => setError(t("gatekeeper.voiceNotUnderstood"));
-    recognition.onend = () => setVoiceListening(false);
-    setError(null);
-    setVoiceListening(true);
-    recognition.start();
-  };
-
-  useEffect(() => {
-    const launch = () => startGateVoiceEntry();
-    window.addEventListener("vndrly:gate-voice", launch);
+    const reportVoiceError = (code: string) => {
+      if (disposed) return;
+      const key = code === "not-allowed"
+        ? "gatekeeper.voicePermissionDenied"
+        : code === "unavailable" || code === "service-not-allowed" || code === "audio-capture" || code === "start-failed"
+          ? "gatekeeper.voiceUnavailable"
+          : "gatekeeper.voiceNotUnderstood";
+      setError(translateRef.current(key));
+    };
+    const supportsRecording = Boolean(navigator.mediaDevices?.getUserMedia) && typeof MediaRecorder !== "undefined";
+    const session: {
+      dispose: () => void | Promise<void>;
+      toggle: () => void | Promise<void>;
+    } = supportsRecording
+      ? createGateAudioSession({
+          getStream: () => navigator.mediaDevices.getUserMedia({ audio: true }),
+          createRecorder: (stream, mimeType) => new MediaRecorder(
+            stream as MediaStream,
+            mimeType ? { mimeType } : undefined,
+          ) as unknown as GateAudioRecorder,
+          mimeType: pickGateRecordingMimeType(),
+          onAudio: async (audio) => {
+            processing = true;
+            if (!disposed) setVoiceTranscribing(true);
+            try {
+              const transcript = await transcribeAskVRecording(audio);
+              if (disposed) return;
+              if (!transcript) {
+                setError(translateRef.current("gatekeeper.voiceNotUnderstood"));
+                return;
+              }
+              processVoiceTranscriptRef.current(transcript);
+            } catch (reason) {
+              if (disposed) return;
+              const code = reason instanceof Error ? reason.message : "";
+              setError(translateRef.current(
+                code === "assistant.transcribe_unavailable"
+                  ? "gatekeeper.voiceUnavailable"
+                  : "gatekeeper.voiceNotUnderstood",
+              ));
+            } finally {
+              processing = false;
+              if (!disposed) setVoiceTranscribing(false);
+            }
+          },
+          onListeningChange: publishListening,
+          onError: reportVoiceError,
+        })
+      : createGateSpeechSession({
+          createRecognition: () => {
+            const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
+            return Recognition ? new Recognition() : null;
+          },
+          onTranscript: (transcript) => processVoiceTranscriptRef.current(transcript),
+          onListeningChange: publishListening,
+          onError: reportVoiceError,
+        });
+    const launch = () => {
+      if (processing) return;
+      setError(null);
+      void session.toggle();
+    };
+    const unsubscribe = subscribeGateVoiceEntry(launch);
     if (sessionStorage.getItem("vndrly:gate-voice-pending") === "1") {
       sessionStorage.removeItem("vndrly:gate-voice-pending");
       window.setTimeout(launch, 50);
     }
     return () => {
-      window.removeEventListener("vndrly:gate-voice", launch);
-      recognitionRef.current?.stop();
+      disposed = true;
+      unsubscribe();
+      void session.dispose();
+      setGateVoiceListening(false);
     };
-  }, [entryDraft, visits.data]);
+  }, []);
 
   const hosts = useMemo(() => {
     if (!site.data) return [];
@@ -453,6 +508,7 @@ export default function GatekeeperPage() {
           <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.subtitle")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.handsFreeHint")}</p>
           {voiceListening && <p className="mt-1 text-sm font-medium text-[color:var(--brand-primary)]">{t("gatekeeper.voiceListening")}</p>}
+          {voiceTranscribing && <p className="mt-1 text-sm font-medium text-[color:var(--brand-primary)]">{t("gatekeeper.voiceTranscribing")}</p>}
         </div>
         <Link
           href="/gate/history"
@@ -713,7 +769,7 @@ export default function GatekeeperPage() {
                 </div>
               </>
             )}
-            <div><Label>{t("gatekeeper.purpose")}</Label><Textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} /></div>
+            <div><Label>{t("gatekeeper.purpose")}</Label><Textarea data-testid="input-gate-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} /></div>
             <div><Label>{t("gatekeeper.expectedMinutes")}</Label><Input inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
             <div className="grid grid-cols-2 gap-3">
               <BlueButton onClick={() => plateInput.current?.click()} disabled={busy}>

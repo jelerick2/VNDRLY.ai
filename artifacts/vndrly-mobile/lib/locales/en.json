@@ -64,7 +64,8 @@
   },
   "gatekeeper": {
     "voiceEntry": "Voice",
-    "voiceListening": "Listening for gate entry details…",
+    "voiceListening": "Listening for gate entry details — tap the microphone again when finished.",
+    "voiceTranscribing": "Processing voice entry…",
     "voiceNotUnderstood": "I couldn't understand that. Say: Bob Villa checking out, or plate ABC123 checking out.",
     "voiceConfirmCheckIn": "Review the filled record, then confirm this check-in.",
     "voiceConfirmCheckOut": "Confirm this visitor is checking out.",

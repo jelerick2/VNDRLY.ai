@@ -43,6 +43,32 @@ describe("parseGateVoiceCommand", () => {
       },
     });
   });
+
+  it("captures the purpose for a first-time company in natural speech", () => {
+    expect(parseGateVoiceCommand("check in Bob Villa from NewCo plate ABC123 for equipment delivery")).toEqual({
+      intent: "check-in",
+      fill: {
+        firstName: "Bob",
+        lastName: "Villa",
+        company: "NewCo",
+        vehiclePlate: "ABC123",
+        purpose: "equipment delivery",
+      },
+    });
+  });
+
+  it("understands with-company and here-for phrasing", () => {
+    expect(parseGateVoiceCommand("Bob Villa with NewCo plate ABC123 checking in here for inspection")).toEqual({
+      intent: "check-in",
+      fill: {
+        firstName: "Bob",
+        lastName: "Villa",
+        company: "NewCo",
+        vehiclePlate: "ABC123",
+        purpose: "inspection",
+      },
+    });
+  });
 });
 
 describe("matchGateCheckoutVisits", () => {

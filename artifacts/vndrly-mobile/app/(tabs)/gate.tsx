@@ -40,7 +40,7 @@ import {
 } from "@/lib/gatekeeper";
 import { captureAndUploadImage } from "@/lib/photos";
 import { matchGateCheckoutVisits, parseGateVoiceCommand } from "@/lib/gate-voice-entry";
-import { subscribeGateVoiceEntry } from "@/lib/gate-voice-launch";
+import { setGateVoiceListening, subscribeGateVoiceEntry } from "@/lib/gate-voice-launch";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import { createPttRecorder, PttMicPermissionError, type PttRecorder } from "@/lib/ptt";
 import { buildHostOptions } from "@/lib/visitorCheckin";
@@ -77,7 +77,9 @@ export default function GatekeeperScreen() {
   const qc = useQueryClient();
   const appliedDefault = useRef(false);
   const voiceRecorderRef = useRef<PttRecorder | null>(null);
-  const voiceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const voiceOperationRef = useRef<Promise<void>>(Promise.resolve());
+  const voiceMountedRef = useRef(true);
+  const voiceToggleRef = useRef<() => Promise<void>>(async () => undefined);
   const [siteCode, setSiteCode] = useState("");
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [hostKey, setHostKey] = useState<string | null>(null);
@@ -92,6 +94,7 @@ export default function GatekeeperScreen() {
   const [busy, setBusy] = useState(false);
   const [activeNameField, setActiveNameField] = useState<DriverNameField | null>(null);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceTranscribing, setVoiceTranscribing] = useState(false);
   const [voiceCheckInPending, setVoiceCheckInPending] = useState(false);
   const [voiceCheckoutMatches, setVoiceCheckoutMatches] = useState<ActiveVisit[]>([]);
 
@@ -171,19 +174,21 @@ export default function GatekeeperScreen() {
   };
 
   const finishGateVoiceEntry = async () => {
-    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
-    voiceTimerRef.current = null;
     const recorder = voiceRecorderRef.current;
     voiceRecorderRef.current = null;
-    setVoiceListening(false);
+    if (voiceMountedRef.current) setVoiceListening(false);
+    setGateVoiceListening(false);
     if (!recorder) return;
     try {
       const { uri, durationSeconds } = await recorder.stop();
       if (durationSeconds < 0.4) return;
-      const command = parseGateVoiceCommand(await transcribeAskVRecording(uri));
+      if (voiceMountedRef.current) setVoiceTranscribing(true);
+      const transcript = await transcribeAskVRecording(uri);
+      if (!voiceMountedRef.current) return;
+      const command = parseGateVoiceCommand(transcript);
       const fill = command.fill;
       if (!Object.keys(fill).length) {
-        Alert.alert(t("visitor.error"), t("gatekeeper.voiceNotUnderstood"));
+        if (voiceMountedRef.current) Alert.alert(t("visitor.error"), t("gatekeeper.voiceNotUnderstood"));
         return;
       }
       if (fill.firstName) setFirstName(fill.firstName);
@@ -197,46 +202,74 @@ export default function GatekeeperScreen() {
         const matches = matchGateCheckoutVisits(activeVisits.data ?? [], fill);
         setVoiceCheckInPending(false);
         setVoiceCheckoutMatches(matches);
-        if (matches.length === 0) Alert.alert(t("visitor.error"), t("gatekeeper.voiceNoCheckoutMatch"));
+        if (matches.length === 0 && voiceMountedRef.current) Alert.alert(t("visitor.error"), t("gatekeeper.voiceNoCheckoutMatch"));
       } else {
         setVoiceCheckoutMatches([]);
         setVoiceCheckInPending(true);
       }
     } catch (error) {
-      Alert.alert(
-        t("visitor.error"),
-        error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
-      );
+      if (voiceMountedRef.current) {
+        Alert.alert(
+          t("visitor.error"),
+          error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
+        );
+      }
     } finally {
+      if (voiceMountedRef.current) setVoiceTranscribing(false);
       await recorder.dispose();
     }
   };
 
   const startGateVoiceEntry = async () => {
-    if (voiceListening) return;
+    if (voiceRecorderRef.current) return;
+    let recorder: PttRecorder | null = null;
     try {
-      await voiceRecorderRef.current?.dispose();
-      const recorder = await createPttRecorder();
+      recorder = await createPttRecorder();
+      if (!voiceMountedRef.current) {
+        await recorder.dispose();
+        return;
+      }
       voiceRecorderRef.current = recorder;
       await recorder.start();
+      if (!voiceMountedRef.current || voiceRecorderRef.current !== recorder) {
+        await recorder.dispose();
+        return;
+      }
       setVoiceListening(true);
-      voiceTimerRef.current = setTimeout(() => void finishGateVoiceEntry(), 6500);
+      setGateVoiceListening(true);
     } catch (error) {
-      voiceRecorderRef.current = null;
-      Alert.alert(
-        t("visitor.error"),
-        error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
-      );
+      if (voiceRecorderRef.current === recorder) voiceRecorderRef.current = null;
+      setGateVoiceListening(false);
+      await recorder?.dispose();
+      if (voiceMountedRef.current) {
+        setVoiceListening(false);
+        Alert.alert(
+          t("visitor.error"),
+          error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
+        );
+      }
     }
   };
 
-  useEffect(() => subscribeGateVoiceEntry(() => {
-    void startGateVoiceEntry();
-  }), [voiceListening]);
+  voiceToggleRef.current = async () => {
+    if (voiceRecorderRef.current) await finishGateVoiceEntry();
+    else await startGateVoiceEntry();
+  };
 
-  useEffect(() => () => {
-    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
-    void voiceRecorderRef.current?.dispose();
+  useEffect(() => subscribeGateVoiceEntry(() => {
+    const toggle = () => voiceToggleRef.current();
+    voiceOperationRef.current = voiceOperationRef.current.then(toggle, toggle);
+  }), []);
+
+  useEffect(() => {
+    voiceMountedRef.current = true;
+    return () => {
+      voiceMountedRef.current = false;
+      const recorder = voiceRecorderRef.current;
+      voiceRecorderRef.current = null;
+      setGateVoiceListening(false);
+      void recorder?.dispose();
+    };
   }, []);
 
   const resetForm = () => {
@@ -435,6 +468,12 @@ export default function GatekeeperScreen() {
                 <Text style={[styles.voiceStatusText, { color: colors.primary }]}>{t("gatekeeper.voiceListening")}</Text>
               </View>
             ) : null}
+            {voiceTranscribing ? (
+              <View style={[styles.voiceStatus, { borderColor: colors.primary }]}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={[styles.voiceStatusText, { color: colors.primary }]}>{t("gatekeeper.voiceTranscribing")}</Text>
+              </View>
+            ) : null}
             {voiceCheckInPending ? (
               <View style={[styles.voiceConfirm, { borderColor: colors.primary }]}>
                 <Text style={[styles.voiceConfirmTitle, { color: colors.foreground }]}>{t("gatekeeper.voiceConfirmCheckIn")}</Text>
@@ -498,9 +537,9 @@ export default function GatekeeperScreen() {
               </View>
             ) : null}
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.company")}</Text>
-            <TextInput value={company} onChangeText={setCompany} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <TextInput testID="gate-company" value={company} onChangeText={setCompany} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.vehiclePlate")} *</Text>
-            <TextInput value={vehiclePlate} onChangeText={(value) => setVehiclePlate(value.toUpperCase())} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <TextInput testID="gate-plate" value={vehiclePlate} onChangeText={(value) => setVehiclePlate(value.toUpperCase())} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
             <View style={styles.twoCol}>
               <TouchableOpacity
                 testID="gate-capture-tag-photo"

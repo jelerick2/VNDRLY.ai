@@ -20,6 +20,7 @@ import {
   portalDisplayLogo,
   shouldUseLayeredPortalLogo,
 } from "@/lib/portal-branding";
+import { requestGateVoiceEntry, subscribeGateVoiceListening } from "@/lib/gate-voice-launch";
 import { VNDRLY_LOGO_SQUARE as vndrlyLogo } from "@/lib/vndrly-brand-assets";
 import {
   useGetVendor,
@@ -78,6 +79,9 @@ export function FieldOpsPortalShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vendorName, setVendorName] = useState<string | null>(null);
   const [employeeName, setEmployeeName] = useState<string | null>(null);
+  const [gateVoiceListening, setGateVoiceListening] = useState(false);
+
+  useEffect(() => subscribeGateVoiceListening(setGateVoiceListening), []);
 
   const vendorId = user?.vendorId ?? null;
   const { data: vendor } = useGetVendor(vendorId ?? 0, {
@@ -237,8 +241,9 @@ export function FieldOpsPortalShell({
               return (
                 <div key={tab.href} className="flex justify-center py-3">
                   <GateVoiceCircleButton
+                    active={gateVoiceListening}
                     onClick={() => {
-                      const launch = () => window.dispatchEvent(new Event("vndrly:gate-voice"));
+                      const launch = () => requestGateVoiceEntry();
                       if (!location.startsWith("/gate") || location.startsWith("/gate/history")) {
                         sessionStorage.setItem("vndrly:gate-voice-pending", "1");
                         setLocation("/gate");

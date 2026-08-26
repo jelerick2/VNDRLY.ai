@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { router, Slot, usePathname } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/useColors";
 import { crewMapTabVisible, homeTabTitleKey, isForemanEmployeeUser, isGatekeeperUser } from "@/lib/mobile-viewer";
 import { useTabBadges } from "@/lib/tabBadges";
-import { requestGateVoiceEntry } from "@/lib/gate-voice-launch";
+import { requestGateVoiceEntry, subscribeGateVoiceListening } from "@/lib/gate-voice-launch";
 
 type TabItem = {
   badge?: number;
@@ -31,6 +31,9 @@ export default function TabLayout() {
   const isForemanEmployee = isForemanEmployeeUser(user);
   const isGatekeeper = isGatekeeperUser(user);
   const showsCrewMap = crewMapTabVisible(user);
+  const [gateVoiceListening, setGateVoiceListening] = useState(false);
+
+  useEffect(() => subscribeGateVoiceListening(setGateVoiceListening), []);
 
   const tabs = ([
     { key: "askv", href: "/(tabs)/askv", label: t("tabs.askv"), icon: "zap", visible: true },
@@ -113,7 +116,7 @@ export default function TabLayout() {
       </View>
       <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         {tabs.map((tab) => {
-          const active = isActiveTab(pathname, tab.key);
+          const active = tab.voiceEntry ? gateVoiceListening : isActiveTab(pathname, tab.key);
           const color = active ? colors.primary : colors.mutedForeground;
           const badgeLabel = tab.badge && tab.badge > 0 ? (tab.badge > 99 ? "99+" : String(tab.badge)) : null;
           return (
@@ -122,8 +125,12 @@ export default function TabLayout() {
               accessibilityRole="button"
               accessibilityState={active ? { selected: true } : undefined}
               onPress={() => {
+                if (tab.voiceEntry) {
+                  if (!isGateScreen(pathname)) router.push(tab.href as never);
+                  requestGateVoiceEntry();
+                  return;
+                }
                 router.push(tab.href as never);
-                if (tab.voiceEntry) requestGateVoiceEntry();
               }}
               style={styles.tabItem}
             >
@@ -151,6 +158,10 @@ function isActiveTab(pathname: string, key: string) {
     return pathname === "/" || pathname === "/index" || pathname === "/(tabs)" || pathname === "/(tabs)/index";
   }
   return pathname.endsWith(`/${key}`) || pathname === `/(tabs)/${key}`;
+}
+
+function isGateScreen(pathname: string): boolean {
+  return pathname === "/gate" || pathname === "/(tabs)/gate" || pathname.endsWith("/gate");
 }
 
 const styles = StyleSheet.create({

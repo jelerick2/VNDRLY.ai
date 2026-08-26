@@ -64,7 +64,8 @@
   },
   "gatekeeper": {
     "voiceEntry": "Voz",
-    "voiceListening": "Escuchando los datos de entrada…",
+    "voiceListening": "Escuchando los datos de entrada; vuelva a tocar el micrófono cuando termine.",
+    "voiceTranscribing": "Procesando la entrada de voz…",
     "voiceNotUnderstood": "No pude entender. Diga: Bob Villa saliendo, o matrícula ABC123 saliendo.",
     "voiceConfirmCheckIn": "Revise el registro completado y confirme esta entrada.",
     "voiceConfirmCheckOut": "Confirme la salida de este visitante.",
