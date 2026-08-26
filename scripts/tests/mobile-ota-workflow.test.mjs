@@ -55,5 +55,10 @@ test("EAS publishes iOS OTA only when the installed native fingerprint matches",
   assert.match(easWorkflow, /before_update:/);
   assert.match(easWorkflow, /pnpm run typecheck/);
   assert.match(easWorkflow, /pnpm run test/);
+  assert.equal(
+    [...easWorkflow.matchAll(/corepack prepare pnpm@9\.15\.9 --activate/g)]
+      .length,
+    2,
+  );
   assert.doesNotMatch(easWorkflow, /type:\s*(?:build|submit)\b/);
 });
