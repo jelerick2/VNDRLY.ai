@@ -74,3 +74,10 @@ test("EAS builds shared TypeScript declarations before validating mobile", () =>
   assert.notEqual(typecheckMobile, -1);
   assert.ok(buildLibraries < typecheckMobile);
 });
+
+test("EAS validates and publishes with the production Node runtime", () => {
+  assert.match(
+    easWorkflow,
+    /defaults:\s*\n\s+tools:\s*\n\s+node:\s*22\.14\.0/,
+  );
+});

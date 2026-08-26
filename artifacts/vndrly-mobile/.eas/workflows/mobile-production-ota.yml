@@ -14,6 +14,10 @@ concurrency:
   group: vndrly-production-ios-ota
   cancel_in_progress: false
 
+defaults:
+  tools:
+    node: 22.14.0
+
 jobs:
   fingerprint:
     name: Calculate production native fingerprint
