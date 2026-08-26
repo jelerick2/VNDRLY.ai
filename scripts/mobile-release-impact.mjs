@@ -14,14 +14,21 @@ function git(args) {
   }).trim();
 }
 
-function collectDiffFiles() {
+function collectDiffFiles(baseRef = null) {
   const files = new Set();
 
-  for (const args of [
-    ["diff", "--name-only"],
-    ["diff", "--name-only", "--cached"],
-    ["ls-files", "--others", "--exclude-standard"],
-  ]) {
+  const commands = baseRef
+    ? [
+        ["diff", "--name-only", baseRef, "--"],
+        ["ls-files", "--others", "--exclude-standard"],
+      ]
+    : [
+        ["diff", "--name-only"],
+        ["diff", "--name-only", "--cached"],
+        ["ls-files", "--others", "--exclude-standard"],
+      ];
+
+  for (const args of commands) {
     const out = git(args);
     for (const file of out.split(/\r?\n/)) {
       if (file.trim()) files.add(file.trim().replaceAll("\\", "/"));
@@ -29,6 +36,16 @@ function collectDiffFiles() {
   }
 
   return [...files].sort();
+}
+
+function readArg(name) {
+  const index = process.argv.indexOf(name);
+  if (index === -1) return null;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error(`${name} requires a value.`);
+  }
+  return value;
 }
 
 const nativeExact = new Set([
@@ -72,8 +89,8 @@ function readWorkingJson(file) {
   }
 }
 
-function packageDependencyChanged(file) {
-  const before = readJsonAtRef("HEAD", file);
+function packageDependencyChanged(file, baseRef = null) {
+  const before = readJsonAtRef(baseRef ?? "HEAD", file);
   const after = readWorkingJson(file);
   if (!before || !after) return true;
 
@@ -90,16 +107,19 @@ function packageDependencyChanged(file) {
   return keys.some((key) => JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null));
 }
 
-function isNativeImpact(file) {
+function isNativeImpact(file, baseRef = null) {
   if (file === "package.json" || file === "artifacts/vndrly-mobile/package.json") {
-    return packageDependencyChanged(file);
+    return packageDependencyChanged(file, baseRef);
   }
   if (nativeExact.has(file)) return true;
   if (nativePrefixes.some((prefix) => file.startsWith(prefix))) return true;
   return nativeSuffixes.some((suffix) => file.endsWith(suffix));
 }
 
-const files = collectDiffFiles();
+const baseRef = readArg("--base-ref");
+if (baseRef) git(["rev-parse", "--verify", `${baseRef}^{commit}`]);
+
+const files = collectDiffFiles(baseRef);
 const mobileFiles = files.filter(
   (file) =>
     file.startsWith("artifacts/vndrly-mobile/") ||
@@ -108,7 +128,7 @@ const mobileFiles = files.filter(
     file === "pnpm-lock.yaml" ||
     file === "package.json",
 );
-const nativeImpactFiles = mobileFiles.filter(isNativeImpact);
+const nativeImpactFiles = mobileFiles.filter((file) => isNativeImpact(file, baseRef));
 
 if (process.argv.includes("--json")) {
   console.log(
