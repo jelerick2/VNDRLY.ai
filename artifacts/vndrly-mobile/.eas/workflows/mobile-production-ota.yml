@@ -50,6 +50,8 @@ jobs:
         - name: Activate repository pnpm version
           run: corepack enable && corepack prepare pnpm@9.15.9 --activate
       before_update:
+        - name: Build shared TypeScript declarations
+          run: pnpm --dir ../.. run typecheck:libs
         - name: Typecheck mobile app
           run: pnpm run typecheck
         - name: Test mobile app

@@ -63,3 +63,14 @@ test("EAS publishes iOS OTA only when the installed native fingerprint matches",
   );
   assert.doesNotMatch(easWorkflow, /type:\s*(?:build|submit)\b/);
 });
+
+test("EAS builds shared TypeScript declarations before validating mobile", () => {
+  const buildLibraries = easWorkflow.indexOf(
+    "pnpm --dir ../.. run typecheck:libs",
+  );
+  const typecheckMobile = easWorkflow.indexOf("pnpm run typecheck");
+
+  assert.notEqual(buildLibraries, -1);
+  assert.notEqual(typecheckMobile, -1);
+  assert.ok(buildLibraries < typecheckMobile);
+});
