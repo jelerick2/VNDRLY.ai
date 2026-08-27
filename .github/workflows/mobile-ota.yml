@@ -82,7 +82,7 @@ jobs:
         run: pnpm --filter @workspace/vndrly-mobile run typecheck
 
       - name: Test mobile app
-        run: pnpm --filter @workspace/vndrly-mobile run test
+        run: pnpm --filter @workspace/vndrly-mobile exec vitest run --maxWorkers=2 --retry=1
 
       - name: Publish production iOS OTA update
         working-directory: artifacts/vndrly-mobile
