@@ -124,6 +124,18 @@ describe("extractPlateCandidate", () => {
     }
   });
 
+  it("keeps decorative OCR brackets on the noisy extraction path", () => {
+    expect(extractPlateCandidate("PLATE [ABC123]")).toMatchObject({
+      plate: "ABC123",
+    });
+    expect(extractPlateCandidate("[EXP 12/26]\nOK 4412")).toMatchObject({
+      plate: "OK4412",
+    });
+    expect(extractPlateCandidate("{ABC123}")).toMatchObject({
+      plate: "ABC123",
+    });
+  });
+
   it("picks an alphanumeric plate out of noisy OCR text", () => {
     expect(
       extractPlateCandidate("OKLAHOMA\nEXP 12/26\nOK 4412\nUSA"),

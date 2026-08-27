@@ -160,9 +160,10 @@ function structuredJsonContent(text: string): {
   return {
     content,
     looksStructured:
-      /^(?:\{|\[|")/.test(content) ||
-      content.includes("{") ||
-      content.includes("[") ||
+      /\{\s*"/.test(content) ||
+      /\[\s*(?:"|\]|\[|-?\d|true\b|false\b|null\b|\{\s*(?:"|\}))/.test(
+        content,
+      ) ||
       /"(?:plate|state|plateConfidence|stateConfidence)"\s*:/i.test(content),
   };
 }

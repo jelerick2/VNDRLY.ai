@@ -36,6 +36,7 @@ passed.
 - JSON objects without an own `plate` field, arrays, primitives, and JSON-shaped malformed content now return an all-null candidate rather than falling through to noisy OCR extraction.
 - Follow-up focused checks passed: parser (11 tests) and route contract (1 selected test).
 - Structured detection now also recognizes JSON fences anywhere in model content, embedded object/array syntax, and quoted OCR contract keys behind prose prefixes; parser coverage is now 12 focused tests.
+- Structured detection now requires JSON-shaped object/array starts, so decorative OCR brackets remain on the noisy-extraction path; parser coverage is now 13 focused tests.
 
 ## Commit
 
@@ -44,6 +45,8 @@ passed.
 Follow-up: `Correct plate OCR response contract`
 
 Final correction: `Harden OCR structured-content detection`
+
+Bracket refinement: `Refine OCR JSON structure detection`
 
 ## Self-review
 
