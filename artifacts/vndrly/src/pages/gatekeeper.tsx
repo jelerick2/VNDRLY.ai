@@ -7,6 +7,7 @@ import {
   NATIONAL_PLATE_STATE_FALLBACK,
   PLATE_OCR_STATE_CONFIDENCE_THRESHOLD,
   normalizePlateState,
+  plateMatchKey,
   type PlateStateCode,
 } from "@workspace/plate-state";
 
@@ -29,6 +30,7 @@ import { pickDefaultGateHostKey, resolveAssignedGateSites, shouldApplyDefaultGat
 import {
   draftsEqual,
   evaluateGateMemory,
+  fillFromVisit,
   mergeGateFill,
   pickSuggestionFill,
   type GateEntryDraft,
@@ -46,6 +48,18 @@ function evidenceUrl(path: string): string {
 
 type Coordinates = { latitude: number; longitude: number };
 type Translate = (key: string) => string;
+type PlateAutoFillField = "firstName" | "lastName" | "company" | "purpose" | "expectedDuration";
+type PlateAutoFillSnapshot = {
+  matchKey: string;
+  values: Partial<Record<PlateAutoFillField, string>>;
+};
+const PLATE_AUTO_FILL_FIELDS: PlateAutoFillField[] = [
+  "firstName",
+  "lastName",
+  "company",
+  "purpose",
+  "expectedDuration",
+];
 
 type GateSpeechRecognition = {
   continuous: boolean;
@@ -116,6 +130,7 @@ export default function GatekeeperPage() {
   const plateInput = useRef<HTMLInputElement>(null);
   const vehicleInput = useRef<HTMLInputElement>(null);
   const appliedDefault = useRef(false);
+  const plateAutoFillRef = useRef<PlateAutoFillSnapshot | null>(null);
   const [siteCode, setSiteCode] = useState("");
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [hostKey, setHostKey] = useState("");
@@ -192,7 +207,9 @@ export default function GatekeeperPage() {
   });
   const exportRows = useMemo(() => toGateLogRows(recentVisits.data ?? []), [recentVisits.data]);
   const previousPlateVisit = useMemo(
-    () => latestVisitForPlate(recentVisits.data ?? [], plateState, vehiclePlate),
+    () => plateState
+      ? latestVisitForPlate(recentVisits.data ?? [], plateState, vehiclePlate)
+      : null,
     [plateState, vehiclePlate, recentVisits.data],
   );
   const entryDraft = useMemo<GateEntryDraft>(() => ({
@@ -223,8 +240,15 @@ export default function GatekeeperPage() {
     setPurpose(next.purpose);
     if (next.expectedDuration) setDuration(next.expectedDuration);
   };
+  const forgetPlateAutoFill = (field: PlateAutoFillField) => {
+    const snapshot = plateAutoFillRef.current;
+    if (!snapshot) return;
+    delete snapshot.values[field];
+    if (Object.keys(snapshot.values).length === 0) plateAutoFillRef.current = null;
+  };
   const onMemoryFieldChange = (field: GateMemoryField, value: string) => {
     const nextValue = field === "vehiclePlate" ? value.toUpperCase() : value;
+    if (field !== "vehiclePlate") forgetPlateAutoFill(field);
     setMemoryDeleting(nextValue.length < entryDraft[field].length);
     setActiveMemoryField(field);
     if (field === "firstName") setFirstName(nextValue);
@@ -233,6 +257,7 @@ export default function GatekeeperPage() {
     else setVehiclePlate(nextValue);
   };
   const onMemoryPick = (suggestion: GateMemorySuggestion) => {
+    plateAutoFillRef.current = null;
     setMemoryDeleting(false);
     applyEntryDraft(mergeGateFill(entryDraft, pickSuggestionFill(suggestion)));
   };
@@ -261,6 +286,7 @@ export default function GatekeeperPage() {
         return;
       }
       applyEntryDraft({ ...entryDraft, ...fill });
+      plateAutoFillRef.current = null;
       setError(null);
     };
     recognition.onerror = () => setError(t("gatekeeper.voiceNotUnderstood"));
@@ -321,15 +347,48 @@ export default function GatekeeperPage() {
     if (next) setHostKey(next);
   }, [hostKey, hosts]);
 
+  const currentPlateMatchKey = plateMatchKey(plateState, vehiclePlate);
+  useEffect(() => {
+    const snapshot = plateAutoFillRef.current;
+    if (!snapshot || snapshot.matchKey === currentPlateMatchKey) return;
+    const next = { ...entryDraft };
+    const replacement = previousPlateVisit ? fillFromVisit(previousPlateVisit) : null;
+    const replacementValues: Partial<Record<PlateAutoFillField, string>> = {};
+    for (const field of PLATE_AUTO_FILL_FIELDS) {
+      const autoFilledValue = snapshot.values[field];
+      if (autoFilledValue == null || entryDraft[field] !== autoFilledValue) continue;
+      const replacementValue = replacement?.[field]
+        || (field === "expectedDuration" ? "60" : "");
+      next[field] = replacementValue;
+      if (replacement?.[field]) replacementValues[field] = replacementValue;
+    }
+    plateAutoFillRef.current = currentPlateMatchKey && Object.keys(replacementValues).length > 0
+      ? { matchKey: currentPlateMatchKey, values: replacementValues }
+      : null;
+    if (!draftsEqual(next, entryDraft)) applyEntryDraft(next);
+  }, [currentPlateMatchKey, entryDraft, previousPlateVisit]);
+
   useEffect(() => {
     if (!memory.fill) return;
     const next = mergeGateFill(entryDraft, memory.fill);
     if (draftsEqual(next, entryDraft)) return;
+    if (currentPlateMatchKey) {
+      const values = plateAutoFillRef.current?.matchKey === currentPlateMatchKey
+        ? { ...plateAutoFillRef.current.values }
+        : {};
+      for (const field of PLATE_AUTO_FILL_FIELDS) {
+        if (next[field] !== entryDraft[field]) values[field] = next[field];
+      }
+      if (Object.keys(values).length > 0) {
+        plateAutoFillRef.current = { matchKey: currentPlateMatchKey, values };
+      }
+    }
     setMemoryDeleting(false);
     applyEntryDraft(next);
-  }, [entryDraft, memory.fill]);
+  }, [currentPlateMatchKey, entryDraft, memory.fill]);
 
   const resetEntry = () => {
+    plateAutoFillRef.current = null;
     setFirstName(""); setLastName(""); setCompany("");
     setVehiclePlate(""); setPurpose(""); setDuration("60"); setHostKey("");
     setPlateState(null); setPlateStateError(null);
@@ -342,6 +401,7 @@ export default function GatekeeperPage() {
 
   const usePreviousPlateDetails = () => {
     if (!previousPlateVisit) return;
+    plateAutoFillRef.current = null;
     setMemoryDeleting(false);
     applyEntryDraft(mergeGateFill(entryDraft, {
       firstName: previousPlateVisit.firstName,
@@ -695,8 +755,8 @@ export default function GatekeeperPage() {
                 </div>
               </>
             )}
-            <div><Label>{t("gatekeeper.purpose")}</Label><Textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} /></div>
-            <div><Label>{t("gatekeeper.expectedMinutes")}</Label><Input inputMode="numeric" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
+            <div><Label>{t("gatekeeper.purpose")}</Label><Textarea value={purpose} onChange={(e) => { forgetPlateAutoFill("purpose"); setPurpose(e.target.value); }} /></div>
+            <div><Label>{t("gatekeeper.expectedMinutes")}</Label><Input inputMode="numeric" value={duration} onChange={(e) => { forgetPlateAutoFill("expectedDuration"); setDuration(e.target.value); }} /></div>
             <div className="grid grid-cols-2 gap-3">
               <BlueButton onClick={() => plateInput.current?.click()} disabled={busy}>
                 <Camera className="mr-2 h-4 w-4" />{platePhotoUrl ? t("gatekeeper.plateAttached") : t("gatekeeper.platePhoto")}

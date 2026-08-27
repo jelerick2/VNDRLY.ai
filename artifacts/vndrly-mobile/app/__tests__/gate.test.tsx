@@ -356,6 +356,93 @@ describe("GatekeeperScreen", () => {
     });
   });
 
+  it("replaces prior composite auto-fill after switching to a state with a different exact match and preserves manual edits", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    fetchGatekeeperRecentVisitsMock.mockResolvedValue([
+      {
+        id: 1,
+        firstName: "Oklahoma",
+        lastName: "Visitor",
+        company: "Sooner Services",
+        vehiclePlate: "4412",
+        plateState: "OK",
+        purpose: "Delivery",
+        expectedDurationMinutes: 30,
+        checkInTime: "2026-08-23T10:00:00Z",
+      },
+      {
+        id: 2,
+        firstName: "Texas",
+        lastName: "Driver",
+        company: "Lone Star Services",
+        vehiclePlate: "4412",
+        plateState: "TX",
+        purpose: "Inspection",
+        expectedDurationMinutes: 45,
+        checkInTime: "2026-08-22T10:00:00Z",
+      },
+    ]);
+    renderScreen();
+
+    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), { target: { value: "4412" } });
+    tap(screen.getByRole("button", { name: "Select plate state" }));
+    tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
+    await waitFor(() => {
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Oklahoma");
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Visitor");
+    });
+
+    fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Manual" } });
+    tap(screen.getByRole("button", { name: "Selected plate state: Oklahoma (OK)" }));
+    tap(screen.getByRole("button", { name: "Texas (TX), state option" }));
+
+    await waitFor(() => {
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Manual");
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Driver");
+    });
+  });
+
+  it("clears prior composite auto-fill when OCR corrects the state to one with no match and preserves manual edits", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    fetchGatekeeperRecentVisitsMock.mockResolvedValue([
+      {
+        id: 1,
+        firstName: "Oklahoma",
+        lastName: "Visitor",
+        company: "Sooner Services",
+        vehiclePlate: "4412",
+        plateState: "OK",
+        purpose: "Delivery",
+        expectedDurationMinutes: 30,
+        checkInTime: "2026-08-23T10:00:00Z",
+      },
+    ]);
+    captureAndUploadImageMock.mockResolvedValue({ objectPath: "/uploads/tx.jpg" });
+    readGatePlateMock.mockResolvedValue({
+      plate: "4412",
+      state: "TX",
+      plateConfidence: 0.98,
+      stateConfidence: 0.91,
+    });
+    renderScreen();
+
+    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), { target: { value: "4412" } });
+    tap(screen.getByRole("button", { name: "Select plate state" }));
+    tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
+    await waitFor(() => {
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Visitor");
+    });
+
+    fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Manual" } });
+    tap(firstByTestId("gate-capture-tag-photo"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" })).toBeTruthy();
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Manual");
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("");
+    });
+  });
+
   it("blocks a missing plate state before starting check-in work and exposes an accessible error", async () => {
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
     submitGatekeeperVisitMock.mockResolvedValue({ ok: true, visitId: 88 });

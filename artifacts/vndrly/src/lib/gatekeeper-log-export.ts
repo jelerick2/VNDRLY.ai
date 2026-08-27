@@ -25,14 +25,14 @@ export function latestVisitForPlate(
   plate: string,
 ): VisitorRow | null {
   const normalized = normalizePlate(plate);
-  if (!normalized) return null;
   const normalizedState = normalizePlateState(state);
+  if (!normalized || !normalizedState) return null;
   const exactKey = plateMatchKey(normalizedState, plate);
   return visits
     .filter((visit) => {
       if (normalizePlate(visit.vehiclePlate) !== normalized) return false;
       const visitState = normalizePlateState(visit.plateState);
-      return !normalizedState || !visitState || plateMatchKey(visitState, visit.vehiclePlate) === exactKey;
+      return !visitState || plateMatchKey(visitState, visit.vehiclePlate) === exactKey;
     })
     .sort((a, b) => {
       const priority = (visit: VisitorRow) =>

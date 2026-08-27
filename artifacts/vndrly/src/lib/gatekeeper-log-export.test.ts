@@ -54,6 +54,13 @@ describe("gatekeeper plate history", () => {
     expect(latestVisitForPlate([legacy, wrongState], "TX", "4412")?.id).toBe(4);
     expect(latestVisitForPlate([wrongState], "TX", "4412")).toBeNull();
   });
+
+  it("does not resolve a previous visit until state and plate are both present", () => {
+    const prior = visit({ id: 6, vehiclePlate: "4412", plateState: "OK" });
+
+    expect(latestVisitForPlate([prior], null, "4412")).toBeNull();
+    expect(latestVisitForPlate([prior], "OK", "")).toBeNull();
+  });
 });
 
 describe("gatekeeper log exports", () => {

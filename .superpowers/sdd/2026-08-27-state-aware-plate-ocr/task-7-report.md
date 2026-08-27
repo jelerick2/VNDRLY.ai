@@ -35,8 +35,8 @@ No database command or shared database access was used.
 
 ## GREEN evidence
 
-- Mobile focused gate + helper suites: `2` files, `14/14` tests passed.
-- Web gatekeeper + memory + previous-visit suites: `3` files, `28/28` tests passed.
+- Mobile focused gate + helper suites: `2` files, `16/16` tests passed.
+- Web gatekeeper + memory + previous-visit suites: `3` files, `33/33` tests passed.
 - Mobile TypeScript check: exit `0`.
 - Web TypeScript check: exit `0`.
 - Locale parity: mobile `1669/1669`, web `4221/4221`, passed.
@@ -74,6 +74,15 @@ No database command or shared database access was used.
 - Scope is limited to the two staffed surfaces, their thin clients/fixtures, state-aware memory/previous-visit helpers, and focused tests/locales.
 - Shared constants and helpers are reused: `PLATE_OCR_STATE_CONFIDENCE_THRESHOLD`, `NATIONAL_PLATE_STATE_FALLBACK`, `normalizePlateState`, `orderPlateStates` through the reusable pickers, and `plateMatchKey`.
 - No new dependency, architecture change, generated client change, or database mutation was introduced.
+
+## Review follow-up: composite auto-fill provenance
+
+- Review RED reproduced stale Oklahoma identity fields after both manual and OCR-driven transitions from `OK + 4412` to `TX + 4412`; the web previous-visit helper also returned and rendered an Oklahoma visit while state was null.
+- Mobile and web now record which visitor fields were auto-filled and the normalized state-plus-number key that supplied them.
+- When that composite key changes, fields still owned by the prior auto-fill are cleared or replaced from the new exact/legacy composite visit. A field relinquishes auto-fill ownership as soon as the gatekeeper edits it, so manual changes survive the transition.
+- Web transition coverage submits `TX + 4412` with the Texas visitor identity and a preserved manually edited company, proving the stale Oklahoma identity cannot reach the check-in payload.
+- Mobile coverage exercises both an exact replacement after a manual state switch and stale-field removal after high-confidence OCR corrects the state to one with no match.
+- Web integration tests now retain the real `latestVisitForPlate` implementation. They verify no banner/prefill without state and Texas selection for same-number Oklahoma/Texas history. The helper itself now requires both normalized state and plate before matching.
 
 ## Concerns
 

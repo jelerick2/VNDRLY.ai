@@ -55,6 +55,11 @@ import {
 } from "@workspace/plate-state";
 
 type DriverNameField = "firstName" | "lastName";
+type PlateAutoFillField = "firstName" | "lastName" | "company" | "purpose" | "duration";
+type PlateAutoFillSnapshot = {
+  matchKey: string;
+  values: Partial<Record<PlateAutoFillField, string>>;
+};
 
 function driverSuggestions(
   visits: ActiveVisit[],
@@ -87,6 +92,7 @@ export default function GatekeeperScreen() {
   const appliedDefault = useRef(false);
   const voiceRecorderRef = useRef<PttRecorder | null>(null);
   const voiceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const plateAutoFillRef = useRef<PlateAutoFillSnapshot | null>(null);
   const [siteCode, setSiteCode] = useState("");
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [hostKey, setHostKey] = useState<string | null>(null);
@@ -178,6 +184,7 @@ export default function GatekeeperScreen() {
   );
 
   const useDriver = (visit: ActiveVisit) => {
+    plateAutoFillRef.current = null;
     setFirstName(visit.firstName ?? "");
     setLastName(visit.lastName ?? "");
     setCompany(visit.company ?? company);
@@ -211,6 +218,7 @@ export default function GatekeeperScreen() {
       if (fill.vehiclePlate) setVehiclePlate(fill.vehiclePlate);
       if (fill.purpose) setPurpose(fill.purpose);
       if (fill.duration) setDuration(fill.duration);
+      plateAutoFillRef.current = null;
       setActiveNameField(null);
     } catch (error) {
       Alert.alert(
@@ -253,6 +261,7 @@ export default function GatekeeperScreen() {
   }, []);
 
   const resetForm = () => {
+    plateAutoFillRef.current = null;
     setFirstName("");
     setLastName("");
     setCompany("");
@@ -306,6 +315,25 @@ export default function GatekeeperScreen() {
     }
   };
 
+  const forgetPlateAutoFill = (field: PlateAutoFillField) => {
+    const snapshot = plateAutoFillRef.current;
+    if (!snapshot) return;
+    delete snapshot.values[field];
+    if (Object.keys(snapshot.values).length === 0) plateAutoFillRef.current = null;
+  };
+
+  const currentPlateMatchKey = plateMatchKey(plateState, vehiclePlate);
+  useEffect(() => {
+    const snapshot = plateAutoFillRef.current;
+    if (!snapshot || snapshot.matchKey === currentPlateMatchKey) return;
+    if (snapshot.values.firstName === firstName) setFirstName("");
+    if (snapshot.values.lastName === lastName) setLastName("");
+    if (snapshot.values.company === company) setCompany("");
+    if (snapshot.values.purpose === purpose) setPurpose("");
+    if (snapshot.values.duration === duration) setDuration("60");
+    plateAutoFillRef.current = null;
+  }, [currentPlateMatchKey]);
+
   useEffect(() => {
     const normalized = vehiclePlate.toUpperCase().replace(/[^A-Z0-9]/g, "");
     if (normalized.length < 3 || !plateState) return;
@@ -323,11 +351,32 @@ export default function GatekeeperScreen() {
         return priority(a) - priority(b) || Date.parse(b.checkInTime) - Date.parse(a.checkInTime);
       })[0];
     if (!prior) return;
-    if (!firstName) setFirstName(prior.firstName ?? "");
-    if (!lastName) setLastName(prior.lastName ?? "");
-    if (!company) setCompany(prior.company ?? "");
-    if (!purpose) setPurpose(prior.purpose ?? "");
-    if (duration === "60" && prior.expectedDurationMinutes) setDuration(String(prior.expectedDurationMinutes));
+    const values = plateAutoFillRef.current?.matchKey === exactKey
+      ? { ...plateAutoFillRef.current.values }
+      : {};
+    if (!firstName && prior.firstName) {
+      values.firstName = prior.firstName;
+      setFirstName(prior.firstName);
+    }
+    if (!lastName && prior.lastName) {
+      values.lastName = prior.lastName;
+      setLastName(prior.lastName);
+    }
+    if (!company && prior.company) {
+      values.company = prior.company;
+      setCompany(prior.company);
+    }
+    if (!purpose && prior.purpose) {
+      values.purpose = prior.purpose;
+      setPurpose(prior.purpose);
+    }
+    if (duration === "60" && prior.expectedDurationMinutes) {
+      values.duration = String(prior.expectedDurationMinutes);
+      setDuration(values.duration);
+    }
+    if (exactKey && Object.keys(values).length > 0) {
+      plateAutoFillRef.current = { matchKey: exactKey, values };
+    }
   }, [company, duration, firstName, lastName, plateState, purpose, recentVisits.data, vehiclePlate]);
 
   const onCheckIn = async () => {
@@ -452,7 +501,7 @@ export default function GatekeeperScreen() {
                   testID="gate-first-name"
                   value={firstName}
                   onFocus={() => setActiveNameField("firstName")}
-                  onChangeText={(value) => { setActiveNameField("firstName"); setFirstName(value); }}
+                  onChangeText={(value) => { forgetPlateAutoFill("firstName"); setActiveNameField("firstName"); setFirstName(value); }}
                   style={inputStyle}
                   placeholderTextColor={colors.mutedForeground}
                 />
@@ -463,7 +512,7 @@ export default function GatekeeperScreen() {
                   testID="gate-last-name"
                   value={lastName}
                   onFocus={() => setActiveNameField("lastName")}
-                  onChangeText={(value) => { setActiveNameField("lastName"); setLastName(value); }}
+                  onChangeText={(value) => { forgetPlateAutoFill("lastName"); setActiveNameField("lastName"); setLastName(value); }}
                   style={inputStyle}
                   placeholderTextColor={colors.mutedForeground}
                 />
@@ -487,7 +536,7 @@ export default function GatekeeperScreen() {
               </View>
             ) : null}
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.company")}</Text>
-            <TextInput value={company} onChangeText={setCompany} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <TextInput value={company} onChangeText={(value) => { forgetPlateAutoFill("company"); setCompany(value); }} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
             <PlateStatePicker
               value={plateState}
               onChange={(state) => {
@@ -584,9 +633,9 @@ export default function GatekeeperScreen() {
                 hostKey={hostKey}
                 onSelectHost={setHostKey}
                 purpose={purpose}
-                onPurposeChange={setPurpose}
+                onPurposeChange={(value) => { forgetPlateAutoFill("purpose"); setPurpose(value); }}
                 duration={duration}
-                onDurationChange={setDuration}
+                onDurationChange={(value) => { forgetPlateAutoFill("duration"); setDuration(value); }}
                 busy={busy}
                 onSubmit={onCheckIn}
                 onChangeSite={() => {

@@ -34,14 +34,16 @@ vi.mock("@/components/live-connection-pill", () => ({
   LiveConnectionPill: () => React.createElement("span", { "data-testid": "live-pill" }),
 }));
 
-vi.mock("@/lib/gatekeeper-log-export", () => ({
-  exportExcel: vi.fn(),
-  exportPdf: vi.fn(),
-  exportWord: vi.fn(),
-  latestVisitForPlate: () => null,
-  normalizePlate: (value: string | null | undefined) => (value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, ""),
-  toGateLogRows: () => [],
-}));
+vi.mock("@/lib/gatekeeper-log-export", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/gatekeeper-log-export")>();
+  return {
+    ...actual,
+    exportExcel: vi.fn(),
+    exportPdf: vi.fn(),
+    exportWord: vi.fn(),
+    toGateLogRows: () => [],
+  };
+});
 
 vi.mock("@/lib/visits-api", () => ({
   listAllVisits: vi.fn(async () => []),
@@ -98,6 +100,36 @@ function renderPage() {
       <GatekeeperPage />
     </QueryClientProvider>,
   );
+}
+
+function recentVisit(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    firstName: "Oklahoma",
+    lastName: "Visitor",
+    company: "Sooner Services",
+    phone: null,
+    email: null,
+    vehiclePlate: "4412",
+    plateState: "OK",
+    platePhotoUrl: null,
+    vehiclePhotoUrl: null,
+    purpose: "Delivery",
+    expectedDurationMinutes: 30,
+    hostType: "partner",
+    hostPartnerId: 7,
+    hostVendorId: null,
+    hostPartnerName: "Acme Partner",
+    hostVendorName: null,
+    siteLocationId: 42,
+    siteName: "Acme HQ",
+    checkInTime: "2026-08-23T10:00:00Z",
+    checkOutTime: "2026-08-23T10:30:00Z",
+    autoCheckedOut: false,
+    checkInLatitude: 35.4,
+    checkInLongitude: -97.5,
+    ...overrides,
+  };
 }
 
 async function selectState(name: string) {
@@ -224,6 +256,112 @@ describe("GatekeeperPage plate state", () => {
     });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Select plate state" })).toBeTruthy();
+    });
+  });
+
+  it("replaces prior composite auto-fill after switching to a state with a different exact match and preserves manual edits", async () => {
+    api.list.mockResolvedValue([
+      recentVisit(),
+      recentVisit({
+        id: 2,
+        firstName: "Texas",
+        lastName: "Driver",
+        company: "Lone Star Services",
+        plateState: "TX",
+        purpose: "Inspection",
+        expectedDurationMinutes: 45,
+        checkInTime: "2026-08-22T10:00:00Z",
+      }),
+    ]);
+    renderPage();
+    await screen.findByTestId("input-gate-plate");
+
+    await selectState("Oklahoma (OK)");
+    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    await waitFor(() => {
+      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Oklahoma");
+      expect((screen.getByTestId("input-gate-company") as HTMLInputElement).value).toBe("Sooner Services");
+    });
+
+    fireEvent.change(screen.getByTestId("input-gate-company"), { target: { value: "Manual Company" } });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    await selectState("Texas (TX)");
+
+    await waitFor(() => {
+      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Texas");
+      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("Driver");
+      expect((screen.getByTestId("input-gate-company") as HTMLInputElement).value).toBe("Manual Company");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }));
+    await waitFor(() => expect(api.gateCheckIn).toHaveBeenCalledTimes(1));
+    expect(api.gateCheckIn.mock.calls[0][0]).toMatchObject({
+      firstName: "Texas",
+      lastName: "Driver",
+      company: "Manual Company",
+      plateState: "TX",
+      vehiclePlate: "4412",
+    });
+  });
+
+  it("clears prior composite auto-fill after switching to a state with no match and preserves manual edits", async () => {
+    api.list.mockResolvedValue([recentVisit()]);
+    renderPage();
+    await screen.findByTestId("input-gate-plate");
+
+    await selectState("Oklahoma (OK)");
+    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    await waitFor(() => {
+      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("Visitor");
+    });
+
+    fireEvent.change(screen.getByTestId("input-gate-first-name"), { target: { value: "Manual" } });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    await selectState("Texas (TX)");
+
+    await waitFor(() => {
+      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Manual");
+      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("");
+      expect((screen.getByTestId("input-gate-company") as HTMLInputElement).value).toBe("");
+    });
+  });
+
+  it("does not show or prefill previous-visit details before a plate state is selected", async () => {
+    api.list.mockResolvedValue([recentVisit()]);
+    renderPage();
+    await screen.findByTestId("input-gate-plate");
+
+    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+
+    await waitFor(() => {
+      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("");
+      expect(screen.queryByText("gatekeeper.previousVisit")).toBeNull();
+      expect(screen.queryByTestId("gate-last-driver-hint")).toBeNull();
+    });
+  });
+
+  it("uses the selected state for same-number previous-visit behavior", async () => {
+    api.list.mockResolvedValue([
+      recentVisit(),
+      recentVisit({
+        id: 2,
+        firstName: "Texas",
+        lastName: "Driver",
+        company: "Lone Star Services",
+        plateState: "TX",
+        checkInTime: "2026-08-20T10:00:00Z",
+      }),
+    ]);
+    renderPage();
+    await screen.findByTestId("input-gate-plate");
+
+    await selectState("Texas (TX)");
+    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+
+    await waitFor(() => {
+      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Texas");
+      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("Driver");
+      expect(screen.getByTestId("gate-last-driver-hint")).toBeTruthy();
     });
   });
 });
