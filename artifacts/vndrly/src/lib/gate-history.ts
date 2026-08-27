@@ -1,4 +1,5 @@
 import type { VisitorRow } from "@/lib/visits-api";
+import { plateMatchesSearch } from "@workspace/plate-state";
 
 export const GATE_HISTORY_DAYS = 30;
 
@@ -28,7 +29,8 @@ function haystack(visit: VisitorRow): string {
 export function visitMatchesHistorySearch(visit: VisitorRow, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  return haystack(visit).includes(needle);
+  return haystack(visit).includes(needle)
+    || plateMatchesSearch(visit.plateState, visit.vehiclePlate, query);
 }
 
 export function sortHistoryNewestFirst(visits: VisitorRow[]): VisitorRow[] {

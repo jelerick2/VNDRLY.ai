@@ -1,9 +1,12 @@
+import { normalizePlateState, type PlateStateCode } from "@workspace/plate-state";
+
 export type KnownGateVisit = {
   id: number;
   firstName: string;
   lastName: string;
   company: string | null;
   vehiclePlate: string | null;
+  plateState: PlateStateCode | null;
   platePhotoUrl: string | null;
   siteName: string | null;
   siteLocationId: number;
@@ -16,6 +19,7 @@ export type GateLiveFlash = {
   lastName: string;
   company: string | null;
   vehiclePlate: string | null;
+  plateState: PlateStateCode | null;
   platePhotoUrl: string | null;
   siteName: string | null;
   at: string;
@@ -30,6 +34,7 @@ export type GateLiveSseEvent =
         lastName: string;
         company: string | null;
         vehiclePlate: string | null;
+        plateState: PlateStateCode | null;
         platePhotoUrl: string | null;
         siteName: string | null;
         siteLocationId: number;
@@ -45,6 +50,7 @@ export type GateLiveSseEvent =
       lastName?: string;
       company?: string | null;
       vehiclePlate?: string | null;
+      plateState?: PlateStateCode | null;
       platePhotoUrl?: string | null;
       siteName?: string | null;
       visitor?: {
@@ -52,6 +58,7 @@ export type GateLiveSseEvent =
         lastName: string;
         company: string | null;
         vehiclePlate: string | null;
+        plateState: PlateStateCode | null;
         platePhotoUrl: string | null;
         siteName: string | null;
       };
@@ -73,6 +80,7 @@ export function flashFromVisitSseEvent(
       lastName: visit.lastName,
       company: visit.company,
       vehiclePlate: visit.vehiclePlate,
+      plateState: normalizePlateState(visit.plateState),
       platePhotoUrl: visit.platePhotoUrl,
       siteName: visit.siteName,
       at: visit.checkInTime,
@@ -85,6 +93,7 @@ export function flashFromVisitSseEvent(
         lastName: event.visitor.lastName,
         company: event.visitor.company,
         vehiclePlate: event.visitor.vehiclePlate,
+        plateState: normalizePlateState(event.visitor.plateState),
         platePhotoUrl: event.visitor.platePhotoUrl,
         siteName: event.visitor.siteName,
       }
@@ -94,6 +103,7 @@ export function flashFromVisitSseEvent(
           lastName: event.lastName ?? "",
           company: event.company ?? null,
           vehiclePlate: event.vehiclePlate ?? null,
+          plateState: normalizePlateState(event.plateState),
           platePhotoUrl: event.platePhotoUrl ?? null,
           siteName: event.siteName ?? null,
         }
@@ -107,6 +117,7 @@ export function flashFromVisitSseEvent(
     lastName: fromEvent.lastName,
     company: fromEvent.company,
     vehiclePlate: fromEvent.vehiclePlate,
+    plateState: normalizePlateState(fromEvent.plateState),
     platePhotoUrl: fromEvent.platePhotoUrl,
     siteName: fromEvent.siteName,
     at: event.checkOutTime,

@@ -14,6 +14,7 @@ function visit(overrides: Partial<VisitorRow> & Pick<VisitorRow, "id" | "checkIn
     phone: null,
     email: null,
     vehiclePlate: "OK-GATE1",
+    plateState: "OK",
     platePhotoUrl: null,
     vehiclePhotoUrl: null,
     purpose: "Delivery",
@@ -91,6 +92,20 @@ describe("buildGateOpsAnalytics", () => {
     expect(stats.visitsByDay.find((d) => d.day === "2026-08-25")?.checkIns).toBe(2);
     expect(stats.visitsByHour.find((h) => h.hour === 14)?.count).toBe(2);
     expect(stats.avgDwellMinutes).toBe(60);
+  });
+
+  it("counts confirmed states separately and keeps legacy plates in their own stable bucket", () => {
+    const stats = buildGateOpsAnalytics(
+      [
+        visit({ id: 10, vehiclePlate: "ABC123", plateState: "TX", checkInTime: "2026-08-25T10:00:00.000Z" }),
+        visit({ id: 11, vehiclePlate: "ABC123", plateState: "OK", checkInTime: "2026-08-25T11:00:00.000Z" }),
+        visit({ id: 12, vehiclePlate: "abc123", plateState: null, checkInTime: "2026-08-25T12:00:00.000Z" }),
+        visit({ id: 13, vehiclePlate: "ABC123", plateState: null, checkInTime: "2026-08-25T13:00:00.000Z" }),
+      ],
+      new Date("2026-08-25T18:00:00.000Z"),
+    );
+
+    expect(stats.uniquePlates).toBe(3);
   });
 });
 

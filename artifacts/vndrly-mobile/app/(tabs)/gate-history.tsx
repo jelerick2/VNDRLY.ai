@@ -15,6 +15,7 @@ import ScreenSafeArea from "@/components/ScreenSafeArea";
 import { useColors } from "@/hooks/useColors";
 import { filterGateHistory, gateHistoryFromIso } from "@/lib/gate-history";
 import { fetchGatekeeperHistory } from "@/lib/gatekeeper";
+import { formatPlateForDisplay } from "@/lib/plate-display";
 
 export default function GateHistoryScreen() {
   const colors = useColors();
@@ -83,7 +84,15 @@ export default function GateHistoryScreen() {
                 </Text>
               </View>
               <Text style={[styles.meta, { color: colors.mutedForeground }]}>
-                {[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" · ")}
+                {[
+                  visit.company,
+                  formatPlateForDisplay(
+                    visit.plateState,
+                    visit.vehiclePlate,
+                    t("gatekeeper.plateStateUnconfirmed"),
+                  ),
+                  visit.siteName,
+                ].filter(Boolean).join(" · ")}
               </Text>
               <Text style={[styles.meta, { color: colors.mutedForeground }]}>
                 {new Date(visit.checkInTime).toLocaleString()}

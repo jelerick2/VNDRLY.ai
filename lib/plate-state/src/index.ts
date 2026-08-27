@@ -78,6 +78,16 @@ const STATE_CODE_BY_NAME = new Map<string, PlateStateCode>(
   US_PLATE_STATES.map((state) => [state.name.toLowerCase(), state.code]),
 );
 
+const STATE_SEARCH_PREFIXES = [...US_PLATE_STATES]
+  .sort((a, b) => b.name.length - a.name.length)
+  .flatMap((state) => [state.name, state.code].map((label) => ({
+    state: state.code,
+    pattern: new RegExp(
+      `^${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\s|[•,;:/_-])+(.+)$`,
+      "i",
+    ),
+  })));
+
 /** Returns a canonical USPS code for a full state name or abbreviation. */
 export function normalizePlateState(
   state: string | null | undefined,
@@ -119,6 +129,47 @@ export function plateMatchKey(
   const normalizedPlate = normalizePlateNumber(plate);
   const plateKey = normalizedPlate?.replace(/[^A-Z0-9]/g, "");
   return normalizedState && plateKey ? `${normalizedState}:${plateKey}` : null;
+}
+
+/** Matches plate-only or state-qualified search text without punctuation sensitivity. */
+export function plateMatchesSearch(
+  state: string | null | undefined,
+  plate: string | null | undefined,
+  query: string | null | undefined,
+): boolean {
+  const normalizedPlate = normalizePlateNumber(plate);
+  const normalizedQuery = query?.trim().toLowerCase() ?? "";
+  if (!normalizedQuery) return true;
+  if (!normalizedPlate) return false;
+
+  const normalizedState = normalizePlateState(state);
+  const stateQualifiedQuery = STATE_SEARCH_PREFIXES
+    .map(({ state: queryState, pattern }) => ({
+      state: queryState,
+      match: pattern.exec(normalizedQuery),
+    }))
+    .find(({ match }) => Boolean(match));
+  if (stateQualifiedQuery?.match) {
+    const plateQuery = stateQualifiedQuery.match[1].replace(/[^a-z0-9]/gi, "").toUpperCase();
+    const plateKey = normalizedPlate.replace(/[^a-z0-9]/gi, "").toUpperCase();
+    return normalizedState === stateQualifiedQuery.state
+      && Boolean(plateQuery)
+      && plateKey.includes(plateQuery);
+  }
+
+  const stateName = normalizedState
+    ? STATE_BY_CODE.get(normalizedState)?.name ?? null
+    : null;
+  const candidates = [
+    normalizedPlate,
+    formatPlate(normalizedState, normalizedPlate),
+    normalizedState ? `${normalizedState} ${normalizedPlate}` : null,
+    stateName ? `${stateName} ${normalizedPlate}` : null,
+  ].filter((value): value is string => Boolean(value));
+  const searchKey = normalizedQuery.replace(/[^a-z0-9]/g, "");
+  return Boolean(searchKey) && candidates.some(
+    (candidate) => candidate.toLowerCase().replace(/[^a-z0-9]/g, "").includes(searchKey),
+  );
 }
 
 /**

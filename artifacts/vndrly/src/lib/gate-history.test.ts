@@ -13,6 +13,7 @@ function visit(over: Partial<VisitorRow> & Pick<VisitorRow, "id" | "firstName" |
     phone: null,
     email: null,
     vehiclePlate: null,
+    plateState: null,
     platePhotoUrl: null,
     vehiclePhotoUrl: null,
     purpose: null,
@@ -48,6 +49,7 @@ describe("gate history search", () => {
       lastName: "Reyes",
       company: "Acme Wireline",
       vehiclePlate: "ABC1234",
+      plateState: "TX",
       checkInTime: "2026-08-23T17:00:00.000Z",
     }),
     visit({
@@ -56,6 +58,7 @@ describe("gate history search", () => {
       lastName: "Ortiz",
       company: "Cactus",
       vehiclePlate: "TX-991",
+      plateState: "OK",
       purpose: "Delivery",
       checkInTime: "2026-08-22T08:00:00.000Z",
     }),
@@ -77,12 +80,20 @@ describe("gate history search", () => {
     expect(filtered.map((row) => row.id)).toEqual([1, 2]);
   });
 
+  it("matches state-qualified plates by code or full name despite punctuation", () => {
+    expect(visitMatchesHistorySearch(rows[0], "TX ABC-1234")).toBe(true);
+    expect(visitMatchesHistorySearch(rows[0], "Texas ABC 1234")).toBe(true);
+    expect(visitMatchesHistorySearch(rows[1], "TX 991")).toBe(false);
+    expect(visitMatchesHistorySearch(rows[1], "Oklahoma TX991")).toBe(true);
+  });
+
   it("filters then keeps newest first", () => {
     const extra = visit({
       id: 3,
       firstName: "Pat",
       lastName: "Nguyen",
       vehiclePlate: "PAT-9",
+      plateState: null,
       checkInTime: "2026-08-21T12:00:00.000Z",
     });
     expect(filterGateHistory([...rows, extra], "pat").map((row) => row.id)).toEqual([1, 3]);

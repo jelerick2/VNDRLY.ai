@@ -1,3 +1,5 @@
+import { plateMatchesSearch, type PlateStateCode } from "@workspace/plate-state";
+
 export const GATE_HISTORY_DAYS = 30;
 
 export type GateHistoryVisit = {
@@ -6,6 +8,7 @@ export type GateHistoryVisit = {
   lastName?: string | null;
   company?: string | null;
   vehiclePlate?: string | null;
+  plateState?: PlateStateCode | null;
   siteName?: string | null;
   purpose?: string | null;
   hostPartnerName?: string | null;
@@ -38,7 +41,8 @@ function haystack(visit: GateHistoryVisit): string {
 export function visitMatchesHistorySearch(visit: GateHistoryVisit, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  return haystack(visit).includes(needle);
+  return haystack(visit).includes(needle)
+    || plateMatchesSearch(visit.plateState, visit.vehiclePlate, query);
 }
 
 export function filterGateHistory(visits: GateHistoryVisit[], query: string): GateHistoryVisit[] {

@@ -66,12 +66,30 @@ describe("gatekeeper plate history", () => {
 describe("gatekeeper log exports", () => {
   it("maps visit history and escapes Office document markup", () => {
     const rows = toGateLogRows([visit()]);
-    expect(rows[0]).toMatchObject({ plate: "TX-ABC 123", visitor: "Taylor Reed", status: "On site" });
+    expect(rows[0]).toMatchObject({ plateState: "TX", plateNumber: "TX-ABC 123", visitor: "Taylor Reed", status: "On site" });
     const excel = buildExcelXml(rows);
     const word = buildWordHtml(rows);
     expect(excel).toContain("Acme &amp; Sons");
     expect(excel).toContain("Delivery &lt;priority&gt;");
     expect(word).toContain("Acme &amp; Sons");
     expect(word).not.toContain("Delivery <priority>");
+  });
+
+  it("exports plate state and number in distinct columns and leaves legacy state blank", () => {
+    const rows = toGateLogRows([
+      visit({ id: 1, vehiclePlate: "ABC123", plateState: "TX" }),
+      visit({ id: 2, vehiclePlate: "LEGACY7", plateState: null }),
+    ]);
+
+    expect(rows.map(({ plateState, plateNumber }) => ({ plateState, plateNumber }))).toEqual([
+      { plateState: "TX", plateNumber: "ABC123" },
+      { plateState: "", plateNumber: "LEGACY7" },
+    ]);
+    const excel = buildExcelXml(rows);
+    const word = buildWordHtml(rows);
+    expect(excel).toContain("Plate State");
+    expect(excel).toContain("Plate Number");
+    expect(word).toContain("Plate State");
+    expect(word).toContain("Plate Number");
   });
 });

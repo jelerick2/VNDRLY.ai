@@ -75,6 +75,7 @@
     "nameRequired": "First name and last name are required.",
     "plateRequired": "A license plate is required.",
     "plateStateRequired": "A plate state is required.",
+    "plateStateUnconfirmed": "State unconfirmed",
     "checkedInTitle": "Checked in",
     "checkedInBody": "Gate entry recorded.",
     "tagPhoto": "Tag photo",

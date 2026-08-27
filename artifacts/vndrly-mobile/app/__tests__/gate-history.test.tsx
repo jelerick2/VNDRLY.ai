@@ -87,6 +87,7 @@ const VISITS = [
     lastName: "Reyes",
     company: "Acme Wireline",
     vehiclePlate: "ABC1234",
+    plateState: "TX",
     siteName: "Energy Spur",
     purpose: "Service",
     hostPartnerName: null,
@@ -100,6 +101,7 @@ const VISITS = [
     lastName: "Ortiz",
     company: "Cactus",
     vehiclePlate: "TX-991",
+    plateState: null,
     siteName: "Energy Spur",
     purpose: "Delivery",
     hostPartnerName: null,
@@ -135,6 +137,8 @@ describe("GateHistoryScreen", () => {
     expect(screen.getByText("Sam Ortiz")).toBeTruthy();
     expect(screen.getByText("gatekeeper.historyCheckedOut")).toBeTruthy();
     expect(screen.getByText("gatekeeper.historyOnSite")).toBeTruthy();
+    expect(screen.getByTestId("gate-history-row-1").textContent).toContain("TX • ABC1234");
+    expect(screen.getByTestId("gate-history-row-2").textContent).toContain("gatekeeper.plateStateUnconfirmed");
 
     fireEvent.change(screen.getByTestId("gate-history-search"), {
       target: { value: "cactus" },

@@ -22,6 +22,8 @@ import {
   pillLabelToneClass,
 } from "@/lib/pill-doctrine";
 import { cn } from "@/lib/utils";
+import { formatPlateForDisplay } from "@/lib/plate-display";
+import { formatPlate } from "@workspace/plate-state";
 import {
   Select,
   SelectContent,
@@ -317,7 +319,8 @@ function compareVisitRows(
     case "company":
       return (a.company ?? "").localeCompare(b.company ?? "") * mul;
     case "vehiclePlate":
-      return (a.vehiclePlate ?? "").localeCompare(b.vehiclePlate ?? "") * mul;
+      return (formatPlate(a.plateState, a.vehiclePlate) ?? "")
+        .localeCompare(formatPlate(b.plateState, b.vehiclePlate) ?? "") * mul;
     case "site":
       return (a.siteName ?? "").localeCompare(b.siteName ?? "") * mul;
     case "host":
@@ -467,7 +470,13 @@ function VisitTable({
               </td>
               <td className="py-2 pr-3">{r.company ?? "—"}</td>
               <td className="py-2 pr-3">
-                <div className="font-medium">{r.vehiclePlate ?? "—"}</div>
+                <div className="font-medium">
+                  {formatPlateForDisplay(
+                    r.plateState,
+                    r.vehiclePlate,
+                    t("gatekeeper.plateStateUnconfirmed"),
+                  ) ?? "—"}
+                </div>
                 {(r.platePhotoUrl || r.vehiclePhotoUrl) && (
                   <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <Camera className="h-3 w-3" />

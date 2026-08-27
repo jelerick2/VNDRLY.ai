@@ -10,6 +10,7 @@ import ImagePill from "@/components/image-pill";
 import { ClipboardList, Clock, MapPin } from "lucide-react";
 import SphereBackButton from "@/components/sphere-back-button";
 import type { MapboxPoint } from "@/components/mapbox-map";
+import { formatPlateForDisplay } from "@/lib/plate-display";
 
 const LazyMapboxMap = lazy(() =>
   import("@/components/mapbox-map").then((mod) => ({ default: mod.MapboxMap })),
@@ -191,7 +192,14 @@ export default function VisitDetailPage({ id }: { id: string }) {
             <Row label={t("visitor.detail.purpose")} value={data.purpose ?? "—"} />
             <Row label={t("visitor.detail.phone")} value={data.phone ?? "—"} />
             <Row label={t("visitor.detail.email")} value={data.email ?? "—"} />
-            <Row label={t("visitor.detail.vehiclePlate")} value={data.vehiclePlate ?? "—"} />
+            <Row
+              label={t("visitor.detail.vehiclePlate")}
+              value={formatPlateForDisplay(
+                data.plateState,
+                data.vehiclePlate,
+                t("gatekeeper.plateStateUnconfirmed"),
+              ) ?? "—"}
+            />
             <Row
               label={t("visitor.detail.expectedDuration")}
               value={

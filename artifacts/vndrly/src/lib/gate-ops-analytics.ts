@@ -1,4 +1,5 @@
 import type { VisitorRow } from "./visits-api";
+import { normalizePlateNumber, plateMatchKey } from "@workspace/plate-state";
 
 export function dwellMinutes(visit: Pick<VisitorRow, "checkInTime" | "checkOutTime">, now: Date): number {
   const start = Date.parse(visit.checkInTime);
@@ -54,7 +55,12 @@ export function buildGateOpsAnalytics(visits: VisitorRow[], now: Date): GateOpsA
       const name = visit.company.trim();
       companies.set(name, (companies.get(name) ?? 0) + 1);
     }
-    if (visit.vehiclePlate?.trim()) plates.add(visit.vehiclePlate.trim().toUpperCase());
+    if (visit.vehiclePlate?.trim()) {
+      const legacyPlate = normalizePlateNumber(visit.vehiclePlate)?.replace(/[^A-Z0-9]/g, "");
+      const key = plateMatchKey(visit.plateState, visit.vehiclePlate)
+        ?? (legacyPlate ? `legacy:${legacyPlate}` : null);
+      if (key) plates.add(key);
+    }
     visitorKeys.add(`${visit.firstName}|${visit.lastName}|${visit.company ?? ""}`.toLowerCase());
     const day = dayKey(visit.checkInTime);
     const dayRow = byDay.get(day) ?? { checkIns: 0, stillOnSite: 0 };

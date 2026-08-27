@@ -102,7 +102,7 @@ describe("Gate Log page", () => {
           phone: null,
           email: null,
           vehiclePlate: "OK-SOLO",
-          plateState: "OK",
+          plateState: null,
           platePhotoUrl: null,
           vehiclePhotoUrl: null,
           purpose: "Haul",
@@ -157,6 +157,8 @@ describe("Gate Log page", () => {
     expect(screen.getByTestId("gate-log-recommendations").textContent).toMatch(/watchlist|Watchlist|placa/i);
     expect(screen.getByTestId("gate-log-visits-by-day")).toBeTruthy();
     expect(screen.getByTestId("gate-log-top-companies").textContent).toContain("Acme Pump");
+    expect(screen.getByTestId("gate-log-history").textContent).toContain("OK • OK-GATE1");
+    expect(screen.getByTestId("gate-log-history").textContent).toContain("State unconfirmed");
 
     fireEvent.change(screen.getByTestId("gate-log-search"), { target: { value: "solo" } });
     expect(screen.getAllByTestId("gate-log-history-row")).toHaveLength(1);

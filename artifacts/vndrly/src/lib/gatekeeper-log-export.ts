@@ -2,7 +2,8 @@ import type { VisitorRow } from "@/lib/visits-api";
 import { normalizePlateState, plateMatchKey } from "@workspace/plate-state";
 
 export type GateLogExportRow = {
-  plate: string;
+  plateState: string;
+  plateNumber: string;
   visitor: string;
   company: string;
   phone: string;
@@ -49,7 +50,8 @@ function formatDate(value: string | null): string {
 
 export function toGateLogRows(visits: VisitorRow[]): GateLogExportRow[] {
   return visits.map((visit) => ({
-    plate: visit.vehiclePlate ?? "",
+    plateState: normalizePlateState(visit.plateState) ?? "",
+    plateNumber: visit.vehiclePlate ?? "",
     visitor: `${visit.firstName} ${visit.lastName}`.trim(),
     company: visit.company ?? "",
     phone: visit.phone ?? "",
@@ -64,7 +66,8 @@ export function toGateLogRows(visits: VisitorRow[]): GateLogExportRow[] {
 }
 
 const columns: Array<{ key: keyof GateLogExportRow; label: string }> = [
-  { key: "plate", label: "License Plate" },
+  { key: "plateState", label: "Plate State" },
+  { key: "plateNumber", label: "Plate Number" },
   { key: "visitor", label: "Visitor" },
   { key: "company", label: "Company" },
   { key: "phone", label: "Phone" },
@@ -114,7 +117,7 @@ export async function exportPdf(rows: GateLogExportRow[]): Promise<void> {
   const { jsPDF } = await import("jspdf");
   const document = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
   const pageWidth = document.internal.pageSize.getWidth();
-  const widths = [48, 68, 60, 58, 80, 58, 62, 84, 74, 74, 56];
+  const widths = [36, 58, 62, 54, 52, 68, 54, 58, 72, 64, 64, 48];
   const rowHeight = 28;
   const margin = 24;
   let y = 54;

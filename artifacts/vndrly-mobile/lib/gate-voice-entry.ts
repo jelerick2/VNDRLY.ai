@@ -1,11 +1,32 @@
+import {
+  normalizePlateState,
+  US_PLATE_STATES,
+  type PlateStateCode,
+} from "@workspace/plate-state";
+
 export type GateVoiceFill = {
   firstName?: string;
   lastName?: string;
   company?: string;
   vehiclePlate?: string;
+  plateState?: PlateStateCode;
   purpose?: string;
   duration?: string;
 };
+
+const SPOKEN_STATE_PATTERN = US_PLATE_STATES
+  .flatMap((state) => [state.name, state.code])
+  .sort((a, b) => b.length - a.length)
+  .map((value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+  .join("|");
+
+function plateStateBeforeLabel(text: string) {
+  const spoken = new RegExp(
+    `(?:^|\\s)(${SPOKEN_STATE_PATTERN})\\s+(?=(?:license plate|plate|tag)\\b)`,
+    "i",
+  ).exec(text)?.[1];
+  return normalizePlateState(spoken);
+}
 
 export function parseGateVoiceEntry(transcript: string): GateVoiceFill {
   const text = transcript.trim();
@@ -22,7 +43,9 @@ export function parseGateVoiceEntry(transcript: string): GateVoiceFill {
   const purpose = valueAfter(["purpose", "reason"], [allLabels]);
   const duration = valueAfter(["duration", "time"], [allLabels]);
   const nameParts = driver?.split(/\s+/).filter(Boolean) ?? [];
+  const plateState = plateStateBeforeLabel(text);
   return {
+    ...(plateState ? { plateState } : {}),
     ...(plate ? { vehiclePlate: plate.replace(/\s+/g, "").toUpperCase() } : {}),
     ...(nameParts[0] ? { firstName: nameParts[0] } : {}),
     ...(nameParts.length > 1 ? { lastName: nameParts.slice(1).join(" ") } : {}),

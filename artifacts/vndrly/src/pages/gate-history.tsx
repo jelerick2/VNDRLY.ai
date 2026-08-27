@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { FIELD_OPS_PAGE_CLASS } from "@/lib/field-ops-content-pane";
 import { filterGateHistory, gateHistoryFromIso } from "@/lib/gate-history";
 import { listAllVisits } from "@/lib/visits-api";
+import { formatPlateForDisplay } from "@/lib/plate-display";
 
 export default function GateHistoryPage() {
   const { t } = useTranslation();
@@ -23,6 +24,8 @@ export default function GateHistoryPage() {
     () => filterGateHistory(visits.data ?? [], query),
     [query, visits.data],
   );
+  const displayPlate = (state: string | null | undefined, plate: string | null | undefined) =>
+    formatPlateForDisplay(state, plate, t("gatekeeper.plateStateUnconfirmed"));
 
   return (
     <div className={FIELD_OPS_PAGE_CLASS} data-testid="gate-history-page">
@@ -69,7 +72,7 @@ export default function GateHistoryPage() {
                       {visit.firstName} {visit.lastName}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" · ")}
+                      {[visit.company, displayPlate(visit.plateState, visit.vehiclePlate), visit.siteName].filter(Boolean).join(" · ")}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(visit.checkInTime).toLocaleString()}

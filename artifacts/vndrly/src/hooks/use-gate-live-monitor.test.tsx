@@ -77,6 +77,7 @@ describe("useGateLiveMonitor", () => {
           lastName: "Reyes",
           company: "Acme",
           vehiclePlate: "ABC1234",
+          plateState: "OK",
           platePhotoUrl: "/plates/abc.jpg",
           siteName: "Energy Spur",
           siteLocationId: 309,
@@ -89,6 +90,7 @@ describe("useGateLiveMonitor", () => {
     expect(result.current.flash?.firstName).toBe("Pat");
     expect(result.current.flash?.kind).toBe("checked_in");
     expect(result.current.flash?.vehiclePlate).toBe("ABC1234");
+    expect(result.current.flash?.plateState).toBe("OK");
   });
 
   it("flashes a remote check-out using the on-site list when the event has no name", () => {
@@ -104,6 +106,7 @@ describe("useGateLiveMonitor", () => {
               lastName: "Ortiz",
               company: "Cactus",
               vehiclePlate: "TX-991",
+              plateState: "TX",
               platePhotoUrl: "/p.jpg",
               siteName: "Energy Spur",
               siteLocationId: 309,
@@ -127,5 +130,6 @@ describe("useGateLiveMonitor", () => {
     expect(result.current.flash?.kind).toBe("checked_out");
     expect(result.current.flash?.firstName).toBe("Sam");
     expect(result.current.flash?.vehiclePlate).toBe("TX-991");
+    expect(result.current.flash?.plateState).toBe("TX");
   });
 });

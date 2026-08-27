@@ -75,6 +75,7 @@
     "nameRequired": "Nombre y apellido son obligatorios.",
     "plateRequired": "Se requiere una matrícula.",
     "plateStateRequired": "Se requiere el estado de la placa.",
+    "plateStateUnconfirmed": "Estado sin confirmar",
     "checkedInTitle": "Entrada registrada",
     "checkedInBody": "Registro de entrada guardado.",
     "tagPhoto": "Foto de placa",

@@ -38,6 +38,7 @@ import {
   type GateMemorySuggestion,
 } from "@/lib/gate-entry-memory";
 import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
+import { formatPlateForDisplay } from "@/lib/plate-display";
 import { listAllVisits, visitsApi, type SiteContext } from "@/lib/visits-api";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -153,6 +154,8 @@ export default function GatekeeperPage() {
   const [plateOcrStatus, setPlateOcrStatus] = useState<"idle" | "reading" | "read" | "unreadable">("idle");
   const [ocrPlate, setOcrPlate] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const displayPlate = (state: string | null | undefined, plate: string | null | undefined) =>
+    formatPlateForDisplay(state, plate, t("gatekeeper.plateStateUnconfirmed"));
 
   const visits = useQuery({
     queryKey: ["gatekeeper-visits"],
@@ -199,6 +202,7 @@ export default function GatekeeperPage() {
       lastName: visit.lastName,
       company: visit.company,
       vehiclePlate: visit.vehiclePlate,
+      plateState: visit.plateState,
       platePhotoUrl: visit.platePhotoUrl,
       siteName: visit.siteName,
       siteLocationId: visit.siteLocationId,
@@ -230,6 +234,18 @@ export default function GatekeeperPage() {
     }),
     [activeMemoryField, entryDraft, memoryDeleting, recentVisits.data],
   );
+  const displayMemorySuggestions = memory.suggestions.map((suggestion) => {
+    const rawPlate = suggestion.visit.vehiclePlate?.trim();
+    const displayedPlate = displayPlate(suggestion.visit.plateState, rawPlate);
+    if (!rawPlate || !displayedPlate) return suggestion;
+    return {
+      ...suggestion,
+      label: activeMemoryField === "vehiclePlate" ? displayedPlate : suggestion.label,
+      detail: activeMemoryField === "vehiclePlate"
+        ? suggestion.detail
+        : suggestion.detail.replace(rawPlate, displayedPlate),
+    };
+  });
 
   const applyEntryDraft = (next: GateEntryDraft) => {
     setFirstName(next.firstName);
@@ -564,7 +580,7 @@ export default function GatekeeperPage() {
                 : t("gatekeeper.liveCheckedOut", { name: `${live.flash.firstName} ${live.flash.lastName}`.trim() })}
             </p>
             <p className="mt-1 truncate text-sm text-muted-foreground">
-              {[live.flash.company, live.flash.vehiclePlate, live.flash.siteName].filter(Boolean).join(" · ")}
+              {[live.flash.company, displayPlate(live.flash.plateState, live.flash.vehiclePlate), live.flash.siteName].filter(Boolean).join(" · ")}
             </p>
           </div>
           <LiveConnectionPill status={live.liveStatus} compact onRefresh={() => void visits.refetch()} />
@@ -601,7 +617,7 @@ export default function GatekeeperPage() {
                   <div className="min-w-0">
                     <p className="font-semibold text-foreground">{visit.firstName} {visit.lastName}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" · ")}
+                      {[visit.company, displayPlate(visit.plateState, visit.vehiclePlate), visit.siteName].filter(Boolean).join(" · ")}
                     </p>
                     <p className="text-xs text-muted-foreground">{new Date(visit.checkInTime).toLocaleString()}</p>
                   </div>
@@ -635,7 +651,7 @@ export default function GatekeeperPage() {
                 <Label>{t("gatekeeper.firstName")} *</Label>
                 <GateMemoryInput
                   value={firstName}
-                  suggestions={activeMemoryField === "firstName" ? memory.suggestions : []}
+                  suggestions={activeMemoryField === "firstName" ? displayMemorySuggestions : []}
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
                   onChange={(event) => onMemoryFieldChange("firstName", event.target.value)}
@@ -647,7 +663,7 @@ export default function GatekeeperPage() {
                 <Label>{t("gatekeeper.lastName")} *</Label>
                 <GateMemoryInput
                   value={lastName}
-                  suggestions={activeMemoryField === "lastName" ? memory.suggestions : []}
+                  suggestions={activeMemoryField === "lastName" ? displayMemorySuggestions : []}
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
                   onChange={(event) => onMemoryFieldChange("lastName", event.target.value)}
@@ -661,7 +677,7 @@ export default function GatekeeperPage() {
                 <Label>{t("gatekeeper.company")}</Label>
                 <GateMemoryInput
                   value={company}
-                  suggestions={activeMemoryField === "company" ? memory.suggestions : []}
+                  suggestions={activeMemoryField === "company" ? displayMemorySuggestions : []}
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
                   onChange={(event) => onMemoryFieldChange("company", event.target.value)}
@@ -682,7 +698,7 @@ export default function GatekeeperPage() {
                 <Label className="mt-2 block">{t("gatekeeper.vehiclePlate")} *</Label>
                 <GateMemoryInput
                   value={vehiclePlate}
-                  suggestions={activeMemoryField === "vehiclePlate" ? memory.suggestions : []}
+                  suggestions={activeMemoryField === "vehiclePlate" ? displayMemorySuggestions : []}
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
                   onChange={(event) => onMemoryFieldChange("vehiclePlate", event.target.value)}

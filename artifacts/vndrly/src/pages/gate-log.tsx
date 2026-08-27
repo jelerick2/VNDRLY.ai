@@ -30,6 +30,7 @@ import {
   analyticsHorizontalChartHeight,
 } from "@/lib/analytics-bar-chart";
 import { filterGateHistory } from "@/lib/gate-history";
+import { formatPlateForDisplay } from "@/lib/plate-display";
 import { buildGateOpsAnalytics, buildGateStaffHours, dwellMinutes } from "@/lib/gate-ops-analytics";
 import { visitsApi } from "@/lib/visits-api";
 
@@ -54,6 +55,8 @@ export default function GateLogPage() {
   const brand = useBrand();
   const iconStyle = { color: brand.isOrgBranded ? brand.primary : "#f59e0b" };
   const [query, setQuery] = useState("");
+  const displayPlate = (state: string | null | undefined, plate: string | null | undefined) =>
+    formatPlateForDisplay(state, plate, t("gatekeeper.plateStateUnconfirmed"));
 
   const ops = useQuery({
     queryKey: [...OPS_KEY],
@@ -176,7 +179,7 @@ export default function GateLogPage() {
                 : t("gatekeeper.liveCheckedOut", { name: `${live.flash.firstName} ${live.flash.lastName}`.trim() })}
             </p>
             <p className="mt-1 truncate text-sm text-muted-foreground">
-              {[live.flash.company, live.flash.vehiclePlate, live.flash.siteName].filter(Boolean).join(" · ")}
+              {[live.flash.company, displayPlate(live.flash.plateState, live.flash.vehiclePlate), live.flash.siteName].filter(Boolean).join(" · ")}
             </p>
           </div>
         </div>
@@ -220,7 +223,7 @@ export default function GateLogPage() {
                       {visit.firstName} {visit.lastName}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" · ")}
+                      {[visit.company, displayPlate(visit.plateState, visit.vehiclePlate), visit.siteName].filter(Boolean).join(" · ")}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {t("gateLog.dwellSoFar", { minutes: dwellMinutes(visit, now) })}
@@ -276,7 +279,7 @@ export default function GateLogPage() {
                       {visit.firstName} {visit.lastName}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" · ")}
+                      {[visit.company, displayPlate(visit.plateState, visit.vehiclePlate), visit.siteName].filter(Boolean).join(" · ")}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {fmt(visit.checkInTime)}

@@ -42,6 +42,7 @@ import {
   submitGatekeeperVisit,
 } from "@/lib/gatekeeper";
 import { captureAndUploadImage } from "@/lib/photos";
+import { formatPlateForDisplay } from "@/lib/plate-display";
 import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import { createPttRecorder, PttMicPermissionError, type PttRecorder } from "@/lib/ptt";
@@ -216,6 +217,7 @@ export default function GatekeeperScreen() {
       if (fill.lastName) setLastName(fill.lastName);
       if (fill.company) setCompany(fill.company);
       if (fill.vehiclePlate) setVehiclePlate(fill.vehiclePlate);
+      if (fill.plateState) setPlateState(fill.plateState);
       if (fill.purpose) setPurpose(fill.purpose);
       if (fill.duration) setDuration(fill.duration);
       plateAutoFillRef.current = null;
@@ -465,7 +467,15 @@ export default function GatekeeperScreen() {
                       {visit.firstName} {visit.lastName}
                     </Text>
                     <Text style={[styles.muted, { color: colors.mutedForeground }]}>
-                      {[visit.company, visit.vehiclePlate, visit.siteName].filter(Boolean).join(" - ")}
+                      {[
+                        visit.company,
+                        formatPlateForDisplay(
+                          visit.plateState,
+                          visit.vehiclePlate,
+                          t("gatekeeper.plateStateUnconfirmed"),
+                        ),
+                        visit.siteName,
+                      ].filter(Boolean).join(" - ")}
                     </Text>
                     <Text style={[styles.muted, { color: colors.mutedForeground }]}>
                       {new Date(visit.checkInTime).toLocaleString()}
@@ -529,7 +539,14 @@ export default function GatekeeperScreen() {
                   >
                     <Text style={[styles.suggestionName, { color: colors.foreground }]}>{visit.firstName} {visit.lastName}</Text>
                     <Text style={[styles.muted, { color: colors.mutedForeground }]}>
-                      {[visit.company, visit.vehiclePlate].filter(Boolean).join(" - ")}
+                      {[
+                        visit.company,
+                        formatPlateForDisplay(
+                          visit.plateState,
+                          visit.vehiclePlate,
+                          t("gatekeeper.plateStateUnconfirmed"),
+                        ),
+                      ].filter(Boolean).join(" - ")}
                     </Text>
                   </TouchableOpacity>
                 ))}
