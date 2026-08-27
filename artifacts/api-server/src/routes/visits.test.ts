@@ -1502,17 +1502,43 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
     }
   }
 
-  it("requires a staff session", async () => {
+  it("allows unauthenticated self-service callers and discloses only aggregate recommendations", async () => {
     const { site } = seedScenario();
+    addConfirmedVisits(site.id, "OK", 2, 1);
 
     const res = await request(app)
       .get(`/api/visits/sites/${site.id}/preferred-plate-states`);
 
-    expect(res.status).toBe(401);
-    expect(res.body.code).toBe("auth.required");
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["OK", "CA", "TX", "NY", "FL"] });
+    expect(Object.keys(res.body)).toEqual(["preferred"]);
   });
 
-  it("returns not found for a missing site after staff authentication", async () => {
+  it("allows an authenticated guest to retrieve the same aggregate-only recommendations", async () => {
+    const { site } = seedScenario();
+    addConfirmedVisits(site.id, "NM", 2, 1);
+    const { token } = await startGuest();
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["NM", "CA", "TX", "NY", "FL"] });
+    expect(Object.keys(res.body)).toEqual(["preferred"]);
+  });
+
+  it("returns not found for a missing site to an unauthenticated self-service caller", async () => {
+    seedScenario();
+
+    const res = await request(app)
+      .get("/api/visits/sites/9999/preferred-plate-states");
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("site.not_found");
+  });
+
+  it("retains missing-site behavior after staff authentication", async () => {
     seedScenario();
 
     const res = await request(app)

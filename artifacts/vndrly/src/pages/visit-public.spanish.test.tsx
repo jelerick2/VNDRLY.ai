@@ -11,9 +11,24 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+  configurable: true,
+  value: vi.fn(),
+});
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+
 vi.mock("@/lib/visits-api", () => ({
   visitsApi: {
     getSiteContext: vi.fn(),
+    guestMe: vi.fn(),
+    listPreferredPlateStates: vi.fn(),
     myActive: vi.fn(),
     startGuestSession: vi.fn(),
     checkIn: vi.fn(),
@@ -21,42 +36,6 @@ vi.mock("@/lib/visits-api", () => ({
     guestLogout: vi.fn(),
   },
 }));
-
-// Radix Select relies on PointerEvents that jsdom does not implement;
-// swap it for a native <select> so userEvent can pick a state.
-vi.mock("@/components/ui/select", () => {
-  const Select = ({
-    value,
-    onValueChange,
-  }: {
-    value: string;
-    onValueChange: (v: string) => void;
-    children?: React.ReactNode;
-  }) =>
-    React.createElement(
-      "select",
-      {
-        "data-testid": "select-vehicle-state",
-        value: value ?? "",
-        onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
-          onValueChange(e.target.value),
-      },
-      [
-        React.createElement("option", { key: "_blank", value: "" }),
-        React.createElement("option", { key: "CA", value: "CA" }, "CA"),
-      ],
-    );
-  const Pass = ({ children }: { children?: React.ReactNode }) =>
-    React.createElement(React.Fragment, null, children);
-  const Noop = () => null;
-  return {
-    Select,
-    SelectTrigger: Pass,
-    SelectValue: Noop,
-    SelectContent: Pass,
-    SelectItem: Noop,
-  };
-});
 
 import i18n from "@/lib/i18n";
 import VisitPublicPage from "./visit-public";
@@ -80,6 +59,8 @@ beforeEach(async () => {
   await i18n.changeLanguage("es");
 
   vi.mocked(visitsApi.getSiteContext).mockReset();
+  vi.mocked(visitsApi.guestMe).mockReset();
+  vi.mocked(visitsApi.listPreferredPlateStates).mockReset();
   vi.mocked(visitsApi.myActive).mockReset();
   vi.mocked(visitsApi.startGuestSession).mockReset();
 
@@ -104,8 +85,27 @@ beforeEach(async () => {
     vendors: [],
   });
   vi.mocked(visitsApi.myActive).mockResolvedValue(null);
+  const guestSession = {
+    guestSessionId: 1,
+    role: "guest" as const,
+    expiresAt: "2026-08-28T12:00:00.000Z",
+    profile: {
+      firstName: "",
+      lastName: "",
+      phone: null,
+      email: null,
+      company: null,
+      vehiclePlate: null,
+      plateState: null,
+      lastPurpose: null,
+    },
+  };
+  vi.mocked(visitsApi.guestMe).mockResolvedValue(guestSession);
+  vi.mocked(visitsApi.listPreferredPlateStates).mockResolvedValue({
+    preferred: ["CA", "TX", "NY", "FL", "OH"],
+  });
   vi.mocked(visitsApi.startGuestSession).mockResolvedValue(
-    {} as Awaited<ReturnType<typeof visitsApi.startGuestSession>>,
+    { ...guestSession, token: "guest-token" },
   );
 });
 
@@ -132,8 +132,9 @@ describe("Visit public page — Spanish copy", () => {
     await user.type(screen.getByTestId("input-phone"), "5555550123");
     await user.type(screen.getByTestId("input-email"), "juan@example.com");
     await user.type(screen.getByTestId("input-company"), "Acme");
+    await user.click(screen.getByRole("button", { name: "Select plate state" }));
+    await user.click(screen.getByRole("option", { name: "California (CA)" }));
     await user.type(screen.getByTestId("input-vehicle-plate"), "ABC123");
-    await user.selectOptions(screen.getByTestId("select-vehicle-state"), "CA");
     await user.type(screen.getByTestId("input-purpose"), "entrega");
     await user.click(screen.getByTestId("switch-safety"));
     await user.click(screen.getByTestId("button-guest-signin"));

@@ -1440,12 +1440,19 @@ function parsePlateStateCounts(
 
 // ---------- GET /api/visits/sites/:siteId/preferred-plate-states ----------
 router.get("/visits/sites/:siteId/preferred-plate-states", async (req, res): Promise<void> => {
-  const session = getStaffSession(req);
-  if (!session || session.role === "guest") {
-    res.status(401).json({ message: "Login required", code: AUTH_REQUIRED });
-    return;
-  }
-  if (!await enforceVisitsRateLimit(req, res, session)) return;
+  const staffSession = getStaffSession(req);
+  const session = staffSession?.role === "guest" ? null : staffSession;
+  const guestPayload = getGuestSessionPayload(req);
+  // This one read is intentionally available to the public QR flow and to
+  // authenticated guests. Its response is a fixed-size aggregate of state
+  // codes only: no visit counts, identities, timestamps, or visit details.
+  // Existing sites are already disclosed by the public site-context route,
+  // and every other visit endpoint retains its existing authentication and
+  // role checks. Rate-limit guests by their session and public callers by IP.
+  const rateLimitSession = session ?? (guestPayload
+    ? { userId: -guestPayload.guestSessionId, role: guestPayload.role }
+    : null);
+  if (!await enforceVisitsRateLimit(req, res, rateLimitSession)) return;
 
   const siteId = Number(req.params.siteId);
   if (!Number.isSafeInteger(siteId) || siteId <= 0) {
@@ -1462,7 +1469,7 @@ router.get("/visits/sites/:siteId/preferred-plate-states", async (req, res): Pro
     return;
   }
 
-  if (isGatekeeperSession(session) || session.role === "vendor") {
+  if (session && (isGatekeeperSession(session) || session.role === "vendor")) {
     if (!session.vendorId) {
       res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
       return;
@@ -1479,12 +1486,12 @@ router.get("/visits/sites/:siteId/preferred-plate-states", async (req, res): Pro
       res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
       return;
     }
-  } else if (session.role === "partner") {
+  } else if (session?.role === "partner") {
     if (site.partnerId !== session.partnerId) {
       res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
       return;
     }
-  } else if (session.role !== "admin") {
+  } else if (session && session.role !== "admin") {
     res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
     return;
   }

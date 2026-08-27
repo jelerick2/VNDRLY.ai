@@ -115,6 +115,12 @@ const { setTokenMock, setUserMock } = vi.hoisted(() => ({
   setTokenMock: vi.fn(),
   setUserMock: vi.fn(),
 }));
+const { authUserRef } = vi.hoisted(() => ({
+  authUserRef: { current: { id: -1, role: "guest" } as { id: number; role: string } | null },
+}));
+vi.mock("@/hooks/use-auth", () => ({
+  useAuth: () => ({ user: authUserRef.current }),
+}));
 vi.mock("@/lib/auth", () => ({
   setToken: (...a: unknown[]) => setTokenMock(...a),
   setUser: (...a: unknown[]) => setUserMock(...a),
@@ -208,6 +214,7 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  authUserRef.current = { id: -1, role: "guest" };
   camPermRef.current = { granted: true };
   requestCamPermMock.mockImplementation(async () => ({ granted: true }));
   fetchActiveVisitMock.mockResolvedValue(null);
@@ -246,8 +253,8 @@ const SITE_CTX: SiteContext = {
   ],
 };
 
-function renderScreen() {
-  const qc = new QueryClient({
+function renderScreen(client?: QueryClient) {
+  const qc = client ?? new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return render(
@@ -368,6 +375,62 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
       expect(screen.getByRole("button", { name: "Select plate state" })).toBeTruthy();
       expect((firstByTestId("visitor-vehicle-plate") as HTMLInputElement).value).toBe("");
     });
+  });
+
+  it("isolates sequential visitors in the same normal-lived query cache and restores visitor B once", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
+    });
+    fetchGuestSessionMock.mockResolvedValueOnce({
+      guestSessionId: 1,
+      role: "guest",
+      expiresAt: "2026-08-28T12:00:00.000Z",
+      profile: {
+        firstName: "Visitor",
+        lastName: "A",
+        phone: null,
+        email: null,
+        company: null,
+        vehiclePlate: "VISITOR-A",
+        plateState: "TX",
+        lastPurpose: null,
+      },
+    });
+
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    const visitorA = renderScreen(queryClient);
+    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("accept-site-btn"));
+    expect((await findFirstByTestId("visitor-vehicle-plate") as HTMLInputElement).value).toBe("VISITOR-A");
+    visitorA.unmount();
+
+    authUserRef.current = { id: -2, role: "guest" };
+    fetchGuestSessionMock.mockResolvedValueOnce({
+      guestSessionId: 2,
+      role: "guest",
+      expiresAt: "2026-08-28T13:00:00.000Z",
+      profile: {
+        firstName: "Visitor",
+        lastName: "B",
+        phone: null,
+        email: null,
+        company: null,
+        vehiclePlate: "VISITOR-B",
+        plateState: "OK",
+        lastPurpose: null,
+      },
+    });
+
+    renderScreen(queryClient);
+    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("accept-site-btn"));
+    const visitorBPlate = await findFirstByTestId("visitor-vehicle-plate") as HTMLInputElement;
+    await waitFor(() => expect(visitorBPlate.value).toBe("VISITOR-B"));
+    expect(visitorBPlate.value).not.toBe("VISITOR-A");
+    expect(await screen.findByRole("button", { name: "Selected plate state: Oklahoma (OK)" })).toBeTruthy();
+    expect(fetchGuestSessionMock).toHaveBeenCalledTimes(2);
   });
 
   it("blocks a restored plate without state before requesting location or check-in", async () => {

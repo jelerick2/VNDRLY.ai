@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -31,6 +32,7 @@ import { startGuestSession } from "@/lib/guest";
 export default function GuestLoginScreen() {
   const colors = useColors();
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -77,6 +79,13 @@ export default function GuestLoginScreen() {
     setBusy(true);
     try {
       const normalizedPlate = normalizePlateNumber(vehiclePlate);
+      // A new guest login replaces any previous kiosk visitor. Remove all
+      // private guest-session queries before rotating credentials so cached
+      // profile or active-visit data can never cross that boundary.
+      await queryClient.cancelQueries({ queryKey: ["guest-session"] });
+      await queryClient.cancelQueries({ queryKey: ["visit-active"] });
+      queryClient.removeQueries({ queryKey: ["guest-session"] });
+      queryClient.removeQueries({ queryKey: ["visit-active"] });
       await startGuestSession({
         firstName: firstName.trim(),
         lastName: lastName.trim(),

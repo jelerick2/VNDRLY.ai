@@ -75,15 +75,18 @@ const EMPTY_SESSION = {
 
 let geolocationMock: ReturnType<typeof vi.fn>;
 
-function renderPage() {
-  const client = new QueryClient({
+function renderPage(client?: QueryClient) {
+  const queryClient = client ?? new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  return render(
-    <QueryClientProvider client={client}>
+  return {
+    client: queryClient,
+    ...render(
+    <QueryClientProvider client={queryClient}>
       <VisitPublicPage siteCode="ACME-HQ" />
     </QueryClientProvider>,
-  );
+    ),
+  };
 }
 
 async function selectState(name: string) {
@@ -228,5 +231,56 @@ describe("VisitPublicPage plate state", () => {
       plateState: undefined,
       vehiclePlate: undefined,
     });
+  });
+
+  it("evicts visitor A and restores visitor B with the same normal-lived query cache", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 60_000 } },
+    });
+    const visitorASession = {
+      ...EMPTY_SESSION,
+      guestSessionId: 101,
+      profile: { ...EMPTY_SESSION.profile, vehiclePlate: "VISITOR-A", plateState: "TX" },
+    };
+    const visitorBSession = {
+      ...EMPTY_SESSION,
+      guestSessionId: 202,
+      profile: { ...EMPTY_SESSION.profile, vehiclePlate: "VISITOR-B", plateState: "OK" },
+    };
+    api.guestMe.mockResolvedValue(visitorASession);
+    api.myActive.mockResolvedValueOnce({
+      id: 99,
+      siteLocationId: 42,
+      siteName: "Acme HQ",
+      hostType: "partner",
+      hostPartnerName: "Acme Partner",
+      hostVendorName: null,
+      purpose: "Inspection",
+      vehiclePlate: "VISITOR-A",
+      plateState: "TX",
+      checkInTime: "2026-08-27T12:00:00.000Z",
+    });
+
+    const visitorA = renderPage(client);
+    fireEvent.click(await screen.findByTestId("button-check-out"));
+    await waitFor(() => expect(api.guestLogout).toHaveBeenCalledTimes(1));
+    expect((screen.getByTestId("input-vehicle-plate") as HTMLInputElement).value).toBe("");
+
+    api.startGuestSession.mockResolvedValue(visitorBSession);
+    fillRequiredIdentity();
+    fireEvent.click(screen.getByTestId("button-guest-signin"));
+    await waitFor(() => expect(api.startGuestSession).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByTestId("button-back"));
+    expect((screen.getByTestId("input-vehicle-plate") as HTMLInputElement).value).toBe("VISITOR-B");
+    expect(screen.getByRole("button", { name: "Selected plate state: Oklahoma (OK)" })).toBeTruthy();
+
+    visitorA.unmount();
+    api.myActive.mockResolvedValue(null);
+    api.guestMe.mockResolvedValue(visitorBSession);
+    renderPage(client);
+    const visitorBPlate = await screen.findByTestId("input-vehicle-plate") as HTMLInputElement;
+    await waitFor(() => expect(visitorBPlate.value).toBe("VISITOR-B"));
+    expect(visitorBPlate.value).not.toBe("VISITOR-A");
+    expect(await screen.findByRole("button", { name: "Selected plate state: Oklahoma (OK)" })).toBeTruthy();
   });
 });

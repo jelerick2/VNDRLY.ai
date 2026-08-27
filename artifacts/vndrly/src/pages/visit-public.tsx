@@ -1,6 +1,6 @@
 import { PngPillButton } from "@/components/png-pill-rollover";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { OFF_GEOFENCE } from "@workspace/visit-error-codes";
 import { visitsApi, type SiteContext, type VisitorRow } from "@/lib/visits-api";
@@ -32,6 +32,7 @@ type Step = "signin" | "checkin" | "active";
 
 export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("signin");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
 
   const [active, setActive] = useState<VisitorRow | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
-  const restoredGuestProfile = useRef(false);
+  const restoredGuestSessionId = useRef<number | null>(null);
 
   const ctxQuery = useQuery<SiteContext>({
     queryKey: ["site-context-public", siteCode],
@@ -82,8 +83,8 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
   });
 
   useEffect(() => {
-    if (!guestQuery.data || restoredGuestProfile.current) return;
-    restoredGuestProfile.current = true;
+    if (!guestQuery.data || restoredGuestSessionId.current === guestQuery.data.guestSessionId) return;
+    restoredGuestSessionId.current = guestQuery.data.guestSessionId;
     setVehiclePlate(normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "");
     setPlateState(normalizePlateState(guestQuery.data.profile.plateState));
   }, [guestQuery.data]);
@@ -154,6 +155,11 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
     if (normalizedPlate && !plateState) return;
     setBusy(true);
     try {
+      // The guest cookie is replaced by this call, so evict the previous
+      // kiosk visitor before rotating it. This key is deliberately not
+      // shared with staff auth queries.
+      await queryClient.cancelQueries({ queryKey: ["guest-session-public"] });
+      queryClient.removeQueries({ queryKey: ["guest-session-public"] });
       const session = await visitsApi.startGuestSession({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -165,8 +171,15 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
         purpose: purpose.trim() || undefined,
         safetyAcknowledged: safety,
       });
+      restoredGuestSessionId.current = session.guestSessionId;
       setVehiclePlate(normalizePlateNumber(session.profile.vehiclePlate) ?? normalizedPlate ?? "");
       setPlateState(normalizePlateState(session.profile.plateState) ?? (normalizedPlate ? plateState : null));
+      queryClient.setQueryData(["guest-session-public"], {
+        guestSessionId: session.guestSessionId,
+        role: session.role,
+        expiresAt: session.expiresAt,
+        profile: session.profile,
+      });
       setStep("checkin");
     } catch (e) {
       setError(e instanceof Error ? e.message : t("visitor.public.errorTitle"));
@@ -236,6 +249,9 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
       try { const pos = await getPosition(); lat = pos.coords.latitude; lng = pos.coords.longitude; } catch {}
       await visitsApi.checkOut(active.id, lat, lng);
       try { await visitsApi.guestLogout(); } catch {}
+      await queryClient.cancelQueries({ queryKey: ["guest-session-public"] });
+      queryClient.removeQueries({ queryKey: ["guest-session-public"] });
+      restoredGuestSessionId.current = null;
       setActive(null);
       setFirstName("");
       setLastName("");

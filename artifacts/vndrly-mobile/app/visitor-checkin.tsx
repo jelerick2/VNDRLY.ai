@@ -29,6 +29,7 @@ import {
 
 import AmberButton from "@/components/AmberButton";
 import VisitorHostPicker from "@/components/VisitorHostPicker";
+import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/useColors";
 import { setToken, setUser } from "@/lib/auth";
 import { translateApiError } from "@/lib/apiErrors";
@@ -85,6 +86,8 @@ export default function VisitorCheckInScreen() {
   const colors = useColors();
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const guestSessionIdentity = user?.role === "guest" ? user.id : null;
   const [siteCode, setSiteCode] = useState("");
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [siteConfirmed, setSiteConfirmed] = useState(false);
@@ -107,7 +110,7 @@ export default function VisitorCheckInScreen() {
   // form. Tracked here so any 401 — from queries or mutations — can flip
   // it on without prop-drilling.
   const [sessionExpired, setSessionExpired] = useState(false);
-  const restoredGuestProfile = useRef(false);
+  const restoredGuestSessionId = useRef<number | null>(null);
 
   const onScanned = ({ data }: { data: string }) => {
     if (!scanning) return;
@@ -135,8 +138,9 @@ export default function VisitorCheckInScreen() {
   };
 
   const activeQuery = useQuery({
-    queryKey: ["visit-active"],
+    queryKey: ["visit-active", guestSessionIdentity],
     queryFn: fetchActiveVisit,
+    enabled: guestSessionIdentity !== null,
     refetchInterval: 30000,
     // Don't keep retrying expired-session 401s — they won't recover until
     // the visitor signs back in, and every retry just delays the
@@ -145,8 +149,9 @@ export default function VisitorCheckInScreen() {
   });
 
   const guestQuery = useQuery({
-    queryKey: ["guest-session"],
+    queryKey: ["guest-session", guestSessionIdentity],
     queryFn: fetchGuestSession,
+    enabled: guestSessionIdentity !== null,
     retry: false,
   });
 
@@ -167,8 +172,8 @@ export default function VisitorCheckInScreen() {
     ?? NATIONAL_PLATE_STATE_FALLBACK;
 
   useEffect(() => {
-    if (!guestQuery.data || restoredGuestProfile.current) return;
-    restoredGuestProfile.current = true;
+    if (!guestQuery.data || restoredGuestSessionId.current === guestQuery.data.guestSessionId) return;
+    restoredGuestSessionId.current = guestQuery.data.guestSessionId;
     setVehiclePlate(normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "");
     setPlateState(normalizePlateState(guestQuery.data.profile.plateState));
   }, [guestQuery.data]);
@@ -304,6 +309,10 @@ export default function VisitorCheckInScreen() {
 
   const onSignOut = async () => {
     await guestLogout();
+    await qc.cancelQueries({ queryKey: ["guest-session"] });
+    await qc.cancelQueries({ queryKey: ["visit-active"] });
+    qc.removeQueries({ queryKey: ["guest-session"] });
+    qc.removeQueries({ queryKey: ["visit-active"] });
     router.replace("/login");
   };
 
@@ -313,6 +322,10 @@ export default function VisitorCheckInScreen() {
   // here — the server-side session has already expired, so the
   // /api/auth/guest/logout call would itself 401 and add latency.
   const onSignInAgain = async () => {
+    await qc.cancelQueries({ queryKey: ["guest-session"] });
+    await qc.cancelQueries({ queryKey: ["visit-active"] });
+    qc.removeQueries({ queryKey: ["guest-session"] });
+    qc.removeQueries({ queryKey: ["visit-active"] });
     await setToken(null);
     await setUser(null);
     router.replace("/guest-login");

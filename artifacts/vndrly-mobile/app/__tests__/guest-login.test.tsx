@@ -1,6 +1,17 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { cancelQueriesMock, removeQueriesMock } = vi.hoisted(() => ({
+  cancelQueriesMock: vi.fn(async () => undefined),
+  removeQueriesMock: vi.fn(),
+}));
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    cancelQueries: cancelQueriesMock,
+    removeQueries: removeQueriesMock,
+  }),
+}));
+
 vi.mock("@/hooks/useColors", () => ({
   useColors: () => ({
     background: "#fff",
@@ -235,6 +246,8 @@ describe("GuestLoginScreen — sign-up form", () => {
       plateState: "TX",
       vehiclePlate: "ABC123",
     });
+    expect(removeQueriesMock).toHaveBeenCalledWith({ queryKey: ["guest-session"] });
+    expect(removeQueriesMock).toHaveBeenCalledWith({ queryKey: ["visit-active"] });
   });
 
   it("does not send a selected state when the plate is blank", async () => {
