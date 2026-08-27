@@ -108,6 +108,9 @@ importers:
       '@workspace/map-utils':
         specifier: workspace:*
         version: link:../../lib/map-utils
+      '@workspace/plate-state':
+        specifier: workspace:*
+        version: link:../../lib/plate-state
       '@workspace/platform-eula':
         specifier: workspace:*
         version: link:../../lib/platform-eula
