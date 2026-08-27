@@ -61,7 +61,7 @@ function driverSuggestions(
     .sort((a, b) => Date.parse(b.checkInTime) - Date.parse(a.checkInTime))
     .filter((visit) => {
       if (!(visit[field] ?? "").trim().toLowerCase().startsWith(needle)) return false;
-      if (companyNeedle && !(visit.company ?? "").trim().toLowerCase().startsWith(companyNeedle)) return false;
+      if (companyNeedle && (visit.company ?? "").trim().toLowerCase() !== companyNeedle) return false;
       const key = `${(visit.firstName ?? "").trim().toLowerCase()}|${(visit.lastName ?? "").trim().toLowerCase()}|${(visit.company ?? "").trim().toLowerCase()}`;
       if (seen.has(key)) return false;
       seen.add(key);

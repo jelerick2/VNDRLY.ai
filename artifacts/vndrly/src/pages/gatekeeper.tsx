@@ -20,10 +20,10 @@ import { FIELD_OPS_PAGE_CLASS } from "@/lib/field-ops-content-pane";
 import { exportExcel, exportPdf, exportWord, latestVisitForPlate, toGateLogRows } from "@/lib/gatekeeper-log-export";
 import { pickDefaultGateHostKey, resolveAssignedGateSites, shouldApplyDefaultGateSite } from "@/lib/gate-default-site";
 import {
+  applyGateMemorySuggestion,
   draftsEqual,
   evaluateGateMemory,
   mergeGateFill,
-  pickSuggestionFill,
   type GateEntryDraft,
   type GateMemoryField,
   type GateMemorySuggestion,
@@ -133,7 +133,7 @@ export default function GatekeeperPage() {
   });
   const recentVisits = useQuery({
     queryKey: ["gatekeeper-recent-visits"],
-    queryFn: () => visitsApi.list({ limit: 1000 }),
+    queryFn: () => listAllVisits(),
     retry: false,
   });
   const assigned = useQuery({
@@ -241,7 +241,7 @@ export default function GatekeeperPage() {
   };
   const onMemoryPick = (suggestion: GateMemorySuggestion) => {
     setMemoryDeleting(false);
-    applyEntryDraft(mergeGateFill(entryDraft, pickSuggestionFill(suggestion)));
+    applyEntryDraft(applyGateMemorySuggestion(entryDraft, suggestion, activeMemoryField));
   };
 
   useEffect(() => {
