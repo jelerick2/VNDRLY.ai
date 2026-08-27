@@ -34,20 +34,18 @@ describe("plate formatting and matching", () => {
 });
 
 describe("orderPlateStates", () => {
-  it("filters by state name and returns preferred matches first", () => {
-    expect(orderPlateStates(["OK", "TX"], "te").map((state) => state.code)).toEqual([
+  it("filters the complete state catalog by name", () => {
+    expect(orderPlateStates(["OK", "TX"], "tex").map((state) => state.code)).toEqual([
       "TX",
     ]);
   });
 
   it("keeps preferred states first and alphabetizes every remaining state", () => {
-    const ordered = orderPlateStates(
-      ["TX", "OK", ...US_PLATE_STATES.map((state) => state.code)],
-      "",
-    );
+    const ordered = orderPlateStates(["TX", "OK"], "");
 
     expect(ordered.slice(0, 2).map((state) => state.code)).toEqual(["TX", "OK"]);
     expect(ordered).toHaveLength(US_PLATE_STATES.length);
+    expect(new Set(ordered.map((state) => state.code))).toHaveLength(US_PLATE_STATES.length);
     expect(ordered.slice(2).map((state) => state.name)).toEqual(
       [...ordered.slice(2).map((state) => state.name)].sort((left, right) =>
         left.localeCompare(right),

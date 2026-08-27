@@ -122,35 +122,34 @@ export function plateMatchKey(
 }
 
 /**
- * Resolves an ordered set of candidate codes into picker entries. Supply
- * preferred codes first, followed by `US_PLATE_STATES.map(({ code }) => code)`;
- * duplicate codes are removed while preserving the preferred order and the
- * catalog provides a deterministic alphabetical remainder.
+ * Places normalized preferred codes first, then appends every unseen catalog
+ * state in alphabetical name order before applying an optional search query.
  */
 export function orderPlateStates(
-  preferredThenRemaining: readonly (string | null | undefined)[],
+  preferredStates: readonly (string | null | undefined)[],
   query: string | null | undefined = "",
 ): readonly (typeof US_PLATE_STATES)[number][] {
   const search = query?.trim().toLowerCase() ?? "";
   const seen = new Set<PlateStateCode>();
   const ordered: (typeof US_PLATE_STATES)[number][] = [];
 
-  for (const value of preferredThenRemaining) {
+  const addState = (value: string | null | undefined) => {
     const code = normalizePlateState(value);
-    if (!code || seen.has(code)) continue;
+    if (!code || seen.has(code)) return;
 
     const state = STATE_BY_CODE.get(code);
-    if (!state) continue;
+    if (!state) return;
     seen.add(code);
+    ordered.push(state);
+  };
 
-    if (
+  preferredStates.forEach(addState);
+  US_PLATE_STATES.forEach((state) => addState(state.code));
+
+  return ordered.filter(
+    (state) =>
       !search ||
       state.code.toLowerCase().includes(search) ||
-      state.name.toLowerCase().includes(search)
-    ) {
-      ordered.push(state);
-    }
-  }
-
-  return ordered;
+      state.name.toLowerCase().includes(search),
+  );
 }
