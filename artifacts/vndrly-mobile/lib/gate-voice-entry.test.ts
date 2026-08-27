@@ -19,6 +19,8 @@ describe("parseGateVoiceEntry", () => {
     ["state OK plate ABC 123 driver Bob Villa", "OK"],
     ["state HI tag ABC 123 driver Bob Villa", "HI"],
     ["state ID license plate ABC 123 driver Bob Villa", "ID"],
+    ["state OH plate ABC 123 driver Bob Villa", "OH"],
+    ["Ohio, plate ABC 123 driver Bob Villa", "OH"],
   ])("extracts a precisely cued state without contaminating the plate from %s", (transcript, code) => {
     expect(parseGateVoiceEntry(transcript)).toMatchObject({
       plateState: code,
@@ -33,6 +35,8 @@ describe("parseGateVoiceEntry", () => {
     "OK plate ABC 123 driver Bob Villa",
     "HI plate ABC 123 driver Bob Villa",
     "ID plate ABC 123 driver Bob Villa",
+    "OH plate ABC 123 driver Bob Villa",
+    "Oh, plate ABC 123 driver Bob Villa",
     "check in plate ABC 123 driver Bob Villa",
     "ZZ plate ABC 123 driver Bob Villa",
   ])(

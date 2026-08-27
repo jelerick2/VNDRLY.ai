@@ -83,6 +83,7 @@ const AMBIGUOUS_SPOKEN_STATE_CODES = new Set<PlateStateCode>([
   "ID",
   "IN",
   "ME",
+  "OH",
   "OK",
   "OR",
 ]);
