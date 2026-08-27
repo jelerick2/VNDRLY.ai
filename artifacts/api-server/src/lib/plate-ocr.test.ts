@@ -109,6 +109,21 @@ describe("extractPlateCandidate", () => {
     }
   });
 
+  it("does not fall back to noisy OCR for structured content with prose prefixes", () => {
+    for (const content of [
+      'Model response:\n```json\n{"state":"TX"}\n```',
+      'Result: ["ABC123"]',
+      'Model response: "plate": "ABC123"',
+    ]) {
+      expect(extractPlateCandidate(content)).toEqual({
+        plate: null,
+        state: null,
+        plateConfidence: null,
+        stateConfidence: null,
+      });
+    }
+  });
+
   it("picks an alphanumeric plate out of noisy OCR text", () => {
     expect(
       extractPlateCandidate("OKLAHOMA\nEXP 12/26\nOK 4412\nUSA"),

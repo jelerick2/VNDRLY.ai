@@ -147,20 +147,33 @@ function candidateFromPlate(plate: string | null): PlateOcrCandidate {
   return { ...emptyPlateCandidate(), plate };
 }
 
-function looksLikeJson(text: string): boolean {
-  return /^(?:\{|\[|")/.test(text.trim());
+function structuredJsonContent(text: string): {
+  content: string;
+  looksStructured: boolean;
+} {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced) {
+    return { content: fenced[1], looksStructured: true };
+  }
+
+  const content = text.trim();
+  return {
+    content,
+    looksStructured:
+      /^(?:\{|\[|")/.test(content) ||
+      content.includes("{") ||
+      content.includes("[") ||
+      /"(?:plate|state|plateConfidence|stateConfidence)"\s*:/i.test(content),
+  };
 }
 
 function fromJsonPlate(text: string): {
   candidate: PlateOcrCandidate;
   hit: boolean;
 } {
-  const trimmed = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/u, "");
+  const { content, looksStructured } = structuredJsonContent(text);
   try {
-    const parsed = JSON.parse(trimmed) as unknown;
+    const parsed = JSON.parse(content) as unknown;
     if (
       parsed &&
       typeof parsed === "object" &&
@@ -176,7 +189,7 @@ function fromJsonPlate(text: string): {
   } catch {
     return {
       candidate: emptyPlateCandidate(),
-      hit: looksLikeJson(trimmed),
+      hit: looksStructured,
     };
   }
 }

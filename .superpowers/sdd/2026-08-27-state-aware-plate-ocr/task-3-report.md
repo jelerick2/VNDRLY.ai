@@ -35,12 +35,15 @@ passed.
 - `POST /api/visits/gate/read-plate` now returns the candidate fields at the top level, retaining `plate` as the legacy scalar value.
 - JSON objects without an own `plate` field, arrays, primitives, and JSON-shaped malformed content now return an all-null candidate rather than falling through to noisy OCR extraction.
 - Follow-up focused checks passed: parser (11 tests) and route contract (1 selected test).
+- Structured detection now also recognizes JSON fences anywhere in model content, embedded object/array syntax, and quoted OCR contract keys behind prose prefixes; parser coverage is now 12 focused tests.
 
 ## Commit
 
 `Return state confidence from plate OCR`
 
 Follow-up: `Correct plate OCR response contract`
+
+Final correction: `Harden OCR structured-content detection`
 
 ## Self-review
 
