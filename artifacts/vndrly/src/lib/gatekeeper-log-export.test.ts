@@ -1,7 +1,33 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { VisitorRow } from "@/lib/visits-api";
-import { buildExcelXml, buildWordHtml, latestVisitForPlate, normalizePlate, toGateLogRows } from "./gatekeeper-log-export";
+const pdf = vi.hoisted(() => ({
+  addPage: vi.fn(),
+  rect: vi.fn(),
+  save: vi.fn(),
+  text: vi.fn(),
+}));
+
+vi.mock("jspdf", () => ({
+  jsPDF: class {
+    internal = {
+      pageSize: {
+        getHeight: () => 612,
+        getWidth: () => 792,
+      },
+    };
+    addPage = pdf.addPage;
+    rect = pdf.rect;
+    save = pdf.save;
+    text = pdf.text;
+    setFillColor() {}
+    setFont() {}
+    setFontSize() {}
+    splitTextToSize(value: string) { return [value]; }
+  },
+}));
+
+import { buildExcelXml, buildWordHtml, exportPdf, latestVisitForPlate, normalizePlate, toGateLogRows } from "./gatekeeper-log-export";
 
 vi.setSystemTime(new Date("2026-08-22T12:00:00Z"));
 
@@ -91,5 +117,24 @@ describe("gatekeeper log exports", () => {
     expect(excel).toContain("Plate Number");
     expect(word).toContain("Plate State");
     expect(word).toContain("Plate Number");
+  });
+
+  it("draws state and number into separate PDF cells and leaves the legacy state cell blank", async () => {
+    pdf.text.mockClear();
+    pdf.save.mockClear();
+    const rows = toGateLogRows([
+      visit({ id: 1, vehiclePlate: "ABC123", plateState: "TX" }),
+      visit({ id: 2, vehiclePlate: "LEGACY7", plateState: null }),
+    ]);
+
+    await exportPdf(rows);
+
+    const drawnText = pdf.text.mock.calls.map(([value]) =>
+      Array.isArray(value) ? value.join("") : value,
+    );
+    expect(drawnText.slice(1, 3)).toEqual(["Plate State", "Plate Number"]);
+    expect(drawnText.slice(13, 15)).toEqual(["TX", "ABC123"]);
+    expect(drawnText.slice(25, 27)).toEqual(["", "LEGACY7"]);
+    expect(pdf.save).toHaveBeenCalledWith("vndrly-gate-log.pdf");
   });
 });

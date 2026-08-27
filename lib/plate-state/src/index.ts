@@ -78,6 +78,50 @@ const STATE_CODE_BY_NAME = new Map<string, PlateStateCode>(
   US_PLATE_STATES.map((state) => [state.name.toLowerCase(), state.code]),
 );
 
+const AMBIGUOUS_SPOKEN_STATE_CODES = new Set<PlateStateCode>([
+  "HI",
+  "ID",
+  "IN",
+  "ME",
+  "OK",
+  "OR",
+]);
+
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const SPOKEN_STATE_NAME_PATTERN = [...US_PLATE_STATES]
+  .sort((a, b) => b.name.length - a.name.length)
+  .map((state) => escapeRegExp(state.name))
+  .join("|");
+
+const SPOKEN_STATE_CODE_PATTERN = US_PLATE_STATES
+  .map((state) => state.code)
+  .join("|");
+
+const UNAMBIGUOUS_SPOKEN_STATE_CODE_PATTERN = US_PLATE_STATES
+  .map((state) => state.code)
+  .filter((code) => !AMBIGUOUS_SPOKEN_STATE_CODES.has(code))
+  .join("|");
+
+const SPOKEN_PLATE_LABEL_PATTERN = "(?:license\\s+plate|plate|tag)";
+const SPOKEN_LABEL_SEPARATOR_PATTERN = "(?:\\s+|\\s*[,;:.!?-]\\s*)";
+
+const EXPLICIT_SPOKEN_STATE_PATTERN = new RegExp(
+  `(?:^|\\s)state\\s*[:,-]?\\s+(${SPOKEN_STATE_NAME_PATTERN}|${SPOKEN_STATE_CODE_PATTERN})(?=${SPOKEN_LABEL_SEPARATOR_PATTERN}${SPOKEN_PLATE_LABEL_PATTERN}\\b)`,
+  "i",
+);
+
+const FULL_NAME_BEFORE_PLATE_PATTERN = new RegExp(
+  `(?:^|\\s)(${SPOKEN_STATE_NAME_PATTERN})(?=${SPOKEN_LABEL_SEPARATOR_PATTERN}${SPOKEN_PLATE_LABEL_PATTERN}\\b)`,
+  "i",
+);
+
+const UNAMBIGUOUS_CODE_BEFORE_PLATE_PATTERN = new RegExp(
+  `(?:^|\\s)(${UNAMBIGUOUS_SPOKEN_STATE_CODE_PATTERN})(?=${SPOKEN_LABEL_SEPARATOR_PATTERN}${SPOKEN_PLATE_LABEL_PATTERN}\\b)`,
+  "i",
+);
+
 const STATE_SEARCH_PREFIXES = [...US_PLATE_STATES]
   .sort((a, b) => b.name.length - a.name.length)
   .flatMap((state) => [state.name, state.code].map((label) => ({
@@ -118,6 +162,34 @@ export function formatPlate(
   const normalizedState = normalizePlateState(state);
   const normalizedPlate = normalizePlateNumber(plate);
   return [normalizedState, normalizedPlate].filter(Boolean).join(" • ") || null;
+}
+
+/** Adds the translated legacy-state marker used by plate presentation surfaces. */
+export function formatPlateForDisplay(
+  state: string | null | undefined,
+  plate: string | null | undefined,
+  stateUnconfirmedLabel: string,
+): string | null {
+  const formatted = formatPlate(state, plate);
+  if (!formatted) return null;
+  return normalizePlateState(state)
+    ? formatted
+    : `${formatted} (${stateUnconfirmedLabel})`;
+}
+
+/**
+ * Reads a state immediately before a spoken plate label. Codes that are also
+ * ordinary English words require an explicit "state" cue; full names do not.
+ */
+export function parseSpokenPlateState(
+  transcript: string | null | undefined,
+): PlateStateCode | null {
+  if (typeof transcript !== "string") return null;
+
+  const spoken = EXPLICIT_SPOKEN_STATE_PATTERN.exec(transcript)?.[1]
+    ?? FULL_NAME_BEFORE_PLATE_PATTERN.exec(transcript)?.[1]
+    ?? UNAMBIGUOUS_CODE_BEFORE_PLATE_PATTERN.exec(transcript)?.[1];
+  return normalizePlateState(spoken);
 }
 
 /** Builds a punctuation-insensitive, state-aware key for plate matching. */

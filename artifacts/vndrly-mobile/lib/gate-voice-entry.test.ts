@@ -10,22 +10,39 @@ describe("parseGateVoiceEntry", () => {
     });
   });
 
-  it("extracts a full state name and keeps the plate number separate", () => {
-    expect(parseGateVoiceEntry("Texas plate ABC 123 driver Bob Villa")).toEqual({
-      plateState: "TX",
+  it.each([
+    ["TX plate ABC 123 driver Bob Villa", "TX"],
+    ["Texas, plate ABC 123 driver Bob Villa", "TX"],
+    ["state IN plate ABC 123 driver Bob Villa", "IN"],
+    ["state OR tag ABC 123 driver Bob Villa", "OR"],
+    ["state ME license plate ABC 123 driver Bob Villa", "ME"],
+    ["state OK plate ABC 123 driver Bob Villa", "OK"],
+    ["state HI tag ABC 123 driver Bob Villa", "HI"],
+    ["state ID license plate ABC 123 driver Bob Villa", "ID"],
+  ])("extracts a precisely cued state without contaminating the plate from %s", (transcript, code) => {
+    expect(parseGateVoiceEntry(transcript)).toMatchObject({
+      plateState: code,
       vehiclePlate: "ABC123",
-      firstName: "Bob",
-      lastName: "Villa",
     });
   });
 
-  it("accepts a state code but ignores an invalid code", () => {
-    expect(parseGateVoiceEntry("tx plate ABC 123 driver Bob Villa")).toMatchObject({
-      plateState: "TX",
-      vehiclePlate: "ABC123",
-    });
-    expect(parseGateVoiceEntry("ZZ plate ABC 123 driver Bob Villa")).not.toHaveProperty("plateState");
-  });
+  it.each([
+    "IN plate ABC 123 driver Bob Villa",
+    "OR plate ABC 123 driver Bob Villa",
+    "ME plate ABC 123 driver Bob Villa",
+    "OK plate ABC 123 driver Bob Villa",
+    "HI plate ABC 123 driver Bob Villa",
+    "ID plate ABC 123 driver Bob Villa",
+    "check in plate ABC 123 driver Bob Villa",
+    "ZZ plate ABC 123 driver Bob Villa",
+  ])(
+    "does not infer an uncued or invalid state from %s",
+    (transcript) => {
+      const parsed = parseGateVoiceEntry(transcript);
+      expect(parsed).not.toHaveProperty("plateState");
+      expect(parsed.vehiclePlate).toBe("ABC123");
+    },
+  );
 
   it("does not treat a plate prefix or driver name as state input", () => {
     expect(parseGateVoiceEntry("plate TXABC123 driver Texas Bob")).toEqual({

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatPlate,
+  formatPlateForDisplay,
   normalizePlateNumber,
   normalizePlateState,
   orderPlateStates,
@@ -24,6 +25,12 @@ describe("plate formatting and matching", () => {
   it("formats an entered plate for display", () => {
     expect(formatPlate("TX", "abc-1234")).toBe("TX • ABC-1234");
     expect(normalizePlateNumber(" abc-1234 ")).toBe("ABC-1234");
+  });
+
+  it("marks a legacy plate while preserving the shared state-qualified presentation", () => {
+    expect(formatPlateForDisplay("TX", "abc-1234", "State unconfirmed")).toBe("TX • ABC-1234");
+    expect(formatPlateForDisplay(null, "legacy7", "State unconfirmed")).toBe("LEGACY7 (State unconfirmed)");
+    expect(formatPlateForDisplay(null, null, "State unconfirmed")).toBeNull();
   });
 
   it("matches the same plate within a state while preserving state boundaries", () => {

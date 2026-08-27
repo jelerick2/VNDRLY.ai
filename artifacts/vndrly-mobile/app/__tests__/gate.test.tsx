@@ -239,6 +239,36 @@ function isDisabled(el: HTMLElement): boolean {
 }
 
 describe("GatekeeperScreen", () => {
+  it("renders the state-qualified plate in the active visit rows", async () => {
+    fetchGatekeeperVisitsMock.mockResolvedValue([
+      {
+        id: 88,
+        firstName: "Taylor",
+        lastName: "Reed",
+        company: "Acme",
+        siteLocationId: 42,
+        siteName: "Acme HQ",
+        siteAddress: "123 Main St",
+        hostType: "partner",
+        hostPartnerName: "Acme Partner",
+        hostVendorName: null,
+        purpose: "Delivery",
+        vehiclePlate: "ABC123",
+        plateState: "TX",
+        platePhotoUrl: null,
+        vehiclePhotoUrl: null,
+        expectedDurationMinutes: 60,
+        checkInTime: "2026-08-27T12:00:00Z",
+        checkOutTime: null,
+        expiresAt: "2026-08-27T13:00:00Z",
+      },
+    ]);
+
+    const view = renderScreen();
+
+    await waitFor(() => expect(view.container.textContent).toContain("TX • ABC123"));
+  });
+
   it("shows the branded vendor logo in front of Gate Portal", async () => {
     renderScreen();
     await findFirstByTestId("gate-first-name");

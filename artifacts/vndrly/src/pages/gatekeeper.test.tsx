@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   listPreferredPlateStates: vi.fn(),
   readPlate: vi.fn(),
 }));
+const liveMonitor = vi.hoisted(() => ({ flash: null as Record<string, unknown> | null }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -27,7 +28,7 @@ vi.mock("@/hooks/use-brand", () => ({
 }));
 
 vi.mock("@/hooks/use-gate-live-monitor", () => ({
-  useGateLiveMonitor: () => ({ flash: null, liveStatus: "live" }),
+  useGateLiveMonitor: () => ({ flash: liveMonitor.flash, liveStatus: "live" }),
 }));
 
 vi.mock("@/components/live-connection-pill", () => ({
@@ -143,6 +144,7 @@ async function selectState(name: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  liveMonitor.flash = null;
   api.list.mockResolvedValue([]);
   api.listAssignedGateSites.mockResolvedValue({
     sites: [ASSIGNED_SITE],
@@ -162,6 +164,34 @@ beforeEach(() => {
 });
 
 describe("GatekeeperPage plate state", () => {
+  it("renders state-qualified plates from both the live event and active gate rows", async () => {
+    api.list.mockResolvedValue([
+      recentVisit({
+        id: 87,
+        vehiclePlate: "4412",
+        plateState: "OK",
+        checkOutTime: null,
+      }),
+    ]);
+    liveMonitor.flash = {
+      kind: "checked_in",
+      visitId: 88,
+      firstName: "Taylor",
+      lastName: "Reed",
+      company: "Acme",
+      vehiclePlate: "ABC123",
+      plateState: "TX",
+      platePhotoUrl: null,
+      siteName: "Acme HQ",
+      at: "2026-08-27T12:00:00Z",
+    };
+
+    const view = renderPage();
+
+    expect((await screen.findByTestId("gate-live-flash")).textContent).toContain("TX • ABC123");
+    await waitFor(() => expect(view.container.textContent).toContain("OK • 4412"));
+  });
+
   it("waits for the authorized site id and renders its preferred states immediately before the plate input", async () => {
     let resolveSite!: (value: typeof SITE_CONTEXT) => void;
     api.getSiteContext.mockReturnValue(new Promise((resolve) => { resolveSite = resolve; }));
