@@ -74,6 +74,7 @@
     "newEntry": "New gate entry",
     "nameRequired": "First name and last name are required.",
     "plateRequired": "A license plate is required.",
+    "plateStateRequired": "A plate state is required.",
     "checkedInTitle": "Checked in",
     "checkedInBody": "Gate entry recorded.",
     "tagPhoto": "Tag photo",

@@ -132,6 +132,10 @@ export type PlateOcrCandidate = {
   stateConfidence: number | null;
 };
 
+export type PreferredPlateStatesResponse = {
+  preferred: PlateStateCode[];
+};
+
 export const visitsApi = {
   list: (params?: { siteLocationId?: number; from?: string; to?: string; activeOnly?: boolean; limit?: number; offset?: number }) => {
     const qs: string[] = [];
@@ -146,6 +150,8 @@ export const visitsApi = {
   get: (id: number) => jf<VisitorDetail>(`/api/visits/${id}`),
   getSiteContext: (siteCode: string) => jf<SiteContext>(`/api/visits/site-context/${encodeURIComponent(siteCode)}`),
   listAssignedGateSites: () => jf<AssignedGateSitesResponse>(`/api/visits/gate/assigned-sites`),
+  listPreferredPlateStates: (siteId: number) =>
+    jf<PreferredPlateStatesResponse>(`/api/visits/sites/${siteId}/preferred-plate-states`),
   listPublicSites: () => jf<PublicSite[]>(`/api/visits/public-sites`),
   startGuestSession: (input: {
     firstName: string;

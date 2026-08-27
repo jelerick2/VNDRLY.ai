@@ -81,11 +81,30 @@ describe("submitGatekeeperVisit", () => {
       lastName: "Hale",
       company: "Peak Energy",
       vehiclePlate: "",
+      plateState: null,
       purpose: "Water haul",
       durationStr: "45",
     });
     expect(result).toEqual({ ok: false, reason: "missing-plate" });
     expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it("requires a plate state before requesting location", async () => {
+    const { submitGatekeeperVisit } = await import("./gatekeeper");
+    const result = await submitGatekeeperVisit({
+      ctx: baseCtx,
+      hostKey: "partner:7",
+      firstName: "Jordan",
+      lastName: "Hale",
+      company: "Peak Energy",
+      vehiclePlate: "4412",
+      plateState: null,
+      purpose: "Water haul",
+      durationStr: "45",
+    });
+    expect(result).toEqual({ ok: false, reason: "missing-state" });
+    expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
+    expect(apiFetchMock).not.toHaveBeenCalled();
   });
 
   it("posts tag and vehicle photo URLs and omits phone and email", async () => {
@@ -97,7 +116,8 @@ describe("submitGatekeeperVisit", () => {
       firstName: "Jordan",
       lastName: "Hale",
       company: "Peak Energy",
-      vehiclePlate: "OK-4412",
+      vehiclePlate: "4412",
+      plateState: "OK",
       purpose: "Water haul",
       durationStr: "45",
       platePhotoUrl: "/uploads/tag.jpg",
@@ -113,6 +133,7 @@ describe("submitGatekeeperVisit", () => {
     expect(body.platePhotoUrl).toBe("/uploads/tag.jpg");
     expect(body.vehiclePhotoUrl).toBe("/uploads/truck.jpg");
     expect(body.firstName).toBe("Jordan");
-    expect(body.vehiclePlate).toBe("OK-4412");
+    expect(body.vehiclePlate).toBe("4412");
+    expect(body.plateState).toBe("OK");
   });
 });

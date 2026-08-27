@@ -4807,6 +4807,7 @@
     "lastName": "Last name",
     "company": "Company",
     "vehiclePlate": "Vehicle plate",
+    "plateStateRequired": "A plate state is required.",
     "siteCode": "Site code",
     "locationUnavailable": "Location is required for gate check-in.",
     "locationDenied": "Allow location access to record this gate entry.",

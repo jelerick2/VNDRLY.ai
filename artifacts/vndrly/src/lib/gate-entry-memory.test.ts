@@ -18,6 +18,7 @@ function visit(overrides: Partial<VisitorRow> = {}): VisitorRow {
     phone: "555-0142",
     email: "jordan@peak.example",
     vehiclePlate: "OK-4412",
+    plateState: "OK",
     platePhotoUrl: null,
     vehiclePhotoUrl: null,
     purpose: "Water haul",
@@ -45,6 +46,7 @@ function draft(overrides: Partial<GateEntryDraft> = {}): GateEntryDraft {
     lastName: "",
     company: "",
     vehiclePlate: "",
+    plateState: null,
     purpose: "",
     expectedDuration: "60",
     ...overrides,
@@ -108,7 +110,7 @@ describe("evaluateGateMemory", () => {
     });
     const result = evaluateGateMemory({
       visits: [older, newer],
-      draft: draft({ vehiclePlate: "OK-4412" }),
+      draft: draft({ vehiclePlate: "OK-4412", plateState: "OK" }),
       activeField: "vehiclePlate",
     });
     expect(result.fill).toMatchObject({
@@ -119,6 +121,109 @@ describe("evaluateGateMemory", () => {
       purpose: "Hot oil",
       expectedDuration: "30",
     });
+  });
+
+  it("does not exact-match the same plate number from a different state", () => {
+    const result = evaluateGateMemory({
+      visits: [visit({ vehiclePlate: "4412", plateState: "OK" })],
+      draft: draft({ vehiclePlate: "4412", plateState: "TX" }),
+      activeField: "vehiclePlate",
+    });
+
+    expect(result.fill).toBeNull();
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("waits for a state before returning plate-number memory", () => {
+    const result = evaluateGateMemory({
+      visits: [visit({ vehiclePlate: "4412", plateState: "OK" })],
+      draft: draft({ vehiclePlate: "4412", plateState: null }),
+      activeField: "vehiclePlate",
+    });
+
+    expect(result.fill).toBeNull();
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it("prioritizes an exact state and number match over newer legacy and different-state rows", () => {
+    const exact = visit({
+      id: 30,
+      firstName: "Exact",
+      lastName: "Texas",
+      vehiclePlate: "4412",
+      plateState: "TX",
+      checkInTime: "2026-08-20T10:00:00Z",
+    });
+    const legacy = visit({
+      id: 31,
+      firstName: "Legacy",
+      lastName: "Driver",
+      vehiclePlate: "44-12",
+      plateState: null,
+      checkInTime: "2026-08-22T10:00:00Z",
+    });
+    const wrongState = visit({
+      id: 32,
+      firstName: "Wrong",
+      lastName: "State",
+      vehiclePlate: "4412",
+      plateState: "OK",
+      checkInTime: "2026-08-23T10:00:00Z",
+    });
+
+    const result = evaluateGateMemory({
+      visits: [legacy, wrongState, exact],
+      draft: draft({ vehiclePlate: "4412", plateState: "TX" }),
+      activeField: "vehiclePlate",
+    });
+
+    expect(result.fill).toMatchObject({
+      firstName: "Exact",
+      lastName: "Texas",
+      plateState: "TX",
+    });
+    expect(result.suggestions.map((suggestion) => suggestion.visit.plateState)).toEqual([
+      "TX",
+      null,
+    ]);
+  });
+
+  it("keeps composite plate priority while completing another memory field", () => {
+    const exact = visit({
+      id: 40,
+      firstName: "Exact",
+      lastName: "Texas",
+      company: "Peak Energy",
+      vehiclePlate: "4412",
+      plateState: "TX",
+      checkInTime: "2026-08-20T10:00:00Z",
+    });
+    const legacy = visit({
+      id: 41,
+      firstName: "Legacy",
+      lastName: "Driver",
+      company: "Peak Energy",
+      vehiclePlate: "4412",
+      plateState: null,
+      checkInTime: "2026-08-22T10:00:00Z",
+    });
+    const wrongState = visit({
+      id: 42,
+      firstName: "Wrong",
+      lastName: "State",
+      company: "Peak Energy",
+      vehiclePlate: "4412",
+      plateState: "OK",
+      checkInTime: "2026-08-23T10:00:00Z",
+    });
+
+    const result = evaluateGateMemory({
+      visits: [legacy, wrongState, exact],
+      draft: draft({ company: "Peak", vehiclePlate: "4412", plateState: "TX" }),
+      activeField: "company",
+    });
+
+    expect(result.fill).toMatchObject({ firstName: "Exact", lastName: "Texas", plateState: "TX" });
   });
 
   it("does not complete an ambiguous company prefix", () => {
@@ -144,7 +249,7 @@ describe("evaluateGateMemory", () => {
   it("fills the rest of the visitor when a plate uniquely matches", () => {
     const result = evaluateGateMemory({
       visits: [peakJordan, peakRiley, summitMaya],
-      draft: draft({ vehiclePlate: "ok4412" }),
+      draft: draft({ vehiclePlate: "ok4412", plateState: "OK" }),
       activeField: "vehiclePlate",
     });
     expect(result.fill).toMatchObject({
@@ -170,7 +275,7 @@ describe("evaluateGateMemory", () => {
     });
     const result = evaluateGateMemory({
       visits: [older, newer],
-      draft: draft({ vehiclePlate: "ok-44" }),
+      draft: draft({ vehiclePlate: "ok-44", plateState: "OK" }),
       activeField: "vehiclePlate",
     });
     expect(result.fill?.purpose).toBe("Fresh haul");
@@ -310,7 +415,7 @@ describe("evaluateGateMemory", () => {
   it("does not fill phone or email from historical visits", () => {
     const result = evaluateGateMemory({
       visits: [peakJordan],
-      draft: draft({ vehiclePlate: "OK-4412" }),
+      draft: draft({ vehiclePlate: "OK-4412", plateState: "OK" }),
       activeField: "vehiclePlate",
     });
     expect(result.fill?.firstName).toBe("Jordan");

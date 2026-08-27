@@ -1,4 +1,5 @@
 import type { VisitorRow } from "@/lib/visits-api";
+import { normalizePlateState, plateMatchKey } from "@workspace/plate-state";
 
 export type GateLogExportRow = {
   plate: string;
@@ -18,12 +19,26 @@ export function normalizePlate(value: string | null | undefined): string {
   return (value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-export function latestVisitForPlate(visits: VisitorRow[], plate: string): VisitorRow | null {
+export function latestVisitForPlate(
+  visits: VisitorRow[],
+  state: string | null,
+  plate: string,
+): VisitorRow | null {
   const normalized = normalizePlate(plate);
   if (!normalized) return null;
+  const normalizedState = normalizePlateState(state);
+  const exactKey = plateMatchKey(normalizedState, plate);
   return visits
-    .filter((visit) => normalizePlate(visit.vehiclePlate) === normalized)
-    .sort((a, b) => Date.parse(b.checkInTime) - Date.parse(a.checkInTime))[0] ?? null;
+    .filter((visit) => {
+      if (normalizePlate(visit.vehiclePlate) !== normalized) return false;
+      const visitState = normalizePlateState(visit.plateState);
+      return !normalizedState || !visitState || plateMatchKey(visitState, visit.vehiclePlate) === exactKey;
+    })
+    .sort((a, b) => {
+      const priority = (visit: VisitorRow) =>
+        exactKey && plateMatchKey(visit.plateState, visit.vehiclePlate) === exactKey ? 0 : 1;
+      return priority(a) - priority(b) || Date.parse(b.checkInTime) - Date.parse(a.checkInTime);
+    })[0] ?? null;
 }
 
 function formatDate(value: string | null): string {

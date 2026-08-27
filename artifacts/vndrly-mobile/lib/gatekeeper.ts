@@ -13,7 +13,7 @@ export type GatekeeperVisitInput = {
   lastName: string;
   company: string;
   vehiclePlate: string;
-  plateState?: string;
+  plateState: PlateStateCode | null;
   purpose: string;
   durationStr: string;
   platePhotoUrl?: string;
@@ -22,7 +22,11 @@ export type GatekeeperVisitInput = {
 
 export type GatekeeperSubmitResult =
   | { ok: true; visitId: number }
-  | { ok: false; reason: "missing-name" | "missing-plate" | "no-host" | "location-denied" };
+  | { ok: false; reason: "missing-name" | "missing-plate" | "missing-state" | "no-host" | "location-denied" };
+
+export type PreferredPlateStatesResponse = {
+  preferred: PlateStateCode[];
+};
 
 export async function fetchGatekeeperVisits(): Promise<ActiveVisit[]> {
   return apiFetch<Array<ActiveVisit & { checkOutTime?: string | null }>>("/api/visits?activeOnly=true&limit=1000");
@@ -30,6 +34,10 @@ export async function fetchGatekeeperVisits(): Promise<ActiveVisit[]> {
 
 export async function fetchAssignedGateSites(): Promise<AssignedGateSitesResponse> {
   return apiFetch("/api/visits/gate/assigned-sites");
+}
+
+export async function fetchPreferredPlateStates(siteId: number): Promise<PreferredPlateStatesResponse> {
+  return apiFetch(`/api/visits/sites/${siteId}/preferred-plate-states`);
 }
 
 export async function fetchGatekeeperHistory(fromIso: string): Promise<ActiveVisit[]> {
@@ -58,12 +66,11 @@ export type PlateOcrCandidate = {
   stateConfidence: number | null;
 };
 
-export async function readGatePlate(objectPath: string): Promise<string | null> {
-  const result = await apiFetch<PlateOcrCandidate>("/api/visits/gate/read-plate", {
+export async function readGatePlate(objectPath: string): Promise<PlateOcrCandidate> {
+  return apiFetch<PlateOcrCandidate>("/api/visits/gate/read-plate", {
     method: "POST",
     body: JSON.stringify({ objectPath }),
   });
-  return result.plate;
 }
 
 export async function deleteGateEvidence(objectPath: string | null): Promise<void> {
@@ -100,6 +107,7 @@ export async function submitGatekeeperVisit(
     return { ok: false, reason: "missing-name" };
   }
   if (!input.vehiclePlate.trim()) return { ok: false, reason: "missing-plate" };
+  if (!input.plateState) return { ok: false, reason: "missing-state" };
   const host = buildHostOptions(input.ctx).find((o) => o.key === input.hostKey);
   if (!host) return { ok: false, reason: "no-host" };
 

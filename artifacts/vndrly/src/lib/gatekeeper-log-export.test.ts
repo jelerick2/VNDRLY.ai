@@ -14,6 +14,7 @@ function visit(overrides: Partial<VisitorRow> = {}): VisitorRow {
     phone: "555-0100",
     email: "taylor@example.com",
     vehiclePlate: "TX-ABC 123",
+    plateState: "TX",
     platePhotoUrl: null,
     vehiclePhotoUrl: null,
     purpose: "Delivery <priority>",
@@ -40,8 +41,18 @@ describe("gatekeeper plate history", () => {
     const older = visit({ id: 1, checkInTime: "2026-08-20T10:00:00Z" });
     const newer = visit({ id: 2, vehiclePlate: "TXABC123", checkInTime: "2026-08-21T10:00:00Z" });
     expect(normalizePlate(" tx abc-123 ")).toBe("TXABC123");
-    expect(latestVisitForPlate([older, newer], "tx-abc 123")?.id).toBe(2);
-    expect(latestVisitForPlate([older], "TXABC12")).toBeNull();
+    expect(latestVisitForPlate([older, newer], "TX", "tx-abc 123")?.id).toBe(2);
+    expect(latestVisitForPlate([older], "TX", "TXABC12")).toBeNull();
+  });
+
+  it("prefers the exact composite key, permits legacy fallback, and excludes another state", () => {
+    const exact = visit({ id: 3, vehiclePlate: "4412", plateState: "TX", checkInTime: "2026-08-20T10:00:00Z" });
+    const legacy = visit({ id: 4, vehiclePlate: "44-12", plateState: null, checkInTime: "2026-08-22T10:00:00Z" });
+    const wrongState = visit({ id: 5, vehiclePlate: "4412", plateState: "OK", checkInTime: "2026-08-23T10:00:00Z" });
+
+    expect(latestVisitForPlate([legacy, wrongState, exact], "TX", "4412")?.id).toBe(3);
+    expect(latestVisitForPlate([legacy, wrongState], "TX", "4412")?.id).toBe(4);
+    expect(latestVisitForPlate([wrongState], "TX", "4412")).toBeNull();
   });
 });
 

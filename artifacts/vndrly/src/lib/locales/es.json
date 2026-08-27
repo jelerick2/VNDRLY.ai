@@ -4807,6 +4807,7 @@
     "lastName": "Apellido",
     "company": "Empresa",
     "vehiclePlate": "Placa",
+    "plateStateRequired": "Se requiere el estado de la placa.",
     "siteCode": "Código del sitio",
     "locationUnavailable": "Se requiere ubicación para el registro en portería.",
     "locationDenied": "Permita el acceso a la ubicación para registrar esta entrada.",

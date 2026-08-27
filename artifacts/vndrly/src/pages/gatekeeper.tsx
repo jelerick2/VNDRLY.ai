@@ -3,11 +3,18 @@ import { Link } from "wouter";
 import { Camera, FileText, History, Loader2, RefreshCw, Search, Sheet, Shield } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  NATIONAL_PLATE_STATE_FALLBACK,
+  PLATE_OCR_STATE_CONFIDENCE_THRESHOLD,
+  normalizePlateState,
+  type PlateStateCode,
+} from "@workspace/plate-state";
 
 import AmberButton from "@/components/amber-button";
 import BlueButton from "@/components/blue-button";
 import { LiveConnectionPill } from "@/components/live-connection-pill";
 import { GateMemoryInput } from "@/components/gate-memory-input";
+import { PlateStatePicker } from "@/components/plate-state-picker";
 import { Card, CardContent, CardHeader, CardTitle, CARD_INNER_TILE_CLASS, CARD_TITLE_ICON_CLASS } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -116,6 +123,8 @@ export default function GatekeeperPage() {
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
+  const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
+  const [plateStateError, setPlateStateError] = useState<string | null>(null);
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
@@ -157,6 +166,14 @@ export default function GatekeeperPage() {
     enabled: !!confirmedCode,
     retry: false,
   });
+  const preferredPlateStates = useQuery({
+    queryKey: ["preferred-plate-states", site.data?.site.id],
+    queryFn: () => visitsApi.listPreferredPlateStates(site.data!.site.id),
+    enabled: Boolean(site.data?.site.id),
+    retry: false,
+  });
+  const orderedStatePreferences = preferredPlateStates.data?.preferred
+    ?? NATIONAL_PLATE_STATE_FALLBACK;
   const activeVisits = visits.data ?? [];
   const live = useGateLiveMonitor({
     enabled: Boolean(user),
@@ -175,17 +192,18 @@ export default function GatekeeperPage() {
   });
   const exportRows = useMemo(() => toGateLogRows(recentVisits.data ?? []), [recentVisits.data]);
   const previousPlateVisit = useMemo(
-    () => latestVisitForPlate(recentVisits.data ?? [], vehiclePlate),
-    [vehiclePlate, recentVisits.data],
+    () => latestVisitForPlate(recentVisits.data ?? [], plateState, vehiclePlate),
+    [plateState, vehiclePlate, recentVisits.data],
   );
   const entryDraft = useMemo<GateEntryDraft>(() => ({
     firstName,
     lastName,
     company,
     vehiclePlate,
+    plateState,
     purpose,
     expectedDuration: duration,
-  }), [company, duration, firstName, lastName, purpose, vehiclePlate]);
+  }), [company, duration, firstName, lastName, plateState, purpose, vehiclePlate]);
   const memory = useMemo(
     () => evaluateGateMemory({
       visits: recentVisits.data ?? [],
@@ -201,6 +219,7 @@ export default function GatekeeperPage() {
     setLastName(next.lastName);
     setCompany(next.company);
     setVehiclePlate(next.vehiclePlate.toUpperCase());
+    setPlateState(next.plateState);
     setPurpose(next.purpose);
     if (next.expectedDuration) setDuration(next.expectedDuration);
   };
@@ -313,6 +332,7 @@ export default function GatekeeperPage() {
   const resetEntry = () => {
     setFirstName(""); setLastName(""); setCompany("");
     setVehiclePlate(""); setPurpose(""); setDuration("60"); setHostKey("");
+    setPlateState(null); setPlateStateError(null);
     setPlatePhotoUrl(null); setVehiclePhotoUrl(null);
     setActiveMemoryField(null);
     setMemoryDeleting(false);
@@ -328,6 +348,7 @@ export default function GatekeeperPage() {
       lastName: previousPlateVisit.lastName,
       company: previousPlateVisit.company ?? "",
       vehiclePlate: previousPlateVisit.vehiclePlate ?? "",
+      plateState: previousPlateVisit.plateState,
       purpose: previousPlateVisit.purpose ?? "",
       expectedDuration: previousPlateVisit.expectedDurationMinutes?.toString() ?? "60",
     }));
@@ -345,14 +366,24 @@ export default function GatekeeperPage() {
         return;
       }
       const objectPath = await uploadEvidence(file, t);
-      const plate = await visitsApi.readPlate({ objectPath }).then((result) => result.plate).catch(() => null);
+      const candidate = await visitsApi.readPlate({ objectPath }).catch(() => null);
       void deleteUnattachedEvidence(platePhotoUrl);
       setPlatePhotoUrl(objectPath);
-      if (plate) {
+      if (candidate?.plate) {
         setMemoryDeleting(false);
         setActiveMemoryField("vehiclePlate");
-        setVehiclePlate(plate);
-        setOcrPlate(plate);
+        setVehiclePlate(candidate.plate);
+        setOcrPlate(candidate.plate);
+        if (
+          candidate.stateConfidence != null
+          && candidate.stateConfidence >= PLATE_OCR_STATE_CONFIDENCE_THRESHOLD
+        ) {
+          const normalizedState = normalizePlateState(candidate.state);
+          if (normalizedState) {
+            setPlateState(normalizedState);
+            setPlateStateError(null);
+          }
+        }
         setPlateOcrStatus("read");
       } else {
         setPlateOcrStatus("unreadable");
@@ -372,6 +403,11 @@ export default function GatekeeperPage() {
       setError(t("gatekeeper.requiredFields"));
       return;
     }
+    if (!plateState) {
+      setPlateStateError(t("gatekeeper.plateStateRequired"));
+      return;
+    }
+    setPlateStateError(null);
     setBusy(true); setError(null);
     try {
       const coords = await currentPosition(true, t);
@@ -381,6 +417,7 @@ export default function GatekeeperPage() {
         lastName: lastName.trim(),
         company: company.trim() || undefined,
         vehiclePlate: vehiclePlate.trim() || undefined,
+        plateState,
         purpose: purpose.trim() || undefined,
         expectedDurationMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
         siteLocationId: context.site.id,
@@ -573,7 +610,16 @@ export default function GatekeeperPage() {
                 />
               </div>
               <div>
-                <Label>{t("gatekeeper.vehiclePlate")} *</Label>
+                <PlateStatePicker
+                  value={plateState}
+                  onChange={(stateCode) => {
+                    setPlateState(stateCode);
+                    setPlateStateError(null);
+                  }}
+                  preferredStates={orderedStatePreferences}
+                  error={plateStateError ?? undefined}
+                />
+                <Label className="mt-2 block">{t("gatekeeper.vehiclePlate")} *</Label>
                 <GateMemoryInput
                   value={vehiclePlate}
                   suggestions={activeMemoryField === "vehiclePlate" ? memory.suggestions : []}
@@ -607,7 +653,7 @@ export default function GatekeeperPage() {
               <Label>{t("gatekeeper.currentLocation")} *</Label>
               {assignedSites.length > 0 ? (
                 <Select
-                  value={assignedSites.some((row) => row.siteCode === confirmedCode) ? confirmedCode! : undefined}
+                  value={assignedSites.some((row) => row.siteCode === confirmedCode) ? confirmedCode! : ""}
                   onValueChange={(code) => {
                     setSiteCode(code);
                     setConfirmedCode(code);

@@ -1,5 +1,10 @@
 import { normalizePlate } from "@/lib/gatekeeper-log-export";
 import type { VisitorRow } from "@/lib/visits-api";
+import {
+  normalizePlateState,
+  plateMatchKey,
+  type PlateStateCode,
+} from "@workspace/plate-state";
 
 export const MIN_SUGGESTION_LENGTH = 1;
 export const MIN_AUTO_FILL_LENGTH = 2;
@@ -16,6 +21,7 @@ export type GateEntryDraft = {
   lastName: string;
   company: string;
   vehiclePlate: string;
+  plateState: PlateStateCode | null;
   purpose: string;
   expectedDuration: string;
 };
@@ -33,7 +39,9 @@ export type GateMemoryResult = {
   fill: Partial<GateEntryDraft> | null;
 };
 
-const DRAFT_KEYS: (keyof GateEntryDraft)[] = [
+type GateEntryStringKey = Exclude<keyof GateEntryDraft, "plateState">;
+
+const DRAFT_STRING_KEYS: GateEntryStringKey[] = [
   "firstName",
   "lastName",
   "company",
@@ -48,6 +56,7 @@ export function emptyGateDraft(): GateEntryDraft {
     lastName: "",
     company: "",
     vehiclePlate: "",
+    plateState: null,
     purpose: "",
     expectedDuration: "60",
   };
@@ -59,6 +68,7 @@ export function fillFromVisit(visit: VisitorRow): GateEntryDraft {
     lastName: visit.lastName,
     company: visit.company ?? "",
     vehiclePlate: (visit.vehiclePlate ?? "").toUpperCase(),
+    plateState: normalizePlateState(visit.plateState),
     purpose: visit.purpose ?? "",
     expectedDuration:
       visit.expectedDurationMinutes != null ? String(visit.expectedDurationMinutes) : "",
@@ -66,7 +76,8 @@ export function fillFromVisit(visit: VisitorRow): GateEntryDraft {
 }
 
 export function draftsEqual(a: GateEntryDraft, b: GateEntryDraft): boolean {
-  return DRAFT_KEYS.every((key) => a[key] === b[key]);
+  return a.plateState === b.plateState
+    && DRAFT_STRING_KEYS.every((key) => a[key] === b[key]);
 }
 
 function norm(value: string | null | undefined): string {
@@ -113,7 +124,33 @@ function visitMatchesDraft(
     && draft.vehiclePlate.trim()
     && !platePrefix(visit.vehiclePlate, draft.vehiclePlate)
   ) return false;
+  if (
+    activeField !== "firstName"
+    && activeField !== "lastName"
+    && draft.plateState
+    && normalizePlateState(visit.plateState)
+    && normalizePlateState(visit.plateState) !== draft.plateState
+  ) return false;
   return true;
+}
+
+function plateStateMatchPriority(
+  visit: VisitorRow,
+  draft: GateEntryDraft,
+  activeField: GateMemoryField,
+): number {
+  if (activeField === "firstName" || activeField === "lastName" || !draft.plateState) return 0;
+  return normalizePlateState(visit.plateState) === draft.plateState ? 0 : 1;
+}
+
+function rankedMatches(
+  visits: VisitorRow[],
+  draft: GateEntryDraft,
+  activeField: GateMemoryField,
+): VisitorRow[] {
+  return newestFirst(visits).sort((a, b) =>
+    plateStateMatchPriority(a, draft, activeField)
+    - plateStateMatchPriority(b, draft, activeField));
 }
 
 function queryLength(field: GateMemoryField, value: string): number {
@@ -145,8 +182,13 @@ function uniqueBy<T>(rows: T[], keyOf: (row: T) => string): T[] {
 function alreadyMatchesSuggestion(draft: GateEntryDraft, visit: VisitorRow, field: GateMemoryField): boolean {
   if (field === "company") return Boolean(draft.company.trim()) && norm(draft.company) === norm(visit.company);
   if (field === "vehiclePlate") {
+    const exactDraftKey = plateMatchKey(draft.plateState, draft.vehiclePlate);
+    const exactVisitKey = plateMatchKey(visit.plateState, visit.vehiclePlate);
+    const plateMatches = exactDraftKey
+      ? exactDraftKey === exactVisitKey
+      : normalizePlate(draft.vehiclePlate) === normalizePlate(visit.vehiclePlate);
     return Boolean(normalizePlate(draft.vehiclePlate))
-      && normalizePlate(draft.vehiclePlate) === normalizePlate(visit.vehiclePlate)
+      && plateMatches
       && Boolean(draft.firstName.trim());
   }
   return (
@@ -164,7 +206,10 @@ function visitorSuggestions(
   field: GateMemoryField,
 ): GateMemorySuggestion[] {
   const grouped = uniqueBy(matches, (visit) => {
-    if (field === "vehiclePlate") return normalizePlate(visit.vehiclePlate);
+    if (field === "vehiclePlate") {
+      return plateMatchKey(visit.plateState, visit.vehiclePlate)
+        ?? `legacy:${normalizePlate(visit.vehiclePlate)}`;
+    }
     if (field === "company") return norm(visit.company);
     return identityKey(visit);
   });
@@ -177,7 +222,7 @@ function visitorSuggestions(
     if (!label) return [];
     if (alreadyMatchesSuggestion(draft, visit, field)) return [];
     return [{
-      id: `${field}:${identityKey(visit)}:${normalizePlate(visit.vehiclePlate)}`,
+      id: `${field}:${identityKey(visit)}:${plateMatchKey(visit.plateState, visit.vehiclePlate) ?? `legacy:${normalizePlate(visit.vehiclePlate)}`}`,
       label,
       detail: suggestionDetail(
         visit,
@@ -227,7 +272,7 @@ function sharedFill(matches: VisitorRow[]): Partial<GateEntryDraft> {
 export function shouldApplyField(
   current: string,
   suggested: string,
-  key: keyof GateEntryDraft,
+  key: GateEntryStringKey,
 ): boolean {
   if (!suggested) return false;
   const trimmed = current.trim();
@@ -243,7 +288,7 @@ export function shouldApplyField(
   return suggested.toLowerCase().startsWith(trimmed.toLowerCase());
 }
 
-function effectivelyEqual(key: keyof GateEntryDraft, current: string, suggested: string): boolean {
+function effectivelyEqual(key: GateEntryStringKey, current: string, suggested: string): boolean {
   if (current === suggested) return true;
   if (key === "vehiclePlate") {
     return Boolean(normalizePlate(current)) && normalizePlate(current) === normalizePlate(suggested);
@@ -255,7 +300,8 @@ function effectivelyEqual(key: keyof GateEntryDraft, current: string, suggested:
 }
 
 function fillIsUseful(fill: Partial<GateEntryDraft>, draft: GateEntryDraft): boolean {
-  return DRAFT_KEYS.some((key) => {
+  if (!draft.plateState && fill.plateState) return true;
+  return DRAFT_STRING_KEYS.some((key) => {
     const suggested = fill[key];
     if (suggested == null || suggested === "") return false;
     return shouldApplyField(draft[key], suggested, key) && !effectivelyEqual(key, draft[key], suggested);
@@ -264,11 +310,12 @@ function fillIsUseful(fill: Partial<GateEntryDraft>, draft: GateEntryDraft): boo
 
 export function mergeGateFill(current: GateEntryDraft, fill: Partial<GateEntryDraft>): GateEntryDraft {
   const next = { ...current };
-  for (const key of DRAFT_KEYS) {
+  for (const key of DRAFT_STRING_KEYS) {
     const suggested = fill[key];
     if (suggested == null) continue;
     if (shouldApplyField(current[key], suggested, key)) next[key] = suggested;
   }
+  if (!current.plateState && fill.plateState) next.plateState = fill.plateState;
   return next;
 }
 
@@ -300,8 +347,15 @@ export function evaluateGateMemory(input: {
   if (!activeField || length < minSuggestionLength) {
     return { suggestions: [], fill: null };
   }
+  if (activeField === "vehiclePlate" && !draft.plateState) {
+    return { suggestions: [], fill: null };
+  }
 
-  const matches = newestFirst(visits.filter((visit) => visitMatchesDraft(visit, draft, activeField)));
+  const matches = rankedMatches(
+    visits.filter((visit) => visitMatchesDraft(visit, draft, activeField)),
+    draft,
+    activeField,
+  );
   const suggestionSource = activeField === "company"
     ? uniqueBy(matches.filter((visit) => (visit.company ?? "").trim()), (visit) => norm(visit.company))
     : matches;
@@ -311,7 +365,12 @@ export function evaluateGateMemory(input: {
     return { suggestions, fill: null };
   }
 
-  const fill = sharedFill(matches);
+  const exactPlateMatches = activeField !== "firstName" && activeField !== "lastName" && draft.plateState
+    ? matches.filter((visit) =>
+        plateMatchKey(visit.plateState, visit.vehiclePlate)
+        === plateMatchKey(draft.plateState, draft.vehiclePlate))
+    : [];
+  const fill = sharedFill(exactPlateMatches.length > 0 ? exactPlateMatches : matches);
   if (!fillIsUseful(fill, draft)) {
     return { suggestions, fill: null };
   }

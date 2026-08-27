@@ -18,6 +18,7 @@ import {
 
 import AmberButton from "@/components/AmberButton";
 import BrandTitleRow from "@/components/BrandTitleRow";
+import PlateStatePicker from "@/components/PlateStatePicker";
 import ScreenSafeArea from "@/components/ScreenSafeArea";
 import VisitorHostPicker from "@/components/VisitorHostPicker";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,6 +33,7 @@ import {
 import { fetchSiteContext, type ActiveVisit, type SiteContext } from "@/lib/guest";
 import {
   fetchAssignedGateSites,
+  fetchPreferredPlateStates,
   deleteGateEvidence,
   fetchGatekeeperRecentVisits,
   fetchGatekeeperVisits,
@@ -44,6 +46,13 @@ import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import { createPttRecorder, PttMicPermissionError, type PttRecorder } from "@/lib/ptt";
 import { buildHostOptions } from "@/lib/visitorCheckin";
+import {
+  NATIONAL_PLATE_STATE_FALLBACK,
+  PLATE_OCR_STATE_CONFIDENCE_THRESHOLD,
+  normalizePlateState,
+  plateMatchKey,
+  type PlateStateCode,
+} from "@workspace/plate-state";
 
 type DriverNameField = "firstName" | "lastName";
 
@@ -85,6 +94,8 @@ export default function GatekeeperScreen() {
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
+  const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
+  const [plateStateError, setPlateStateError] = useState<string | null>(null);
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
@@ -126,6 +137,14 @@ export default function GatekeeperScreen() {
     enabled: !!confirmedCode,
     retry: false,
   });
+  const preferredPlateStates = useQuery({
+    queryKey: ["preferred-plate-states", ctxQuery.data?.site.id],
+    queryFn: () => fetchPreferredPlateStates(ctxQuery.data!.site.id),
+    enabled: Boolean(ctxQuery.data?.site.id),
+    retry: false,
+  });
+  const orderedStatePreferences = preferredPlateStates.data?.preferred
+    ?? NATIONAL_PLATE_STATE_FALLBACK;
 
   useEffect(() => {
     if (appliedDefault.current) return;
@@ -162,7 +181,10 @@ export default function GatekeeperScreen() {
     setFirstName(visit.firstName ?? "");
     setLastName(visit.lastName ?? "");
     setCompany(visit.company ?? company);
-    if (!vehiclePlate.trim()) setVehiclePlate((visit.vehiclePlate ?? "").toUpperCase());
+    if (!vehiclePlate.trim()) {
+      setVehiclePlate((visit.vehiclePlate ?? "").toUpperCase());
+      if (!plateState) setPlateState(normalizePlateState(visit.plateState));
+    }
     if (!purpose.trim()) setPurpose(visit.purpose ?? "");
     if (duration === "60" && visit.expectedDurationMinutes) setDuration(String(visit.expectedDurationMinutes));
     setActiveNameField(null);
@@ -235,6 +257,8 @@ export default function GatekeeperScreen() {
     setLastName("");
     setCompany("");
     setVehiclePlate("");
+    setPlateState(null);
+    setPlateStateError(null);
     setPurpose("");
     setDuration("60");
     setPlatePhotoUrl(null);
@@ -258,8 +282,18 @@ export default function GatekeeperScreen() {
       if (kind === "plate") {
         void deleteGateEvidence(platePhotoUrl).catch(() => undefined);
         setPlatePhotoUrl(result.objectPath);
-        const plate = await readGatePlate(result.objectPath).catch(() => null);
-        if (plate) setVehiclePlate(plate);
+        const candidate = await readGatePlate(result.objectPath).catch(() => null);
+        if (candidate?.plate) setVehiclePlate(candidate.plate);
+        if (
+          candidate?.stateConfidence != null
+          && candidate.stateConfidence >= PLATE_OCR_STATE_CONFIDENCE_THRESHOLD
+        ) {
+          const normalizedState = normalizePlateState(candidate.state);
+          if (normalizedState) {
+            setPlateState(normalizedState);
+            setPlateStateError(null);
+          }
+        }
       }
       else {
         void deleteGateEvidence(vehiclePhotoUrl).catch(() => undefined);
@@ -274,17 +308,27 @@ export default function GatekeeperScreen() {
 
   useEffect(() => {
     const normalized = vehiclePlate.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (normalized.length < 3) return;
+    if (normalized.length < 3 || !plateState) return;
+    const exactKey = plateMatchKey(plateState, vehiclePlate);
     const prior = [...(recentVisits.data ?? [])]
-      .filter((visit) => (visit.vehiclePlate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") === normalized)
-      .sort((a, b) => Date.parse(b.checkInTime) - Date.parse(a.checkInTime))[0];
+      .filter((visit) => {
+        if ((visit.vehiclePlate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") !== normalized) return false;
+        if (!plateState) return true;
+        const visitState = normalizePlateState(visit.plateState);
+        return !visitState || plateMatchKey(visitState, visit.vehiclePlate) === exactKey;
+      })
+      .sort((a, b) => {
+        const priority = (visit: ActiveVisit) =>
+          exactKey && plateMatchKey(visit.plateState, visit.vehiclePlate) === exactKey ? 0 : 1;
+        return priority(a) - priority(b) || Date.parse(b.checkInTime) - Date.parse(a.checkInTime);
+      })[0];
     if (!prior) return;
     if (!firstName) setFirstName(prior.firstName ?? "");
     if (!lastName) setLastName(prior.lastName ?? "");
     if (!company) setCompany(prior.company ?? "");
     if (!purpose) setPurpose(prior.purpose ?? "");
     if (duration === "60" && prior.expectedDurationMinutes) setDuration(String(prior.expectedDurationMinutes));
-  }, [company, duration, firstName, lastName, purpose, recentVisits.data, vehiclePlate]);
+  }, [company, duration, firstName, lastName, plateState, purpose, recentVisits.data, vehiclePlate]);
 
   const onCheckIn = async () => {
     const ctx = ctxQuery.data;
@@ -292,6 +336,11 @@ export default function GatekeeperScreen() {
       Alert.alert(t("visitor.error"), t("visitor.siteLookupFailed"));
       return;
     }
+    if (!plateState) {
+      setPlateStateError(t("gatekeeper.plateStateRequired"));
+      return;
+    }
+    setPlateStateError(null);
     setBusy(true);
     try {
       const result = await submitGatekeeperVisit({
@@ -301,6 +350,7 @@ export default function GatekeeperScreen() {
         lastName,
         company,
         vehiclePlate,
+        plateState,
         purpose,
         durationStr: duration,
         platePhotoUrl: platePhotoUrl ?? undefined,
@@ -312,6 +362,8 @@ export default function GatekeeperScreen() {
             ? t("gatekeeper.nameRequired")
             : result.reason === "missing-plate"
               ? t("gatekeeper.plateRequired")
+            : result.reason === "missing-state"
+              ? t("gatekeeper.plateStateRequired")
             : result.reason === "no-host"
               ? t("visitor.pickHost")
               : t("visitor.locationDenied");
@@ -436,8 +488,17 @@ export default function GatekeeperScreen() {
             ) : null}
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.company")}</Text>
             <TextInput value={company} onChangeText={setCompany} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <PlateStatePicker
+              value={plateState}
+              onChange={(state) => {
+                setPlateState(state);
+                setPlateStateError(null);
+              }}
+              preferredStates={orderedStatePreferences}
+              error={plateStateError ?? undefined}
+            />
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.vehiclePlate")} *</Text>
-            <TextInput value={vehiclePlate} onChangeText={(value) => setVehiclePlate(value.toUpperCase())} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <TextInput testID="gate-vehicle-plate" value={vehiclePlate} onChangeText={(value) => setVehiclePlate(value.toUpperCase())} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
             <View style={styles.twoCol}>
               <TouchableOpacity
                 testID="gate-capture-tag-photo"
