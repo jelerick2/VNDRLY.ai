@@ -29,7 +29,10 @@ import {
   PlateOcrUnavailableError,
   readPlateFromImage,
 } from "../lib/plate-ocr";
-import { rankPreferredPlateStates } from "../lib/plate-state-ranking";
+import {
+  rankPreferredPlateStates,
+  type PlateStateVisitCount,
+} from "../lib/plate-state-ranking";
 import { NATIONAL_PLATE_STATE_FALLBACK } from "@workspace/plate-state";
 
 import { SESSION_SECRET } from "../lib/session";
@@ -1363,13 +1366,15 @@ router.get("/visits", async (req, res): Promise<void> => {
   res.json(rows);
 });
 
-function countPlateStates(rows: readonly { plateState: string | null }[]) {
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.plateState) continue;
-    counts.set(row.plateState, (counts.get(row.plateState) ?? 0) + 1);
-  }
-  return [...counts.entries()].map(([state, count]) => ({ state, count }));
+function parsePlateStateCounts(
+  rows: readonly { state: string | null; count: string | number }[],
+): PlateStateVisitCount[] {
+  return rows.flatMap(({ state, count }) => {
+    const parsed = Number(count);
+    return Number.isSafeInteger(parsed) && parsed > 0
+      ? [{ state, count: parsed }]
+      : [];
+  });
 }
 
 // ---------- GET /api/visits/sites/:siteId/preferred-plate-states ----------
@@ -1426,27 +1431,35 @@ router.get("/visits/sites/:siteId/preferred-plate-states", async (req, res): Pro
   const recentCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   const [recentRows, historicalRows] = await Promise.all([
     db
-      .select({ plateState: siteVisitsTable.plateState })
+      .select({
+        state: siteVisitsTable.plateState,
+        count: sql<string | number>`count(*)::int`,
+      })
       .from(siteVisitsTable)
       .where(and(
         eq(siteVisitsTable.siteLocationId, siteId),
         isNotNull(siteVisitsTable.plateState),
         gte(siteVisitsTable.checkInTime, recentCutoff),
-      )),
+      ))
+      .groupBy(siteVisitsTable.plateState),
     db
-      .select({ plateState: siteVisitsTable.plateState })
+      .select({
+        state: siteVisitsTable.plateState,
+        count: sql<string | number>`count(*)::int`,
+      })
       .from(siteVisitsTable)
       .where(and(
         eq(siteVisitsTable.siteLocationId, siteId),
         isNotNull(siteVisitsTable.plateState),
         lt(siteVisitsTable.checkInTime, recentCutoff),
-      )),
+      ))
+      .groupBy(siteVisitsTable.plateState),
   ]);
 
   res.json({
     preferred: rankPreferredPlateStates(
-      countPlateStates(recentRows),
-      countPlateStates(historicalRows),
+      parsePlateStateCounts(recentRows),
+      parsePlateStateCounts(historicalRows),
       NATIONAL_PLATE_STATE_FALLBACK,
     ),
   });

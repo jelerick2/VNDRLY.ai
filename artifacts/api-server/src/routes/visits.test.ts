@@ -22,6 +22,8 @@ import { buildTestCookie } from "../test-utils/session";
 
 type Row = Record<string, any>;
 type ColRef = { __table: string; __col: string };
+type CountExpr = { kind: "count" };
+type Selection = Record<string, ColRef | CountExpr>;
 type Pred =
   | { kind: "eq"; col: ColRef; val: any }
   | { kind: "isNull"; col: ColRef }
@@ -131,7 +133,14 @@ const tables = {
     "siteRadiusMeters",
     "partnerId",
   ]),
-  partners: tableTag("partners", ["id", "name"]),
+  partners: tableTag("partners", [
+    "id",
+    "name",
+    "logoUrl",
+    "logoSquareUrl",
+    "brandPrimaryColor",
+    "brandAccentColor",
+  ]),
   vendors: tableTag("vendors", ["id", "name"]),
   siteWorkAssignments: tableTag("siteWorkAssignments", [
     "id",
@@ -222,13 +231,51 @@ function evalPred(pred: Pred | undefined, row: Row, now = new Date()): boolean {
 
 let lastInsert: { table: string; values: Row | Row[] } | null = null;
 
-function makeQuery(tableName: string) {
+function isCountExpression(value: unknown): value is CountExpr {
+  return Boolean(value && typeof value === "object" && (value as CountExpr).kind === "count");
+}
+
+function projectRow(row: Row, selection: Selection | undefined, count?: number): Row {
+  if (!selection) return row;
+  return Object.fromEntries(
+    Object.entries(selection).map(([key, value]) => {
+      if (isCountExpression(value)) return [key, count];
+      if (!value || typeof value !== "object" || !("__col" in value)) {
+        throw new Error(`unsupported projection: ${key}`);
+      }
+      return [key, row[value.__col]];
+    }),
+  );
+}
+
+function makeQuery(tableName: string, selection?: Selection) {
   let pred: Pred | undefined;
   let limitN: number | undefined;
+  let groupColumns: ColRef[] = [];
   const run = () => {
     const all = fixtures[tableName] ?? [];
     const filtered = all.filter((r) => evalPred(pred, r));
-    return limitN != null ? filtered.slice(0, limitN) : filtered;
+    const hasCount = Object.values(selection ?? {}).some(isCountExpression);
+
+    if (tableName === "siteVisits" && selection?.plateState && !hasCount) {
+      throw new Error("site plate preference reads must be aggregated by state");
+    }
+
+    if (groupColumns.length > 0) {
+      const grouped = new Map<string, Row[]>();
+      for (const row of filtered) {
+        const key = groupColumns.map((column) => String(row[column.__col])).join("\u0000");
+        const rows = grouped.get(key) ?? [];
+        rows.push(row);
+        grouped.set(key, rows);
+      }
+      return [...grouped.values()].map((rows) => projectRow(rows[0], selection, rows.length));
+    }
+
+    if (hasCount) return [projectRow(filtered[0] ?? {}, selection, filtered.length)];
+
+    const rows = filtered.map((row) => projectRow(row, selection));
+    return limitN != null ? rows.slice(0, limitN) : rows;
   };
   const q: any = {
     where: (p: Pred) => {
@@ -237,6 +284,10 @@ function makeQuery(tableName: string) {
     },
     leftJoin: () => q,
     innerJoin: () => q,
+    groupBy: (...columns: ColRef[]) => {
+      groupColumns = columns;
+      return q;
+    },
     orderBy: () => q,
     limit: (n: number) => {
       limitN = n;
@@ -253,10 +304,10 @@ function makeQuery(tableName: string) {
 vi.mock("@workspace/db", () => {
   const db = {
     select: (_cols?: any) => ({
-      from: (t: any) => makeQuery(t.__name),
+      from: (t: any) => makeQuery(t.__name, _cols),
     }),
     selectDistinct: (_cols?: any) => ({
-      from: (t: any) => makeQuery(t.__name),
+      from: (t: any) => makeQuery(t.__name, _cols),
     }),
     insert: (t: any) => ({
       values: (v: any) => {
@@ -343,6 +394,9 @@ vi.mock("drizzle-orm", () => {
   const sqlTag: any = (strings: any, ...values: any[]) => {
     if (Array.isArray(strings) && (strings as any).raw !== undefined) {
       const joined = (strings as string[]).join(" ");
+      if (/^\s*count\(\*\)(?:::\w+)?\s*$/i.test(joined)) {
+        return { kind: "count" };
+      }
       if (
         values.length === 1 &&
         /interval '30 minutes' < now\(\)/.test(joined) &&
@@ -1178,7 +1232,7 @@ describe("GET /api/visits role-aware filtering", () => {
 });
 
 describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
-  function addConfirmedVisits(siteId: number, plateState: string, count: number, daysAgo: number) {
+  function addConfirmedVisits(siteId: number, plateState: string | null, count: number, daysAgo: number) {
     for (let index = 0; index < count; index += 1) {
       fixtures.siteVisits.push({
         id: nextId("siteVisits"),
@@ -1188,6 +1242,27 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
       });
     }
   }
+
+  it("requires a staff session", async () => {
+    const { site } = seedScenario();
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.code).toBe("auth.required");
+  });
+
+  it("returns not found for a missing site after staff authentication", async () => {
+    seedScenario();
+
+    const res = await request(app)
+      .get("/api/visits/sites/9999/preferred-plate-states")
+      .set("Cookie", staffCookie({ role: "admin" }));
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("site.not_found");
+  });
 
   it("returns five aggregate-only state recommendations in site activity order", async () => {
     const { site } = seedScenario();
@@ -1261,6 +1336,44 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
 
     expectStatus(res, 200);
     expect(res.body).toEqual({ preferred: ["OK", "NM", "TX", "CA", "NY"] });
+  });
+
+  it("normalizes duplicates and excludes invalid confirmed-state aggregates", async () => {
+    const { site } = seedScenario();
+    addConfirmedVisits(site.id, "tx", 1, 1);
+    addConfirmedVisits(site.id, "TX", 1, 2);
+    addConfirmedVisits(site.id, "ZZ", 20, 3);
+    addConfirmedVisits(site.id, null, 10, 4);
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "admin" }));
+
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["TX", "CA", "NY", "FL", "OH"] });
+  });
+
+  it("includes a state checked in exactly at the 90-day cutoff in recent precedence", async () => {
+    const now = Date.UTC(2026, 7, 27, 18, 0, 0);
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
+    try {
+      const { site } = seedScenario();
+      const cutoff = now - 90 * 24 * 60 * 60 * 1000;
+      fixtures.siteVisits.push(
+        { id: nextId("siteVisits"), siteLocationId: site.id, plateState: "OK", checkInTime: new Date(cutoff) },
+        { id: nextId("siteVisits"), siteLocationId: site.id, plateState: "TX", checkInTime: new Date(cutoff - 1) },
+        { id: nextId("siteVisits"), siteLocationId: site.id, plateState: "TX", checkInTime: new Date(cutoff - 2) },
+      );
+
+      const res = await request(app)
+        .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+        .set("Cookie", staffCookie({ role: "admin" }));
+
+      expectStatus(res, 200);
+      expect(res.body).toEqual({ preferred: ["OK", "TX", "CA", "NY", "FL"] });
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it("returns the national fallback for an empty site", async () => {
