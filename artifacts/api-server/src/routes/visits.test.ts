@@ -456,10 +456,16 @@ vi.mock("../lib/gate-ocr-rate-limit", () => ({
 }));
 
 const publishVisitEventMock = vi.fn();
+let visitEventSubscriber: ((event: any) => void) | null = null;
 vi.mock("../lib/visit-events", () => ({
   getCurrentVisitEventSeq: vi.fn(async () => 0),
   publishVisitEvent: publishVisitEventMock,
-  subscribeVisitEvents: vi.fn(() => () => undefined),
+  subscribeVisitEvents: vi.fn((subscriber: (event: any) => void) => {
+    visitEventSubscriber = subscriber;
+    return () => {
+      if (visitEventSubscriber === subscriber) visitEventSubscriber = null;
+    };
+  }),
 }));
 
 
@@ -495,6 +501,7 @@ beforeEach(async () => {
   lastInsert = null;
   notifyUsersMock.mockClear();
   publishVisitEventMock.mockClear();
+  visitEventSubscriber = null;
   readPlateFromImageMock.mockReset();
   getStoredObjectMock.mockReset();
   vi.resetModules();
@@ -545,6 +552,76 @@ describe("POST /api/visits/gate/read-plate", () => {
       plateConfidence: 0.96,
       stateConfidence: 0.83,
     });
+  });
+});
+
+describe("GET /api/visits/events", () => {
+  it("streams plate state from a subscribed visit event", async () => {
+    const server = app.listen(0);
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("test server did not bind a TCP port");
+    const controller = new AbortController();
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/api/visits/events`, {
+        headers: { Cookie: staffCookie({ role: "admin" }) },
+        signal: controller.signal,
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).not.toBeNull();
+      const subscriber = visitEventSubscriber;
+      expect(subscriber).toBeTypeOf("function");
+
+      subscriber!({
+        type: "visit.checked_in",
+        seq: 17,
+        visit: {
+          id: 170,
+          firstName: "SSE",
+          lastName: "Driver",
+          company: "Stream Co",
+          vehiclePlate: "SSE-170",
+          plateState: "TX",
+          platePhotoUrl: null,
+          vehiclePhotoUrl: null,
+          purpose: "Delivery",
+          hostType: "partner",
+          hostPartnerId: 1,
+          hostVendorId: null,
+          hostPartnerName: "Acme Partner",
+          hostVendorName: null,
+          siteLocationId: 10,
+          sitePartnerId: 1,
+          siteName: "Site A",
+          checkInTime: "2026-08-27T20:00:00.000Z",
+          checkInLatitude: 40,
+          checkInLongitude: -74,
+        },
+      });
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let stream = "";
+      while (!stream.includes('"plateState":"TX"')) {
+        const chunk = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timed out waiting for SSE visit event")), 2_000),
+          ),
+        ]);
+        if (chunk.done) break;
+        stream += decoder.decode(chunk.value, { stream: true });
+      }
+
+      expect(stream).toContain("event: visit.checked_in");
+      expect(stream).toContain('"vehiclePlate":"SSE-170"');
+      expect(stream).toContain('"plateState":"TX"');
+      await reader.cancel();
+    } finally {
+      controller.abort();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });
 
@@ -712,13 +789,19 @@ describe("plate state persistence schema contract", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("POST /api/auth/guest", () => {
-  it("rejects a vehicle plate without a state", async () => {
+  it.each([
+    ["absent", undefined],
+    ["null", null],
+    ["empty", ""],
+    ["blank", "   "],
+  ])("rejects a vehicle plate when state is %s", async (_label, plateState) => {
     const res = await request(app)
       .post("/api/auth/guest")
       .send({
         firstName: "Jane",
         lastName: "Doe",
         vehiclePlate: "ABC123",
+        plateState,
         safetyAcknowledged: true,
       });
 
@@ -727,14 +810,20 @@ describe("POST /api/auth/guest", () => {
     expect(fixtures.guestSessions).toHaveLength(0);
   });
 
-  it("rejects an invalid state for a vehicle plate", async () => {
+  it.each([
+    ["unknown code", "ZZ"],
+    ["number", 42],
+    ["array", ["TX"]],
+    ["object", { code: "TX" }],
+    ["boolean", true],
+  ])("rejects a vehicle plate when state is an invalid %s", async (_label, plateState) => {
     const res = await request(app)
       .post("/api/auth/guest")
       .send({
         firstName: "Jane",
         lastName: "Doe",
         vehiclePlate: "ABC123",
-        plateState: "ZZ",
+        plateState,
         safetyAcknowledged: true,
       });
 

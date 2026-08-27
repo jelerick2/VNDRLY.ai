@@ -78,10 +78,13 @@ function validatePlateInput(vehiclePlateInput: unknown, plateStateInput: unknown
   const vehiclePlate = typeof vehiclePlateInput === "string" ? vehiclePlateInput.trim() || null : null;
   if (!vehiclePlate) return { ok: true, vehiclePlate: null, plateState: null };
 
-  const rawState = typeof plateStateInput === "string" ? plateStateInput.trim() : "";
-  if (!rawState) {
+  if (plateStateInput == null || (typeof plateStateInput === "string" && !plateStateInput.trim())) {
     return { ok: false, code: "missing-state", message: "Vehicle state is required when a plate is provided" };
   }
+  if (typeof plateStateInput !== "string") {
+    return { ok: false, code: "invalid-state", message: "Vehicle state must be a valid USPS state code" };
+  }
+  const rawState = plateStateInput.trim();
   const plateState = normalizePlateState(rawState);
   if (!plateState) {
     return { ok: false, code: "invalid-state", message: "Vehicle state must be a valid USPS state code" };

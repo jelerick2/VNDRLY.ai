@@ -121,8 +121,8 @@ describe("visit_events sequence allocation", () => {
         firstName: "Test",
         lastName: "Visitor",
         company: null,
-        vehiclePlate: null,
-        plateState: null,
+        vehiclePlate: "TX-42",
+        plateState: "TX",
         platePhotoUrl: null,
         vehiclePhotoUrl: null,
         purpose: null,
@@ -143,11 +143,46 @@ describe("visit_events sequence allocation", () => {
     const ev = JSON.parse(notifyPayloads[0]) as {
       type: string;
       seq: number;
-      visit: { id: number };
+      visit: { id: number; vehiclePlate: string | null; plateState: string | null };
     };
     expect(ev.type).toBe("visit.checked_in");
     expect(ev.seq).toBe(1);
     expect(ev.visit.id).toBe(42);
+    expect(ev.visit.vehiclePlate).toBe("TX-42");
+    expect(ev.visit.plateState).toBe("TX");
+  });
+
+  it("retains a historical null plate state in the published payload", async () => {
+    mod.publishVisitEvent({
+      type: "visit.checked_in",
+      visit: {
+        id: 43,
+        firstName: "Legacy",
+        lastName: "Visitor",
+        company: null,
+        vehiclePlate: "LEGACY-43",
+        plateState: null,
+        platePhotoUrl: null,
+        vehiclePhotoUrl: null,
+        purpose: null,
+        hostType: "partner",
+        hostPartnerId: 1,
+        hostVendorId: null,
+        hostPartnerName: "Acme",
+        hostVendorName: null,
+        siteLocationId: 10,
+        sitePartnerId: 1,
+        siteName: "Site A",
+        checkInTime: new Date().toISOString(),
+        checkInLatitude: 40,
+        checkInLongitude: -74,
+      },
+    });
+    await waitFor(() => notifyPayloads.length === 1);
+    const ev = JSON.parse(notifyPayloads[0]) as {
+      visit: { vehiclePlate: string | null; plateState: string | null };
+    };
+    expect(ev.visit).toMatchObject({ vehiclePlate: "LEGACY-43", plateState: null });
   });
 
   it("getCurrentVisitEventSeq() reflects the most recently allocated seq", async () => {

@@ -128,7 +128,7 @@ describe.runIf(haveRealDb)("visit_events cross-instance delivery", () => {
         firstName: "Cross",
         lastName: "Instance",
         company: marker,
-        vehiclePlate: null,
+        vehiclePlate: "TX-CROSS",
         plateState: "TX",
         platePhotoUrl: null,
         vehiclePhotoUrl: null,

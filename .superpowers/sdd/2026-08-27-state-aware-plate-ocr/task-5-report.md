@@ -34,10 +34,12 @@ Command (guarded schema contract excluded; no database URL used):
 
 Result before production changes: 13 expected failures, 54 passes, 4 skips. Failures proved missing-state/invalid-state writes were accepted, state was omitted from guest/visit/event projections, lowercase state was not normalized, and historical null state was omitted from list/detail serialization.
 
+Review-fix RED: a table-driven guest-session route test covered absent, null, empty, and blank strings plus supplied number, array, object, and boolean values. Before the validator correction, the four supplied non-string cases failed because they returned `missing-state`; 71 tests passed and 4 guarded schema tests skipped.
+
 ## GREEN evidence
 
-- Mocked visit route suite: 67 passed, 4 guarded schema-contract tests skipped.
-- Database-mocked event suites (`visit-events-seq.test.ts`, `visit-event-visibility.test.ts`) with `DATABASE_URL` and `LISTEN_NOTIFY_DATABASE_URL` explicitly blank: 7 passed.
+- Mocked visit route suite: 75 passed, 4 guarded schema-contract tests skipped. This includes an actual mocked subscription delivered through `/api/visits/events` and an assertion on the streamed `plateState` JSON.
+- Database-free event run (`visit-events-seq.test.ts`, `visit-event-visibility.test.ts`, and safely skipped cross-instance `visit-events.test.ts`) with `DATABASE_URL` and `LISTEN_NOTIFY_DATABASE_URL` explicitly blank: 8 passed, 3 cross-instance tests skipped.
 - API typecheck: passed.
 - Web typecheck: passed.
 - Mobile typecheck: passed.
@@ -50,7 +52,7 @@ No `test:no-isolated-db` command ran. No shared or real database command ran. Th
 
 | Boundary | Missing state with plate | Invalid state | Lowercase state | No plate + stray state | Historical null read |
 | --- | --- | --- | --- | --- | --- |
-| Guest session create | 400 `missing-state` | 400 `invalid-state` | stored/read as `TX` | plate/state stored as null | guest reads normalize null |
+| Guest session create | absent/null/empty/blank string → 400 `missing-state` | unknown string/number/array/object/boolean → 400 `invalid-state` | stored/read as `TX` | plate/state stored as null | guest reads normalize null |
 | Guest check-in | 400 `missing-state` | 400 `invalid-state` | guest profile, visit, response, active read, event all `TX` | state discarded without plate | inherited legacy plate/null state rejected for a new visit |
 | Gatekeeper check-in | 400 `missing-state` | 400 `invalid-state` | visit, response, event all `TX` | state discarded without plate | staff reads retain nullable state |
 | Staff list/detail | n/a | n/a | canonical state returned | n/a | explicit list and detail tests return `plateState: null` |
@@ -59,17 +61,18 @@ No `test:no-isolated-db` command ran. No shared or real database command ran. Th
 ## Propagation audit
 
 - Request transport types accept `plateState?: string` at guest-session, guest-check-in, and gatekeeper-check-in boundaries.
-- One route-local `validatePlateInput` trims plate text, calls shared `normalizePlateState`, emits exact `missing-state`/`invalid-state` codes, and clears stray state when no plate exists.
+- One route-local `validatePlateInput` trims plate text, calls shared `normalizePlateState`, classifies absent/null/blank strings as `missing-state`, classifies supplied non-strings or unknown strings as `invalid-state`, and clears stray state when no plate exists.
 - Guest session insert, create response, `/auth/guest/me`, guest profile refresh, and guest-derived visit insertion carry state.
 - Gatekeeper and guest visit insertions, create responses, idempotent/normal checkout responses, active visit, office gate bundle, staff list, and staff detail carry nullable canonical state.
-- Checked-in events require `PlateStateCode | null`; plate-bearing checked-out events pair state with plate. SSE forwards those event objects unchanged.
+- Checked-in events require `PlateStateCode | null`; plate-bearing checked-out events pair state with plate. Database-free publisher tests prove both canonical `TX` and historical null survive serialization, and the mocked SSE route test proves subscription delivery retains state.
 - Assistant active-visitor projection selects and canonicalizes nullable state.
 - Web/mobile read types expose `PlateStateCode | null`; write transports accept strings; web OCR typing now matches the full top-level candidate while mobile preserves its scalar helper compatibility after decoding the full candidate.
 - Existing authorization and role-aware access branches were not changed.
 
 ## Commit
 
-`HEAD` — `Require state on new vehicle check-ins`
+- `fb23c71` — `Require state on new vehicle check-ins`
+- `HEAD` — `Harden plate state validation and event proofs`
 
 ## Self-review
 
@@ -78,9 +81,10 @@ No `test:no-isolated-db` command ran. No shared or real database command ran. Th
 - Confirmed a new guest visit cannot silently combine a newly supplied plate with a stored state from a different plate.
 - Confirmed no state is persisted when the effective plate is blank.
 - Confirmed package-lock changes are limited to the two existing workspace links.
+- Confirmed event fixtures never pair a null plate with a non-null state.
 
 ## Concerns / deviations
 
 - Three fixture-only files outside the brief list needed nullable/code values to keep the new required read/event contracts strong; the parent task approved this scoped expansion.
-- The real cross-instance LISTEN/NOTIFY test in `visit-events.test.ts` was not executed because it requires a real Postgres database. Its state assertion was updated, while database-mocked event serialization/visibility tests and mocked route event assertions provide safe coverage.
+- The real cross-instance LISTEN/NOTIFY branches in `visit-events.test.ts` were skipped because they require a real Postgres database. Their state fixture was corrected, while database-free publisher serialization and mocked route/SSE subscription assertions provide safe state coverage.
 - The route suite emits an existing `MaxListenersExceededWarning`; it completed with zero test failures and the warning is unrelated to this change.
