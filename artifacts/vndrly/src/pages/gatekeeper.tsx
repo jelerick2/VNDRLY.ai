@@ -6,6 +6,8 @@ import { useTranslation } from "react-i18next";
 
 import AmberButton from "@/components/amber-button";
 import BlueButton from "@/components/blue-button";
+import GreenButton from "@/components/green-button";
+import RedButton from "@/components/red-button";
 import { LiveConnectionPill } from "@/components/live-connection-pill";
 import { GateMemoryInput } from "@/components/gate-memory-input";
 import { Card, CardContent, CardHeader, CardTitle, CARD_INNER_TILE_CLASS, CARD_TITLE_ICON_CLASS } from "@/components/ui/card";
@@ -620,9 +622,9 @@ export default function GatekeeperPage() {
                 <span className="text-xs text-muted-foreground">{t("gatekeeper.records", { count: exportRows.length })}</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <BlueButton onClick={() => void exportCompleteLog("pdf")} disabled={!exportRows.length || exporting}><FileText className="mr-1 h-4 w-4" />PDF</BlueButton>
-                <BlueButton onClick={() => void exportCompleteLog("excel")} disabled={!exportRows.length || exporting}><Sheet className="mr-1 h-4 w-4" />Excel</BlueButton>
-                <BlueButton onClick={() => void exportCompleteLog("word")} disabled={!exportRows.length || exporting}><FileText className="mr-1 h-4 w-4" />Word</BlueButton>
+                <RedButton onClick={() => void exportCompleteLog("pdf")} disabled={!exportRows.length || exporting} data-testid="button-gate-export-pdf"><FileText className="mr-1 h-4 w-4" />PDF</RedButton>
+                <GreenButton onClick={() => void exportCompleteLog("excel")} disabled={!exportRows.length || exporting} data-testid="button-gate-export-excel"><Sheet className="mr-1 h-4 w-4" />Excel</GreenButton>
+                <BlueButton onClick={() => void exportCompleteLog("word")} disabled={!exportRows.length || exporting} data-testid="button-gate-export-word"><FileText className="mr-1 h-4 w-4" />Word</BlueButton>
               </div>
             </div>
           </CardContent>
