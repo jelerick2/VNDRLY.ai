@@ -10,6 +10,7 @@ const checkedInAtSite = (siteLocationId: number, hostVendorId: number | null): V
     lastName: "Reyes",
     company: "Acme Wireline",
     vehiclePlate: "ABC1234",
+    plateState: "TX",
     platePhotoUrl: "/plates/abc.jpg",
     vehiclePhotoUrl: null,
     purpose: "Delivery",

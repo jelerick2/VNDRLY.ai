@@ -1,5 +1,6 @@
 import { EventEmitter } from "events";
 import pg from "pg";
+import type { PlateStateCode } from "@workspace/plate-state";
 import { logger } from "./logger";
 
 export type VisitorEventPayload = {
@@ -8,6 +9,7 @@ export type VisitorEventPayload = {
   lastName: string;
   company: string | null;
   vehiclePlate: string | null;
+  plateState: PlateStateCode | null;
   platePhotoUrl: string | null;
   vehiclePhotoUrl: string | null;
   purpose: string | null;
@@ -41,6 +43,7 @@ export type VisitEvent =
       lastName?: string;
       company?: string | null;
       vehiclePlate?: string | null;
+      plateState?: PlateStateCode | null;
       platePhotoUrl?: string | null;
       siteName?: string | null;
     };

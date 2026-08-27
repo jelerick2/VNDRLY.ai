@@ -122,6 +122,7 @@ describe("visit_events sequence allocation", () => {
         lastName: "Visitor",
         company: null,
         vehiclePlate: null,
+        plateState: null,
         platePhotoUrl: null,
         vehiclePhotoUrl: null,
         purpose: null,

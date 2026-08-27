@@ -129,6 +129,7 @@ describe.runIf(haveRealDb)("visit_events cross-instance delivery", () => {
         lastName: "Instance",
         company: marker,
         vehiclePlate: null,
+        plateState: "TX",
         platePhotoUrl: null,
         vehiclePhotoUrl: null,
         purpose: "regression",
@@ -149,7 +150,7 @@ describe.runIf(haveRealDb)("visit_events cross-instance delivery", () => {
     const ev = await received;
     expect(ev).toMatchObject({
       type: "visit.checked_in",
-      visit: { company: marker, firstName: "Cross", lastName: "Instance" },
+      visit: { company: marker, firstName: "Cross", lastName: "Instance", plateState: "TX" },
     });
   }, 10_000);
 

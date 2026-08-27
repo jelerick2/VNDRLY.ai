@@ -33,7 +33,11 @@ import {
   rankPreferredPlateStates,
   type PlateStateVisitCount,
 } from "../lib/plate-state-ranking";
-import { NATIONAL_PLATE_STATE_FALLBACK } from "@workspace/plate-state";
+import {
+  NATIONAL_PLATE_STATE_FALLBACK,
+  normalizePlateState,
+  type PlateStateCode,
+} from "@workspace/plate-state";
 
 import { SESSION_SECRET } from "../lib/session";
 import { enforceVisitsRateLimit } from "../lib/visits-rate-limit";
@@ -65,6 +69,25 @@ const GUEST_COOKIE_NAME = "vndrly_guest";
 const GUEST_SESSION_HOURS = 24;
 const MAX_GATE_EVIDENCE_BYTES = 8 * 1024 * 1024;
 const evidenceStorage = new ObjectStorageService();
+
+type ValidatedPlateInput =
+  | { ok: true; vehiclePlate: string | null; plateState: PlateStateCode | null }
+  | { ok: false; code: "missing-state" | "invalid-state"; message: string };
+
+function validatePlateInput(vehiclePlateInput: unknown, plateStateInput: unknown): ValidatedPlateInput {
+  const vehiclePlate = typeof vehiclePlateInput === "string" ? vehiclePlateInput.trim() || null : null;
+  if (!vehiclePlate) return { ok: true, vehiclePlate: null, plateState: null };
+
+  const rawState = typeof plateStateInput === "string" ? plateStateInput.trim() : "";
+  if (!rawState) {
+    return { ok: false, code: "missing-state", message: "Vehicle state is required when a plate is provided" };
+  }
+  const plateState = normalizePlateState(rawState);
+  if (!plateState) {
+    return { ok: false, code: "invalid-state", message: "Vehicle state must be a valid USPS state code" };
+  }
+  return { ok: true, vehiclePlate, plateState };
+}
 
 async function validateGateEvidencePath(raw: unknown, userId: number): Promise<string | null> {
   if (raw == null || raw === "") return null;
@@ -208,6 +231,7 @@ router.post("/auth/guest", async (req, res): Promise<void> => {
     email?: string;
     company?: string;
     vehiclePlate?: string;
+    plateState?: string;
     purpose?: string;
     safetyAcknowledged?: boolean;
   };
@@ -221,6 +245,11 @@ router.post("/auth/guest", async (req, res): Promise<void> => {
     res.status(400).json({ message: "Safety acknowledgement is required", code: GUEST_SAFETY_REQUIRED });
     return;
   }
+  const plate = validatePlateInput(b.vehiclePlate, b.plateState);
+  if (!plate.ok) {
+    res.status(400).json({ message: plate.message, code: plate.code });
+    return;
+  }
   const jti = crypto.randomBytes(16).toString("hex");
   const expiresAt = new Date(Date.now() + GUEST_SESSION_HOURS * 60 * 60 * 1000);
   const [row] = await db
@@ -232,7 +261,8 @@ router.post("/auth/guest", async (req, res): Promise<void> => {
       phone: b.phone?.trim() || null,
       email: b.email?.trim() || null,
       company: b.company?.trim() || null,
-      vehiclePlate: b.vehiclePlate?.trim() || null,
+      vehiclePlate: plate.vehiclePlate,
+      plateState: plate.plateState,
       lastPurpose: b.purpose?.trim() || null,
       expiresAt,
     })
@@ -258,6 +288,7 @@ router.post("/auth/guest", async (req, res): Promise<void> => {
       email: row.email,
       company: row.company,
       vehiclePlate: row.vehiclePlate,
+      plateState: normalizePlateState(row.plateState),
       lastPurpose: row.lastPurpose,
     },
   });
@@ -278,6 +309,7 @@ router.get("/auth/guest/me", async (req, res): Promise<void> => {
       email: ctx.guest.email,
       company: ctx.guest.company,
       vehiclePlate: ctx.guest.vehiclePlate,
+      plateState: normalizePlateState(ctx.guest.plateState),
       lastPurpose: ctx.guest.lastPurpose,
     },
   });
@@ -439,6 +471,7 @@ const visitListProjection = {
   phone: siteVisitsTable.phone,
   email: siteVisitsTable.email,
   vehiclePlate: siteVisitsTable.vehiclePlate,
+  plateState: siteVisitsTable.plateState,
   platePhotoUrl: siteVisitsTable.platePhotoUrl,
   vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
   purpose: siteVisitsTable.purpose,
@@ -567,6 +600,7 @@ router.get("/visits/gate/ops", async (req, res): Promise<void> => {
     enabled: bundle.enabled,
     visits: bundle.visits.map(({ recordedByUserId: _recordedByUserId, ...visit }) => ({
       ...visit,
+      plateState: normalizePlateState(visit.plateState),
       checkInTime: visit.checkInTime instanceof Date ? visit.checkInTime.toISOString() : visit.checkInTime,
       checkOutTime:
         visit.checkOutTime instanceof Date ? visit.checkOutTime.toISOString() : visit.checkOutTime,
@@ -675,6 +709,7 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
     purpose?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
+    plateState?: string;
     platePhotoUrl?: string;
     vehiclePhotoUrl?: string;
     latitude?: number;
@@ -688,6 +723,11 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
   }
   if (!b.siteLocationId || !b.hostType || !["partner", "vendor"].includes(b.hostType)) {
     res.status(400).json({ message: "siteLocationId and hostType are required", code: VISIT_INVALID_INPUT });
+    return;
+  }
+  const plate = validatePlateInput(b.vehiclePlate, b.plateState);
+  if (!plate.ok) {
+    res.status(400).json({ message: plate.message, code: plate.code });
     return;
   }
   const [site] = await db
@@ -779,7 +819,8 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
       phone: typeof b.phone === "string" && b.phone.trim() ? b.phone.trim() : null,
       email: typeof b.email === "string" && b.email.trim() ? b.email.trim() : null,
       company: typeof b.company === "string" && b.company.trim() ? b.company.trim() : null,
-      vehiclePlate: typeof b.vehiclePlate === "string" && b.vehiclePlate.trim() ? b.vehiclePlate.trim() : null,
+      vehiclePlate: plate.vehiclePlate,
+      plateState: plate.plateState,
       platePhotoUrl,
       vehiclePhotoUrl,
       purpose: typeof b.purpose === "string" && b.purpose.trim() ? b.purpose.trim() : null,
@@ -819,6 +860,7 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
       lastName: visit.lastName,
       company: visit.company,
       vehiclePlate: visit.vehiclePlate,
+      plateState: plate.plateState,
       platePhotoUrl: visit.platePhotoUrl,
       vehiclePhotoUrl: visit.vehiclePhotoUrl,
       purpose: visit.purpose,
@@ -836,7 +878,7 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
     },
   });
 
-  res.status(201).json({ ...visit, hostName, siteName: site.name });
+  res.status(201).json({ ...visit, plateState: plate.plateState, hostName, siteName: site.name });
 });
 
 // ---------- POST /api/visits/gate/:id/check-out (authenticated gatekeeper) ----------
@@ -867,7 +909,7 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
     return;
   }
   if (visit.checkOutTime) {
-    res.json(visit);
+    res.json({ ...visit, plateState: normalizePlateState(visit.plateState) });
     return;
   }
   const [updated] = await db
@@ -896,11 +938,12 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
     lastName: updated.lastName,
     company: updated.company,
     vehiclePlate: updated.vehiclePlate,
+    plateState: normalizePlateState(updated.plateState),
     platePhotoUrl: updated.platePhotoUrl,
     siteName: siteRow?.name ?? null,
   });
 
-  res.json(updated);
+  res.json({ ...updated, plateState: normalizePlateState(updated.plateState) });
 });
 
 // ---------- POST /api/visits/check-in (guest) ----------
@@ -915,6 +958,7 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
     purpose?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
+    plateState?: string;
     platePhotoUrl?: string;
     vehiclePhotoUrl?: string;
     latitude?: number;
@@ -922,6 +966,15 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
   };
   if (!b.siteLocationId || !b.hostType || !["partner", "vendor"].includes(b.hostType)) {
     res.status(400).json({ message: "siteLocationId and hostType are required", code: VISIT_INVALID_INPUT });
+    return;
+  }
+  const bodySuppliesPlate = b.vehiclePlate !== undefined;
+  const plate = validatePlateInput(
+    bodySuppliesPlate ? b.vehiclePlate : ctx.guest.vehiclePlate,
+    bodySuppliesPlate ? b.plateState : b.plateState ?? ctx.guest.plateState,
+  );
+  if (!plate.ok) {
+    res.status(400).json({ message: plate.message, code: plate.code });
     return;
   }
   const [site] = await db
@@ -1023,12 +1076,13 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
     : null;
 
   // Persist updated profile fields onto guest_session for future re-use.
-  if (b.purpose || b.vehiclePlate) {
+  if (b.purpose || b.vehiclePlate !== undefined || b.plateState !== undefined) {
     await db
       .update(guestSessionsTable)
       .set({
         lastPurpose: b.purpose ?? ctx.guest.lastPurpose,
-        vehiclePlate: b.vehiclePlate ?? ctx.guest.vehiclePlate,
+        vehiclePlate: plate.vehiclePlate,
+        plateState: plate.plateState,
       })
       .where(eq(guestSessionsTable.id, ctx.guest.id));
   }
@@ -1043,7 +1097,8 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
       phone: ctx.guest.phone,
       email: ctx.guest.email,
       company: ctx.guest.company,
-      vehiclePlate: b.vehiclePlate ?? ctx.guest.vehiclePlate,
+      vehiclePlate: plate.vehiclePlate,
+      plateState: plate.plateState,
       platePhotoUrl,
       vehiclePhotoUrl,
       purpose: b.purpose ?? ctx.guest.lastPurpose ?? null,
@@ -1084,6 +1139,7 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
       lastName: visit.lastName,
       company: visit.company,
       vehiclePlate: visit.vehiclePlate,
+      plateState: plate.plateState,
       platePhotoUrl: visit.platePhotoUrl,
       vehiclePhotoUrl: visit.vehiclePhotoUrl,
       purpose: visit.purpose,
@@ -1101,7 +1157,7 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
     },
   });
 
-  res.status(201).json({ ...visit, hostName, siteName: site.name });
+  res.status(201).json({ ...visit, plateState: plate.plateState, hostName, siteName: site.name });
 });
 
 // ---------- POST /api/visits/:id/check-out (guest) ----------
@@ -1120,7 +1176,7 @@ router.post("/visits/:id/check-out", async (req, res): Promise<void> => {
     return;
   }
   if (visit.checkOutTime) {
-    res.json(visit);
+    res.json({ ...visit, plateState: normalizePlateState(visit.plateState) });
     return;
   }
   const [updated] = await db
@@ -1147,7 +1203,7 @@ router.post("/visits/:id/check-out", async (req, res): Promise<void> => {
     autoCheckedOut: false,
   });
 
-  res.json(updated);
+  res.json({ ...updated, plateState: normalizePlateState(updated.plateState) });
 });
 
 // ---------- GET /api/visits/events — server-sent events for visit changes ----------
@@ -1260,6 +1316,7 @@ router.get("/visits/me/active", async (req, res): Promise<void> => {
       hostVendorName: vendorsTable.name,
       purpose: siteVisitsTable.purpose,
       vehiclePlate: siteVisitsTable.vehiclePlate,
+      plateState: siteVisitsTable.plateState,
       platePhotoUrl: siteVisitsTable.platePhotoUrl,
       vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
       expectedDurationMinutes: siteVisitsTable.expectedDurationMinutes,
@@ -1273,7 +1330,7 @@ router.get("/visits/me/active", async (req, res): Promise<void> => {
     .where(and(eq(siteVisitsTable.guestSessionId, ctx.guest.id), isNull(siteVisitsTable.checkOutTime)))
     .orderBy(desc(siteVisitsTable.checkInTime))
     .limit(1);
-  res.json(active ?? null);
+  res.json(active ? { ...active, plateState: normalizePlateState(active.plateState) } : null);
 });
 
 // ---------- GET /api/visits — list with role-aware filtering (staff only) ----------
@@ -1337,6 +1394,7 @@ router.get("/visits", async (req, res): Promise<void> => {
       phone: siteVisitsTable.phone,
       email: siteVisitsTable.email,
       vehiclePlate: siteVisitsTable.vehiclePlate,
+      plateState: siteVisitsTable.plateState,
       platePhotoUrl: siteVisitsTable.platePhotoUrl,
       vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
       purpose: siteVisitsTable.purpose,
@@ -1363,7 +1421,7 @@ router.get("/visits", async (req, res): Promise<void> => {
     .orderBy(desc(siteVisitsTable.checkInTime))
     .limit(limit)
     .offset(offset);
-  res.json(rows);
+  res.json(rows.map((row) => ({ ...row, plateState: normalizePlateState(row.plateState) })));
 });
 
 function parsePlateStateCounts(
@@ -1491,6 +1549,7 @@ router.get("/visits/:id", async (req, res): Promise<void> => {
       phone: siteVisitsTable.phone,
       email: siteVisitsTable.email,
       vehiclePlate: siteVisitsTable.vehiclePlate,
+      plateState: siteVisitsTable.plateState,
       platePhotoUrl: siteVisitsTable.platePhotoUrl,
       vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
       purpose: siteVisitsTable.purpose,
@@ -1541,7 +1600,7 @@ router.get("/visits/:id", async (req, res): Promise<void> => {
     res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
     return;
   }
-  res.json(v);
+  res.json({ ...v, plateState: normalizePlateState(v.plateState) });
 });
 
 // ---------- Auto-checkout sweep (called by rules engine) ----------

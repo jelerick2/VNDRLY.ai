@@ -38,6 +38,7 @@ import {
   ticketScopeFilters,
 } from "./data-tools-helpers";
 import { LIVE_TRACKED_LIFECYCLE_STATES } from "@workspace/ticket-status-meta";
+import { normalizePlateState } from "@workspace/plate-state";
 import { estimateMapboxDrivingRoute } from "../lib/mapbox-routing";
 
 export const OPS_DATA_TOOL_NAMES = [
@@ -1418,6 +1419,7 @@ async function queryActiveVisitors(args: Record<string, unknown>, session: Sessi
       lastName: siteVisitsTable.lastName,
       company: siteVisitsTable.company,
       vehiclePlate: siteVisitsTable.vehiclePlate,
+      plateState: siteVisitsTable.plateState,
       platePhotoUrl: siteVisitsTable.platePhotoUrl,
       vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
       purpose: siteVisitsTable.purpose,
@@ -1430,7 +1432,10 @@ async function queryActiveVisitors(args: Record<string, unknown>, session: Sessi
     .where(and(...filters))
     .orderBy(desc(siteVisitsTable.checkInTime))
     .limit(limit);
-  return JSON.stringify({ rows, limit });
+  return JSON.stringify({
+    rows: rows.map((row) => ({ ...row, plateState: normalizePlateState(row.plateState) })),
+    limit,
+  });
 }
 
 export async function runOpsDataTool(

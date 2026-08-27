@@ -609,6 +609,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/plate-state':
+        specifier: workspace:*
+        version: link:../../lib/plate-state
       '@workspace/platform-eula':
         specifier: workspace:*
         version: link:../../lib/platform-eula
@@ -883,6 +886,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/plate-state':
+        specifier: workspace:*
+        version: link:../../lib/plate-state
       '@workspace/ticket-nudge-ui':
         specifier: workspace:*
         version: link:../../lib/ticket-nudge-ui

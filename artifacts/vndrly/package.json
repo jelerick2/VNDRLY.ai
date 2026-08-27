@@ -55,6 +55,7 @@
     "@workspace/crew-validation-codes": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/platform-eula": "workspace:*",
+    "@workspace/plate-state": "workspace:*",
     "@workspace/ticket-nudge-ui": "workspace:*",
     "@workspace/ticket-state-conflict-codes": "workspace:*",
     "@workspace/ticket-status-meta": "workspace:*",

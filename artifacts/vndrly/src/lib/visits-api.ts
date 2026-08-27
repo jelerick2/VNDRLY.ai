@@ -1,3 +1,5 @@
+import type { PlateStateCode } from "@workspace/plate-state";
+
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export type VisitorRow = {
@@ -8,6 +10,7 @@ export type VisitorRow = {
   phone: string | null;
   email: string | null;
   vehiclePlate: string | null;
+  plateState: PlateStateCode | null;
   platePhotoUrl: string | null;
   vehiclePhotoUrl: string | null;
   purpose: string | null;
@@ -101,6 +104,34 @@ export type VisitorDetail = VisitorRow & {
   checkOutLongitude: number | null;
 };
 
+export type GuestProfile = {
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  email: string | null;
+  company: string | null;
+  vehiclePlate: string | null;
+  plateState: PlateStateCode | null;
+  lastPurpose: string | null;
+};
+
+export type GuestSessionResponse = {
+  token: string;
+  guestSessionId: number;
+  role: "guest";
+  expiresAt: string;
+  profile: GuestProfile;
+};
+
+export type GuestSessionRead = Omit<GuestSessionResponse, "token">;
+
+export type PlateOcrCandidate = {
+  plate: string | null;
+  state: PlateStateCode | null;
+  plateConfidence: number | null;
+  stateConfidence: number | null;
+};
+
 export const visitsApi = {
   list: (params?: { siteLocationId?: number; from?: string; to?: string; activeOnly?: boolean; limit?: number; offset?: number }) => {
     const qs: string[] = [];
@@ -123,10 +154,11 @@ export const visitsApi = {
     email?: string;
     company?: string;
     vehiclePlate?: string;
+    plateState?: string;
     purpose?: string;
     safetyAcknowledged: boolean;
-  }) => jf<{ token: string; guestSessionId: number; expiresAt: string }>(`/api/auth/guest`, { method: "POST", body: JSON.stringify(input) }),
-  guestMe: () => jf<unknown>(`/api/auth/guest/me`),
+  }) => jf<GuestSessionResponse>(`/api/auth/guest`, { method: "POST", body: JSON.stringify(input) }),
+  guestMe: () => jf<GuestSessionRead>(`/api/auth/guest/me`),
   guestLogout: () => jf<void>(`/api/auth/guest/logout`, { method: "POST" }),
   checkIn: (input: {
     siteLocationId: number;
@@ -136,6 +168,7 @@ export const visitsApi = {
     purpose?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
+    plateState?: string;
     platePhotoUrl?: string;
     vehiclePhotoUrl?: string;
     latitude: number;
@@ -157,6 +190,7 @@ export const visitsApi = {
     purpose?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
+    plateState?: string;
     platePhotoUrl?: string;
     vehiclePhotoUrl?: string;
     latitude: number;
@@ -165,7 +199,7 @@ export const visitsApi = {
   gateCheckOut: (id: number, latitude?: number, longitude?: number) =>
     jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
   readPlate: (input: { objectPath: string }) =>
-    jf<{ plate: string | null }>(`/api/visits/gate/read-plate`, { method: "POST", body: JSON.stringify(input) }),
+    jf<PlateOcrCandidate>(`/api/visits/gate/read-plate`, { method: "POST", body: JSON.stringify(input) }),
   gateEnabled: () => jf<{ enabled: boolean }>(`/api/visits/gate/enabled`),
   gateOps: () =>
     jf<{

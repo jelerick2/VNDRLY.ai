@@ -1,5 +1,6 @@
 import { apiFetch } from "./api";
 import { setToken, setUser } from "./auth";
+import type { PlateStateCode } from "@workspace/plate-state";
 
 export type GuestProfile = {
   firstName: string;
@@ -8,6 +9,7 @@ export type GuestProfile = {
   email: string | null;
   company: string | null;
   vehiclePlate: string | null;
+  plateState: PlateStateCode | null;
   lastPurpose: string | null;
 };
 
@@ -26,6 +28,7 @@ export type GuestSignUpInput = {
   email?: string;
   company?: string;
   vehiclePlate?: string;
+  plateState?: string;
   purpose?: string;
   safetyAcknowledged: boolean;
 };
@@ -78,6 +81,7 @@ export type ActiveVisit = {
   hostVendorName: string | null;
   purpose: string | null;
   vehiclePlate: string | null;
+  plateState: PlateStateCode | null;
   platePhotoUrl: string | null;
   vehiclePhotoUrl: string | null;
   expectedDurationMinutes: number | null;
@@ -98,6 +102,7 @@ export async function visitorCheckIn(input: {
   purpose?: string;
   expectedDurationMinutes?: number;
   vehiclePlate?: string;
+  plateState?: string;
   platePhotoUrl?: string;
   vehiclePhotoUrl?: string;
   latitude: number;

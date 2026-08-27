@@ -88,6 +88,7 @@ const tables = {
     "email",
     "company",
     "vehiclePlate",
+    "plateState",
     "lastPurpose",
     "createdAt",
     "expiresAt",
@@ -256,10 +257,6 @@ function makeQuery(tableName: string, selection?: Selection) {
     const all = fixtures[tableName] ?? [];
     const filtered = all.filter((r) => evalPred(pred, r));
     const hasCount = Object.values(selection ?? {}).some(isCountExpression);
-
-    if (tableName === "siteVisits" && selection?.plateState && !hasCount) {
-      throw new Error("site plate preference reads must be aggregated by state");
-    }
 
     if (groupColumns.length > 0) {
       const grouped = new Map<string, Row[]>();
@@ -458,6 +455,13 @@ vi.mock("../lib/gate-ocr-rate-limit", () => ({
   enforceGateOcrRateLimit: vi.fn(async () => true),
 }));
 
+const publishVisitEventMock = vi.fn();
+vi.mock("../lib/visit-events", () => ({
+  getCurrentVisitEventSeq: vi.fn(async () => 0),
+  publishVisitEvent: publishVisitEventMock,
+  subscribeVisitEvents: vi.fn(() => () => undefined),
+}));
+
 
 
 function staffCookie(
@@ -490,6 +494,7 @@ beforeEach(async () => {
   for (const k of Object.keys(idCounters)) idCounters[k] = 0;
   lastInsert = null;
   notifyUsersMock.mockClear();
+  publishVisitEventMock.mockClear();
   readPlateFromImageMock.mockReset();
   getStoredObjectMock.mockReset();
   vi.resetModules();
@@ -588,6 +593,7 @@ async function startGuest(extras: Partial<Row> = {}) {
       email: "jane@example.com",
       company: "Visitor Co",
       vehiclePlate: "ABC123",
+      plateState: "TX",
       purpose: "Inspection",
       safetyAcknowledged: true,
       ...extras,
@@ -706,6 +712,60 @@ describe("plate state persistence schema contract", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("POST /api/auth/guest", () => {
+  it("rejects a vehicle plate without a state", async () => {
+    const res = await request(app)
+      .post("/api/auth/guest")
+      .send({
+        firstName: "Jane",
+        lastName: "Doe",
+        vehiclePlate: "ABC123",
+        safetyAcknowledged: true,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: "missing-state", message: expect.any(String) });
+    expect(fixtures.guestSessions).toHaveLength(0);
+  });
+
+  it("rejects an invalid state for a vehicle plate", async () => {
+    const res = await request(app)
+      .post("/api/auth/guest")
+      .send({
+        firstName: "Jane",
+        lastName: "Doe",
+        vehiclePlate: "ABC123",
+        plateState: "ZZ",
+        safetyAcknowledged: true,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: "invalid-state", message: expect.any(String) });
+    expect(fixtures.guestSessions).toHaveLength(0);
+  });
+
+  it("normalizes and returns the guest vehicle state", async () => {
+    const guest = await startGuest({ plateState: " tx " });
+
+    expect(fixtures.guestSessions[0]).toMatchObject({
+      vehiclePlate: "ABC123",
+      plateState: "TX",
+    });
+    expect(guest.body.profile).toMatchObject({ vehiclePlate: "ABC123", plateState: "TX" });
+
+    const me = await request(app)
+      .get("/api/auth/guest/me")
+      .set("Authorization", `Bearer ${guest.token}`);
+    expectStatus(me, 200);
+    expect(me.body.profile).toMatchObject({ vehiclePlate: "ABC123", plateState: "TX" });
+  });
+
+  it("discards a state when no vehicle plate is supplied", async () => {
+    const guest = await startGuest({ vehiclePlate: " ", plateState: "tx" });
+
+    expect(fixtures.guestSessions[0]).toMatchObject({ vehiclePlate: null, plateState: null });
+    expect(guest.body.profile).toMatchObject({ vehiclePlate: null, plateState: null });
+  });
+
   it("requires firstName and lastName", async () => {
     const res = await request(app)
       .post("/api/auth/guest")
@@ -778,6 +838,101 @@ describe("POST /api/auth/guest", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("POST /api/visits/check-in", () => {
+  it("rejects a supplied vehicle plate without a state", async () => {
+    const { site } = seedScenario();
+    const { token } = await startGuest({ vehiclePlate: "", plateState: "" });
+    const res = await request(app)
+      .post("/api/visits/check-in")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        vehiclePlate: "NEW-123",
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: "missing-state", message: expect.any(String) });
+    expect(fixtures.siteVisits).toHaveLength(0);
+  });
+
+  it("rejects an invalid supplied vehicle state", async () => {
+    const { site } = seedScenario();
+    const { token } = await startGuest({ vehiclePlate: "", plateState: "" });
+    const res = await request(app)
+      .post("/api/visits/check-in")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        vehiclePlate: "NEW-123",
+        plateState: "ZZ",
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: "invalid-state", message: expect.any(String) });
+    expect(fixtures.siteVisits).toHaveLength(0);
+  });
+
+  it("normalizes and propagates a supplied vehicle state", async () => {
+    const { site } = seedScenario();
+    const { token } = await startGuest({ vehiclePlate: "", plateState: "" });
+    const res = await request(app)
+      .post("/api/visits/check-in")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        vehiclePlate: " NEW-123 ",
+        plateState: "tx",
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+
+    expectStatus(res, 201);
+    expect(fixtures.guestSessions[0]).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
+    expect(fixtures.siteVisits[0]).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
+    expect(res.body).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
+    expect(publishVisitEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: "visit.checked_in",
+      visit: expect.objectContaining({ vehiclePlate: "NEW-123", plateState: "TX" }),
+    }));
+
+    fixtures.siteVisits[0].siteName = site.name;
+    const active = await request(app)
+      .get("/api/visits/me/active")
+      .set("Authorization", `Bearer ${token}`);
+    expectStatus(active, 200);
+    expect(active.body).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
+  });
+
+  it("requires a state when a historical guest plate is written to a new visit", async () => {
+    const { site } = seedScenario();
+    const { token } = await startGuest({ vehiclePlate: "", plateState: "" });
+    Object.assign(fixtures.guestSessions[0], { vehiclePlate: "LEGACY-1", plateState: null });
+
+    const res = await request(app)
+      .post("/api/visits/check-in")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("missing-state");
+    expect(fixtures.siteVisits).toHaveLength(0);
+  });
+
   it("requires a guest session", async () => {
     seedScenario();
     const res = await request(app)
@@ -949,6 +1104,7 @@ describe("POST /api/visits/check-in", () => {
         hostType: "partner",
         hostPartnerId: 1,
         vehiclePlate: "TRK-778",
+        plateState: "TX",
         platePhotoUrl: "/uploads/visits/plate.jpg",
         vehiclePhotoUrl: "/uploads/visits/truck.jpg",
         latitude: 40.0,
@@ -957,6 +1113,7 @@ describe("POST /api/visits/check-in", () => {
     expectStatus(res, 201);
     expect(fixtures.siteVisits[0]).toMatchObject({
       vehiclePlate: "TRK-778",
+      plateState: "TX",
       platePhotoUrl: "/uploads/visits/plate.jpg",
       vehiclePhotoUrl: "/uploads/visits/truck.jpg",
     });
@@ -971,6 +1128,7 @@ describe("POST /api/visits/check-in", () => {
     expectStatus(list, 200);
     expect(list.body[0]).toMatchObject({
       vehiclePlate: "TRK-778",
+      plateState: "TX",
       platePhotoUrl: "/uploads/visits/plate.jpg",
       vehiclePhotoUrl: "/uploads/visits/truck.jpg",
     });
@@ -1196,6 +1354,18 @@ describe("GET /api/visits role-aware filtering", () => {
     expect(res.body).toHaveLength(2);
   });
 
+  it("serializes a historical visit with a null vehicle state in the staff list", async () => {
+    await seedTwoVisits();
+    Object.assign(fixtures.siteVisits[0], { vehiclePlate: "LEGACY-1", plateState: null });
+
+    const res = await request(app)
+      .get("/api/visits")
+      .set("Cookie", staffCookie({ role: "admin" }));
+
+    expectStatus(res, 200);
+    expect(res.body[0]).toMatchObject({ vehiclePlate: "LEGACY-1", plateState: null });
+  });
+
   it("vendor sees only its own hosted visits", async () => {
     await seedTwoVisits();
     const res = await request(app)
@@ -1389,6 +1559,75 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
 });
 
 describe("gatekeeper visit workflow", () => {
+  it("rejects a gatekeeper vehicle plate without a state", async () => {
+    const { site, vendor } = seedScenario();
+    const response = await request(app)
+      .post("/api/visits/gate/check-in")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .send({
+        firstName: "Pat",
+        lastName: "Guarded",
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        vehiclePlate: "GATE-1",
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe("missing-state");
+    expect(fixtures.siteVisits).toHaveLength(0);
+  });
+
+  it("rejects an invalid gatekeeper vehicle state", async () => {
+    const { site, vendor } = seedScenario();
+    const response = await request(app)
+      .post("/api/visits/gate/check-in")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .send({
+        firstName: "Pat",
+        lastName: "Guarded",
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        vehiclePlate: "GATE-1",
+        plateState: "ZZ",
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.code).toBe("invalid-state");
+    expect(fixtures.siteVisits).toHaveLength(0);
+  });
+
+  it("normalizes and emits a gatekeeper vehicle state", async () => {
+    const { site, vendor } = seedScenario();
+    const response = await request(app)
+      .post("/api/visits/gate/check-in")
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .send({
+        firstName: "Pat",
+        lastName: "Guarded",
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: site.partnerId,
+        vehiclePlate: " GATE-1 ",
+        plateState: "tx",
+        latitude: site.latitude,
+        longitude: site.longitude,
+      });
+
+    expectStatus(response, 201);
+    expect(response.body).toMatchObject({ vehiclePlate: "GATE-1", plateState: "TX" });
+    expect(fixtures.siteVisits[0]).toMatchObject({ vehiclePlate: "GATE-1", plateState: "TX" });
+    expect(publishVisitEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: "visit.checked_in",
+      visit: expect.objectContaining({ vehiclePlate: "GATE-1", plateState: "TX" }),
+    }));
+  });
+
   it("requires the explicit gatekeeper role", async () => {
     const { site, vendor } = seedScenario();
     const response = await request(app)
@@ -1550,6 +1789,18 @@ describe("GET /api/visits/:id (staff detail)", () => {
       .set("Cookie", staffCookie({ role: "admin" }));
     expect(res.status).toBe(404);
     expect(res.body.code).toBe("visit.not_found");
+  });
+
+  it("serializes a historical visit with a null vehicle state in detail", async () => {
+    const { visitId } = seedDetailVisit();
+    Object.assign(fixtures.siteVisits[0], { vehiclePlate: "LEGACY-1", plateState: null });
+
+    const res = await request(app)
+      .get(`/api/visits/${visitId}`)
+      .set("Cookie", staffCookie({ role: "admin" }));
+
+    expectStatus(res, 200);
+    expect(res.body).toMatchObject({ vehiclePlate: "LEGACY-1", plateState: null });
   });
 
   it("returns 403 when a vendor reads a visit hosted by another vendor", async () => {

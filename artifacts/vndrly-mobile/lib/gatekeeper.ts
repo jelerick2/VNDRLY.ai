@@ -3,6 +3,7 @@ import * as Location from "expo-location";
 import { apiFetch } from "./api";
 import type { AssignedGateSitesResponse } from "./gate-default-site";
 import type { ActiveVisit, SiteContext } from "./guest";
+import type { PlateStateCode } from "@workspace/plate-state";
 import { buildHostOptions, parseDurationMinutes } from "./visitorCheckin";
 
 export type GatekeeperVisitInput = {
@@ -12,6 +13,7 @@ export type GatekeeperVisitInput = {
   lastName: string;
   company: string;
   vehiclePlate: string;
+  plateState?: string;
   purpose: string;
   durationStr: string;
   platePhotoUrl?: string;
@@ -49,8 +51,15 @@ async function fetchVisitPages(prefix: string): Promise<ActiveVisit[]> {
   }
 }
 
+export type PlateOcrCandidate = {
+  plate: string | null;
+  state: PlateStateCode | null;
+  plateConfidence: number | null;
+  stateConfidence: number | null;
+};
+
 export async function readGatePlate(objectPath: string): Promise<string | null> {
-  const result = await apiFetch<{ plate: string | null }>("/api/visits/gate/read-plate", {
+  const result = await apiFetch<PlateOcrCandidate>("/api/visits/gate/read-plate", {
     method: "POST",
     body: JSON.stringify({ objectPath }),
   });
@@ -109,6 +118,7 @@ export async function submitGatekeeperVisit(
       hostPartnerId: host.type === "partner" ? host.id : undefined,
       hostVendorId: host.type === "vendor" ? host.id : undefined,
       vehiclePlate: input.vehiclePlate.trim() || undefined,
+      plateState: input.plateState,
       purpose: input.purpose.trim() || undefined,
       expectedDurationMinutes: parseDurationMinutes(input.durationStr),
       ...(input.platePhotoUrl ? { platePhotoUrl: input.platePhotoUrl } : {}),
