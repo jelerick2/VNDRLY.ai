@@ -8,6 +8,14 @@ import { Check, ChevronsUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -46,7 +54,15 @@ export function PlateStatePicker({
     ? `Selected plate state: ${selectedState.name} (${selectedState.code})`
     : selectLabel;
 
+  React.useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      setQuery("");
+    }
+  }, [disabled]);
+
   const selectState = (state: PlateStateCode) => {
+    if (disabled) return;
     onChange(state);
     setOpen(false);
     setQuery("");
@@ -65,7 +81,7 @@ export function PlateStatePicker({
           <Button
             aria-describedby={error ? errorId : undefined}
             aria-expanded={open}
-            aria-haspopup="listbox"
+            aria-haspopup="dialog"
             aria-label={triggerLabel}
             aria-invalid={error ? true : undefined}
             className={cn(
@@ -73,7 +89,6 @@ export function PlateStatePicker({
               error && "border-destructive",
             )}
             disabled={disabled}
-            role="combobox"
             type="button"
             variant="outline"
           >
@@ -86,36 +101,37 @@ export function PlateStatePicker({
           className="w-[var(--radix-popover-trigger-width)] p-2"
           role="dialog"
         >
-          <input
-            aria-label="Search plate states"
-            className="mb-2 flex h-10 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search states"
-            role="searchbox"
-            type="search"
-            value={query}
-          />
-          <div aria-label="Plate state options" className="max-h-72 overflow-y-auto" role="listbox">
-            {states.map((state) => {
-              const isSelected = state.code === value;
-              return (
-                <button
-                  aria-selected={isSelected}
-                  className="flex min-h-10 w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent"
-                  key={state.code}
-                  onClick={() => selectState(state.code)}
-                  role="option"
-                  type="button"
-                >
-                  <Check
-                    aria-hidden="true"
-                    className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")}
-                  />
-                  {state.name} ({state.code})
-                </button>
-              );
-            })}
-          </div>
+          <Command label="Search plate states" loop shouldFilter={false}>
+            <CommandInput
+              aria-label="Search plate states"
+              onValueChange={setQuery}
+              placeholder="Search states"
+              value={query}
+            />
+            <CommandList>
+              <CommandEmpty>No states found.</CommandEmpty>
+              <CommandGroup>
+                {states.map((state) => {
+                  const isSelected = state.code === value;
+                  return (
+                    <CommandItem
+                      aria-selected={isSelected}
+                      key={state.code}
+                      onSelect={() => selectState(state.code)}
+                      role="option"
+                      value={`${state.name} ${state.code}`}
+                    >
+                      <Check
+                        aria-hidden="true"
+                        className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")}
+                      />
+                      {state.name} ({state.code})
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
         </PopoverContent>
       </Popover>
       {error ? (

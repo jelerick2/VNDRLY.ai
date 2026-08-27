@@ -1,4 +1,4 @@
-import React, { useId, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -50,12 +50,20 @@ export function PlateStatePicker({
     ? `Selected plate state: ${selectedState.name} (${selectedState.code})`
     : selectLabel;
 
+  useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      setQuery("");
+    }
+  }, [disabled]);
+
   const close = () => {
     setOpen(false);
     setQuery("");
   };
 
   const selectState = (state: PlateStateCode) => {
+    if (disabled) return;
     onChange(state);
     close();
   };
@@ -65,10 +73,13 @@ export function PlateStatePicker({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={triggerLabel}
+        accessibilityHint={error ? `Error: ${error}` : "Opens the plate state picker."}
         accessibilityState={{ disabled, expanded: open }}
-        aria-describedby={error ? errorId : undefined}
         disabled={disabled}
-        onPress={() => setOpen(true)}
+        onPress={() => {
+          if (!disabled) setOpen(true);
+        }}
+        testID="plate-state-picker-trigger"
         style={[
           styles.trigger,
           {
@@ -97,12 +108,8 @@ export function PlateStatePicker({
         </Text>
       ) : null}
 
-      <Modal
-        visible={open}
-        transparent
-        animationType="slide"
-        onRequestClose={close}
-      >
+      {open ? (
+        <Modal transparent animationType="slide" onRequestClose={close} visible>
         <View style={styles.backdrop}>
           <View
             role="dialog"
@@ -166,7 +173,8 @@ export function PlateStatePicker({
             </ScrollView>
           </View>
         </View>
-      </Modal>
+        </Modal>
+      ) : null}
     </View>
   );
 }

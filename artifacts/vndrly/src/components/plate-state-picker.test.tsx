@@ -3,6 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+
+Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+  configurable: true,
+  value: vi.fn(),
+});
+
 import { PlateStatePicker } from "./plate-state-picker";
 
 function renderPicker(
@@ -14,15 +28,14 @@ function renderPicker(
     preferredStates: ["OK", "TX", "NM"],
     ...overrides,
   };
-  render(<PlateStatePicker {...props} />);
-  return props;
+  return { props, ...render(<PlateStatePicker {...props} />) };
 }
 
 describe("PlateStatePicker", () => {
   it("puts preferred states first, followed by one alphabetical catalog remainder", async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.click(screen.getByRole("combobox", { name: "Select plate state" }));
+    await user.click(screen.getByRole("button", { name: "Select plate state" }));
 
     const options = screen.getAllByRole("option");
     const labels = options.map((option) => option.textContent);
@@ -43,9 +56,9 @@ describe("PlateStatePicker", () => {
 
   it("filters Texas from the accessible search field and reports the chosen code", async () => {
     const user = userEvent.setup();
-    const props = renderPicker();
-    await user.click(screen.getByRole("combobox", { name: "Select plate state" }));
-    await user.type(screen.getByRole("searchbox", { name: "Search plate states" }), "tex");
+    const { props } = renderPicker();
+    await user.click(screen.getByRole("button", { name: "Select plate state" }));
+    await user.type(screen.getByRole("combobox", { name: "Search plate states" }), "tex");
 
     await user.click(screen.getByRole("option", { name: "Texas (TX)" }));
     expect(props.onChange).toHaveBeenCalledWith("TX");
@@ -54,8 +67,8 @@ describe("PlateStatePicker", () => {
 
   it("exposes the selected state, prevents disabled changes, and associates errors", async () => {
     const user = userEvent.setup();
-    const props = renderPicker({ value: "TX", disabled: true, error: "Choose a valid state." });
-    const trigger = screen.getByRole("combobox", { name: "Selected plate state: Texas (TX)" });
+    const { props } = renderPicker({ value: "TX", disabled: true, error: "Choose a valid state." });
+    const trigger = screen.getByRole("button", { name: "Selected plate state: Texas (TX)" });
 
     const error = screen.getByRole("alert");
     expect(trigger.getAttribute("aria-describedby")).toBe(error.id);
@@ -68,9 +81,42 @@ describe("PlateStatePicker", () => {
   it("gives the open picker an accessible dialog and search control", async () => {
     const user = userEvent.setup();
     renderPicker();
-    await user.click(screen.getByRole("combobox", { name: "Select plate state" }));
+    await user.click(screen.getByRole("button", { name: "Select plate state" }));
 
     expect(screen.getByRole("dialog", { name: "Plate state picker" })).toBeTruthy();
-    expect(screen.getByRole("searchbox", { name: "Search plate states" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Search plate states" })).toBeTruthy();
+  });
+
+  it("selects the highlighted command option with Arrow Down and Enter", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPicker();
+    await user.click(screen.getByRole("button", { name: "Select plate state" }));
+
+    const search = screen.getByRole("combobox", { name: "Search plate states" });
+    await user.click(search);
+    await user.keyboard("{ArrowDown}{Enter}");
+
+    expect(props.onChange).toHaveBeenCalledWith("TX");
+  });
+
+  it("closes an open picker and blocks changes when it becomes disabled", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const { rerender } = renderPicker({ onChange });
+    await user.click(screen.getByRole("button", { name: "Select plate state" }));
+    await user.type(screen.getByRole("combobox", { name: "Search plate states" }), "tex");
+
+    rerender(
+      <PlateStatePicker
+        value={null}
+        onChange={onChange}
+        preferredStates={["OK", "TX", "NM"]}
+        disabled
+      />,
+    );
+
+    expect(screen.queryByRole("dialog", { name: "Plate state picker" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Select plate state" }));
+    expect(onChange).not.toHaveBeenCalled();
   });
 });
