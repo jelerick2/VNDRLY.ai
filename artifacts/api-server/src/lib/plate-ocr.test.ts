@@ -85,6 +85,28 @@ describe("extractPlateCandidate", () => {
       plateConfidence: null,
       stateConfidence: null,
     });
+    expect(extractPlateCandidate('{"plate":"ABC123"')).toEqual({
+      plate: null,
+      state: null,
+      plateConfidence: null,
+      stateConfidence: null,
+    });
+  });
+
+  it("returns all null fields for JSON values without a plate field", () => {
+    for (const content of [
+      '{"state":"TX","stateConfidence":0.99}',
+      '["ABC123"]',
+      '"ABC123"',
+      "123",
+    ]) {
+      expect(extractPlateCandidate(content)).toEqual({
+        plate: null,
+        state: null,
+        plateConfidence: null,
+        stateConfidence: null,
+      });
+    }
   });
 
   it("picks an alphanumeric plate out of noisy OCR text", () => {

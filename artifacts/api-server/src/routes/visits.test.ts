@@ -384,6 +384,24 @@ vi.mock("./notifications", () => ({
   VISIT_NOTIFICATIONS_ROLE: "Visitor Notifications",
 }));
 
+const readPlateFromImageMock = vi.fn();
+vi.mock("../lib/plate-ocr", () => ({
+  PlateOcrFailedError: class PlateOcrFailedError extends Error {},
+  PlateOcrUnavailableError: class PlateOcrUnavailableError extends Error {},
+  readPlateFromImage: readPlateFromImageMock,
+}));
+
+const getStoredObjectMock = vi.fn();
+vi.mock("../lib/objectStorage", () => ({
+  ObjectStorageService: class ObjectStorageService {
+    getStoredObject = getStoredObjectMock;
+  },
+}));
+
+vi.mock("../lib/gate-ocr-rate-limit", () => ({
+  enforceGateOcrRateLimit: vi.fn(async () => true),
+}));
+
 
 
 function staffCookie(
@@ -416,6 +434,8 @@ beforeEach(async () => {
   for (const k of Object.keys(idCounters)) idCounters[k] = 0;
   lastInsert = null;
   notifyUsersMock.mockClear();
+  readPlateFromImageMock.mockReset();
+  getStoredObjectMock.mockReset();
   vi.resetModules();
   visitsModule = await import("./visits");
   app = express();
@@ -427,6 +447,44 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.clearAllMocks();
+});
+
+describe("POST /api/visits/gate/read-plate", () => {
+  it("returns the legacy scalar plate and OCR metadata at the top level", async () => {
+    getStoredObjectMock.mockResolvedValue({
+      body: Buffer.from("plate-photo"),
+      contentType: "image/jpeg",
+      acl: { owner: "77" },
+      size: 42,
+    });
+    readPlateFromImageMock.mockResolvedValue({
+      plate: "OK-4412",
+      state: "OK",
+      plateConfidence: 0.96,
+      stateConfidence: 0.83,
+    });
+
+    const res = await request(app)
+      .post("/api/visits/gate/read-plate")
+      .set(
+        "Cookie",
+        staffCookie({
+          userId: 77,
+          role: "vendor",
+          vendorId: 9,
+          vendorRole: "gatekeeper",
+        }),
+      )
+      .send({ objectPath: "/objects/uploads/00000000-0000-4000-8000-000000000001" });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      plate: "OK-4412",
+      state: "OK",
+      plateConfidence: 0.96,
+      stateConfidence: 0.83,
+    });
+  });
 });
 
 // Convenience: seed a site with both a partner host and a vendor host

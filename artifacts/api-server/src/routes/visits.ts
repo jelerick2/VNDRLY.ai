@@ -641,8 +641,8 @@ router.post("/visits/gate/read-plate", async (req, res): Promise<void> => {
     return;
   }
   try {
-    const plate = await readPlateFromImage({ imageBase64, mimeType });
-    res.json({ plate });
+    const candidate = await readPlateFromImage({ imageBase64, mimeType });
+    res.json(candidate);
   } catch (reason) {
     if (reason instanceof PlateOcrUnavailableError) {
       res.status(503).json({ message: reason.message, code: VISIT_PLATE_OCR_UNAVAILABLE });

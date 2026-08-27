@@ -147,6 +147,10 @@ function candidateFromPlate(plate: string | null): PlateOcrCandidate {
   return { ...emptyPlateCandidate(), plate };
 }
 
+function looksLikeJson(text: string): boolean {
+  return /^(?:\{|\[|")/.test(text.trim());
+}
+
 function fromJsonPlate(text: string): {
   candidate: PlateOcrCandidate;
   hit: boolean;
@@ -168,22 +172,13 @@ function fromJsonPlate(text: string): {
         hit: true,
       };
     }
+    return { candidate: emptyPlateCandidate(), hit: true };
   } catch {
-    const match = text.match(/"plate"\s*:\s*(null|"[^"]*")/i);
-    if (match) {
-      if (match[1] === "null")
-        return { candidate: emptyPlateCandidate(), hit: true };
-      const formatted = formatPlateValue(match[1].slice(1, -1));
-      const compact = compactPlate(formatted);
-      return {
-        candidate: candidateFromPlate(
-          isPlausiblePlate(compact) ? formatted : null,
-        ),
-        hit: true,
-      };
-    }
+    return {
+      candidate: emptyPlateCandidate(),
+      hit: looksLikeJson(trimmed),
+    };
   }
-  return { candidate: emptyPlateCandidate(), hit: false };
 }
 
 export function extractPlateCandidate(text: string): PlateOcrCandidate {

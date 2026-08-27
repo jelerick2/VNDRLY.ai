@@ -9,6 +9,8 @@ Complete.
 - `artifacts/api-server/package.json`
 - `artifacts/api-server/src/lib/plate-ocr.test.ts`
 - `artifacts/api-server/src/lib/plate-ocr.ts`
+- `artifacts/api-server/src/routes/visits.test.ts`
+- `artifacts/api-server/src/routes/visits.ts`
 - `pnpm-lock.yaml`
 - `.superpowers/sdd/2026-08-27-state-aware-plate-ocr/task-3-report.md`
 
@@ -28,9 +30,17 @@ passed.
 `git diff --check`
 passed.
 
+## Review correction
+
+- `POST /api/visits/gate/read-plate` now returns the candidate fields at the top level, retaining `plate` as the legacy scalar value.
+- JSON objects without an own `plate` field, arrays, primitives, and JSON-shaped malformed content now return an all-null candidate rather than falling through to noisy OCR extraction.
+- Follow-up focused checks passed: parser (11 tests) and route contract (1 selected test).
+
 ## Commit
 
 `Return state confidence from plate OCR`
+
+Follow-up: `Correct plate OCR response contract`
 
 ## Self-review
 
