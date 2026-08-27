@@ -37,20 +37,34 @@ type Pred =
 function requireIsolatedTestDatabaseUrl(env: {
   DATABASE_URL?: string;
   TEST_DATABASE_URL?: string;
+  VNDRLY_ISOLATED_TEST_DB?: string;
 }): string {
   const databaseUrl = env.DATABASE_URL?.trim();
   const testDatabaseUrl = env.TEST_DATABASE_URL?.trim();
-  if (!databaseUrl || !testDatabaseUrl) {
-    throw new Error("schema contract requires DATABASE_URL and TEST_DATABASE_URL");
+  if (
+    !databaseUrl ||
+    !testDatabaseUrl ||
+    env.VNDRLY_ISOLATED_TEST_DB !== "1"
+  ) {
+    throw new Error("schema contract requires the isolated test wrapper marker and database URLs");
   }
 
-  const databaseName = decodeURIComponent(new URL(databaseUrl).pathname.slice(1)).toLowerCase();
-  const testDatabaseName = decodeURIComponent(new URL(testDatabaseUrl).pathname.slice(1)).toLowerCase();
-  if (
-    !databaseName.endsWith("_test") ||
-    databaseName !== testDatabaseName
-  ) {
-    throw new Error("schema contract requires matching *_test DATABASE_URL and TEST_DATABASE_URL");
+  const normalizedTarget = (urlString: string) => {
+    const url = new URL(urlString);
+    const protocol = url.protocol.toLowerCase();
+    const effectivePort = url.port || (
+      protocol === "postgres:" || protocol === "postgresql:" ? "5432" : ""
+    );
+    return JSON.stringify({
+      protocol,
+      hostname: url.hostname.toLowerCase(),
+      port: effectivePort,
+      username: decodeURIComponent(url.username),
+      databasePath: decodeURIComponent(url.pathname).replace(/^\/+/, ""),
+    });
+  };
+  if (normalizedTarget(databaseUrl) !== normalizedTarget(testDatabaseUrl)) {
+    throw new Error("schema contract requires matching isolated database targets");
   }
 
   return databaseUrl;
@@ -476,21 +490,40 @@ async function startGuest(extras: Partial<Row> = {}) {
 }
 
 describe("plate state persistence schema contract", () => {
-  it("refuses a shared or mismatched database target", () => {
+  it("refuses a missing isolated-wrapper marker", () => {
     expect(() =>
       requireIsolatedTestDatabaseUrl({
-        DATABASE_URL: "postgresql://test:test@example.test/vndrly",
-        TEST_DATABASE_URL: "postgresql://test:test@example.test/vndrly_test",
+        DATABASE_URL: "postgresql://test:test@example.test/explicit_test_database",
+        TEST_DATABASE_URL: "postgresql://test:test@example.test/explicit_test_database",
       }),
-    ).toThrow(/matching \*_test/);
+    ).toThrow(/isolated test wrapper marker/);
+  });
+
+  it("refuses same-name targets on different hosts", () => {
+    expect(() =>
+      requireIsolatedTestDatabaseUrl({
+        DATABASE_URL: "postgresql://test:test@isolated-a.example.test/explicit_test_database",
+        TEST_DATABASE_URL: "postgresql://test:test@isolated-b.example.test/explicit_test_database",
+        VNDRLY_ISOLATED_TEST_DB: "1",
+      }),
+    ).toThrow(/matching isolated database targets/);
+  });
+
+  it("accepts the exact wrapper target without requiring a database-name suffix", () => {
+    const databaseUrl = "postgresql://test%20user:password@isolated.example.test:5432/explicit_database?sslmode=require";
+    expect(requireIsolatedTestDatabaseUrl({
+      DATABASE_URL: databaseUrl,
+      TEST_DATABASE_URL: "postgresql://test%20user:other-password@isolated.example.test/explicit_database?application_name=vitest",
+      VNDRLY_ISOLATED_TEST_DB: "1",
+    })).toBe(databaseUrl);
   });
 
   it("stores and returns TX for guest sessions and site visits", async () => {
     // The route suite mocks @workspace/db, so this contract queries the
     // wrapper-provisioned database directly. The wrapper builds that schema
-    // from the real Drizzle tables before this test starts. The guard mirrors
-    // the wrapper's DATABASE_URL/TEST_DATABASE_URL convention before opening
-    // a connection, and the transaction leaves no persisted fixtures.
+    // from the real Drizzle tables before this test starts. The guard requires
+    // the wrapper's child-only marker and normalized full-target equality
+    // before opening a connection; the transaction leaves no fixtures.
     const isolatedClient = new pg.Client({
       connectionString: requireIsolatedTestDatabaseUrl(process.env),
     });

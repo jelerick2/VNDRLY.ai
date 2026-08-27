@@ -237,6 +237,7 @@ async function main(): Promise<void> {
     ...process.env,
     DATABASE_URL: resolved.testUrl,
     TEST_DATABASE_URL: resolved.testUrl,
+    VNDRLY_ISOLATED_TEST_DB: "1",
   };
   const listenNotifyTestUrl = resolveListenNotifyTestUrl(resolved);
   if (listenNotifyTestUrl) {
