@@ -101,6 +101,7 @@ const tables = {
     "email",
     "company",
     "vehiclePlate",
+    "plateState",
     "platePhotoUrl",
     "vehiclePhotoUrl",
     "purpose",
@@ -367,6 +368,7 @@ vi.mock("drizzle-orm", () => {
     isNull: (col: ColRef) => ({ kind: "isNull", col }),
     isNotNull: (col: ColRef) => ({ kind: "isNotNull", col }),
     lt: (col: ColRef, val: any) => ({ kind: "lt", col, val }),
+    gte: (col: ColRef, val: any) => ({ kind: "gte", col, val }),
     inArray: (col: ColRef, vals: any[]) => ({ kind: "inArray", col, vals }),
     sql: sqlTag,
     desc: passthrough,
@@ -1172,6 +1174,104 @@ describe("GET /api/visits role-aware filtering", () => {
     // full admin view.
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBeLessThan(2);
+  });
+});
+
+describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
+  function addConfirmedVisits(siteId: number, plateState: string, count: number, daysAgo: number) {
+    for (let index = 0; index < count; index += 1) {
+      fixtures.siteVisits.push({
+        id: nextId("siteVisits"),
+        siteLocationId: siteId,
+        plateState,
+        checkInTime: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000 - index),
+      });
+    }
+  }
+
+  it("returns five aggregate-only state recommendations in site activity order", async () => {
+    const { site } = seedScenario();
+    addConfirmedVisits(site.id, "TX", 3, 2);
+    addConfirmedVisits(site.id, "OK", 2, 3);
+    addConfirmedVisits(site.id, "NM", 2, 4);
+    addConfirmedVisits(site.id, "CA", 10, 91);
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "admin" }));
+
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["TX", "NM", "OK", "CA", "NY"] });
+  });
+
+  it("allows gatekeepers to load recommendations for an assigned site", async () => {
+    const { site, vendor } = seedScenario();
+    addConfirmedVisits(site.id, "TX", 1, 1);
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }));
+
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["TX", "CA", "NY", "FL", "OH"] });
+  });
+
+  it("allows vendors to load recommendations only for their assigned sites", async () => {
+    const { site, vendor } = seedScenario();
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "office" }));
+
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["CA", "TX", "NY", "FL", "OH"] });
+  });
+
+  it("denies gatekeepers whose vendor is not assigned to the requested site", async () => {
+    const { otherSite, vendor } = seedScenario();
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${otherSite.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }));
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("visit.no_access");
+  });
+
+  it("denies partners who do not own the requested site", async () => {
+    const { site } = seedScenario();
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "partner", partnerId: 999 }));
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("visit.no_access");
+  });
+
+  it("fills sparse recent history from older confirmed visits before the fallback", async () => {
+    const { site } = seedScenario();
+    addConfirmedVisits(site.id, "OK", 1, 1);
+    addConfirmedVisits(site.id, "TX", 2, 95);
+    addConfirmedVisits(site.id, "NM", 2, 96);
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "partner", partnerId: site.partnerId }));
+
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["OK", "NM", "TX", "CA", "NY"] });
+  });
+
+  it("returns the national fallback for an empty site", async () => {
+    const { site } = seedScenario();
+
+    const res = await request(app)
+      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .set("Cookie", staffCookie({ role: "admin" }));
+
+    expectStatus(res, 200);
+    expect(res.body).toEqual({ preferred: ["CA", "TX", "NY", "FL", "OH"] });
   });
 });
 

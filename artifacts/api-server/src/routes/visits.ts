@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, isNull, sql, lt, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, desc, isNull, sql, lt, gte, isNotNull, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import {
   db,
@@ -29,6 +29,8 @@ import {
   PlateOcrUnavailableError,
   readPlateFromImage,
 } from "../lib/plate-ocr";
+import { rankPreferredPlateStates } from "../lib/plate-state-ranking";
+import { NATIONAL_PLATE_STATE_FALLBACK } from "@workspace/plate-state";
 
 import { SESSION_SECRET } from "../lib/session";
 import { enforceVisitsRateLimit } from "../lib/visits-rate-limit";
@@ -1359,6 +1361,95 @@ router.get("/visits", async (req, res): Promise<void> => {
     .limit(limit)
     .offset(offset);
   res.json(rows);
+});
+
+function countPlateStates(rows: readonly { plateState: string | null }[]) {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.plateState) continue;
+    counts.set(row.plateState, (counts.get(row.plateState) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([state, count]) => ({ state, count }));
+}
+
+// ---------- GET /api/visits/sites/:siteId/preferred-plate-states ----------
+router.get("/visits/sites/:siteId/preferred-plate-states", async (req, res): Promise<void> => {
+  const session = getStaffSession(req);
+  if (!session || session.role === "guest") {
+    res.status(401).json({ message: "Login required", code: AUTH_REQUIRED });
+    return;
+  }
+  if (!await enforceVisitsRateLimit(req, res, session)) return;
+
+  const siteId = Number(req.params.siteId);
+  if (!Number.isSafeInteger(siteId) || siteId <= 0) {
+    res.status(400).json({ message: "Invalid id", code: VISIT_INVALID_ID });
+    return;
+  }
+
+  const [site] = await db
+    .select({ id: siteLocationsTable.id, partnerId: siteLocationsTable.partnerId })
+    .from(siteLocationsTable)
+    .where(eq(siteLocationsTable.id, siteId));
+  if (!site) {
+    res.status(404).json({ message: "Site not found", code: SITE_NOT_FOUND });
+    return;
+  }
+
+  if (isGatekeeperSession(session) || session.role === "vendor") {
+    if (!session.vendorId) {
+      res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
+      return;
+    }
+    const [assignment] = await db
+      .select({ id: siteWorkAssignmentsTable.id })
+      .from(siteWorkAssignmentsTable)
+      .where(and(
+        eq(siteWorkAssignmentsTable.vendorId, session.vendorId),
+        eq(siteWorkAssignmentsTable.siteLocationId, siteId),
+      ))
+      .limit(1);
+    if (!assignment) {
+      res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
+      return;
+    }
+  } else if (session.role === "partner") {
+    if (site.partnerId !== session.partnerId) {
+      res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
+      return;
+    }
+  } else if (session.role !== "admin") {
+    res.status(403).json({ message: "Forbidden", code: VISIT_NO_ACCESS });
+    return;
+  }
+
+  const recentCutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const [recentRows, historicalRows] = await Promise.all([
+    db
+      .select({ plateState: siteVisitsTable.plateState })
+      .from(siteVisitsTable)
+      .where(and(
+        eq(siteVisitsTable.siteLocationId, siteId),
+        isNotNull(siteVisitsTable.plateState),
+        gte(siteVisitsTable.checkInTime, recentCutoff),
+      )),
+    db
+      .select({ plateState: siteVisitsTable.plateState })
+      .from(siteVisitsTable)
+      .where(and(
+        eq(siteVisitsTable.siteLocationId, siteId),
+        isNotNull(siteVisitsTable.plateState),
+        lt(siteVisitsTable.checkInTime, recentCutoff),
+      )),
+  ]);
+
+  res.json({
+    preferred: rankPreferredPlateStates(
+      countPlateStates(recentRows),
+      countPlateStates(historicalRows),
+      NATIONAL_PLATE_STATE_FALLBACK,
+    ),
+  });
 });
 
 // ---------- GET /api/visits/:id — staff detail with role-aware access ----------
