@@ -5,6 +5,7 @@ import request from "supertest";
 import { buildTestCookie } from "../test-utils/session";
 import { attachTestErrorMiddleware, expectStatus } from "../test-utils/route-app";
 import { makeTicketRow } from "../test-utils/ticket-row";
+import { formatTooFarFromSiteMessage } from "@workspace/map-utils";
 
 // ─────────────────────────────────────────────────────────────────────────
 // Task #145 — geofence enforcement on the field-side ticket endpoints.
@@ -286,6 +287,10 @@ describe("POST /tickets — geofence rejection (Task #145)", () => {
     expect(res.body.code).toBe("off_geofence");
     expect(res.body.distanceMeters).toBeGreaterThan(SITE_RADIUS);
     expect(res.body.radiusMeters).toBe(SITE_RADIUS);
+    expect(res.body.message).toBe(
+      formatTooFarFromSiteMessage(res.body.distanceMeters, res.body.radiusMeters),
+    );
+    expect(res.body.message).not.toMatch(/\d+m away/);
     // Crucially, no insert and no transition row — the request must
     // bail before reaching the transaction.
     expect(insertValuesSpy).not.toHaveBeenCalled();
@@ -446,6 +451,10 @@ describe("POST /tickets/:id/check-in — geofence rejection (Task #145)", () => 
     expect(res.body.code).toBe("off_geofence");
     expect(res.body.distanceMeters).toBeGreaterThan(SITE_RADIUS);
     expect(res.body.radiusMeters).toBe(SITE_RADIUS);
+    expect(res.body.message).toBe(
+      formatTooFarFromSiteMessage(res.body.distanceMeters, res.body.radiusMeters),
+    );
+    expect(res.body.message).not.toMatch(/\d+m away/);
     // No update, no transition row — the request must bail before the
     // status CAS transaction runs.
     expect(updateSetSpy).not.toHaveBeenCalled();
@@ -468,6 +477,10 @@ describe("POST /tickets/:id/check-in — geofence rejection (Task #145)", () => 
     expect(res.body.code).toBe("off_geofence");
     expect(res.body.radiusMeters).toBe(1609);
     expect(res.body.distanceMeters).toBeGreaterThan(1609);
+    expect(res.body.message).toBe(
+      formatTooFarFromSiteMessage(res.body.distanceMeters, res.body.radiusMeters),
+    );
+    expect(res.body.message).toMatch(/must be within 1 mile/);
   });
 
   it("accepts the check-in when coords are inside the geofence", async () => {

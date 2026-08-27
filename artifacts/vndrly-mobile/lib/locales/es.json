@@ -283,7 +283,7 @@
     "errorDenyInvite": "No se pudo rechazar el ticket",
     "errorCheckIn": "No se pudo registrar la entrada",
     "errorCheckOut": "No se pudo registrar la salida",
-    "offGeofence": "Está a {{distance}} m — debe estar a menos de {{radius}} m del sitio para registrarse.",
+    "offGeofence": "Está a {{distance}} millas — debe estar a menos de {{radius}} millas del sitio para registrarse.",
     "errorClose": "No se pudo cerrar para revisión",
     "markAwaitingPayment": "En Espera de Pago",
     "awaitingPaymentTitle": "¿Marcar en espera de pago?",

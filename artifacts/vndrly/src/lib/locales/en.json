@@ -1379,7 +1379,7 @@
       "siteNotFound": "Site not found.",
       "errorTitle": "Could not complete request",
       "metersSuffix": "m",
-      "offGeofence": "You are {{distance}} m away — must be within {{radius}} m of the site to check in."
+      "offGeofence": "You are {{distance}} miles away — must be within {{radius}} miles of the site to check in."
     }
   },
   "fieldNewTicket": {
@@ -1406,7 +1406,7 @@
     "stamped": "Time, GPS, and your identity will be stamped on this ticket.",
     "createdToast": "Checked in & ticket created",
     "createFailed": "Failed to create ticket",
-    "offGeofence": "You are {{distance}} m away — must be within {{radius}} m of the site to check in."
+    "offGeofence": "You are {{distance}} miles away — must be within {{radius}} miles of the site to check in."
   },
   "fieldHome": {
     "portal": "Field Employee Portal",
