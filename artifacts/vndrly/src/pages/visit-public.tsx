@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { OFF_GEOFENCE } from "@workspace/visit-error-codes";
+import { formatMetersAsMiles } from "@workspace/map-utils";
 import { visitsApi, type SiteContext, type VisitorRow } from "@/lib/visits-api";
 import { PngPillButton as PillButton } from "@/components/png-pill-rollover";
 import BlueButton from "@/components/blue-button";
@@ -181,8 +182,8 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
       ) {
         setError(
           t("visitor.public.offGeofence", {
-            distance: data.distanceMeters,
-            radius: data.radiusMeters,
+            distance: formatMetersAsMiles(data.distanceMeters),
+            radius: formatMetersAsMiles(data.radiusMeters),
           })
         );
       } else {

@@ -36,6 +36,7 @@ import { enforceGateOcrRateLimit } from "../lib/gate-ocr-rate-limit";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { officeMayAccessGateOps, sessionHasGateOpsScope } from "../lib/gate-ops-access";
 import { isGeofenceBypassActive } from "../lib/geo";
+import { formatTooFarFromSiteMessage } from "@workspace/map-utils";
 import {
   AUTH_GUEST_REQUIRED,
   AUTH_GUEST_EXPIRED,
@@ -740,7 +741,7 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
   const meters = distanceMeters(b.latitude, b.longitude, site.latitude, site.longitude);
   if (meters > radius && !isGeofenceBypassActive()) {
     res.status(400).json({
-      message: `You are too far from the site (${Math.round(meters)}m away, must be within ${radius}m).`,
+      message: formatTooFarFromSiteMessage(meters, radius),
       code: OFF_GEOFENCE,
       distanceMeters: Math.round(meters),
       radiusMeters: radius,
@@ -967,7 +968,7 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
   // every flow without being physically at a Mach/Exxon site.
   if (meters > radius && !isGeofenceBypassActive()) {
     res.status(400).json({
-      message: `You are too far from the site (${Math.round(meters)}m away, must be within ${radius}m).`,
+      message: formatTooFarFromSiteMessage(meters, radius),
       code: OFF_GEOFENCE,
       distanceMeters: Math.round(meters),
       radiusMeters: radius,

@@ -1379,7 +1379,7 @@
       "siteNotFound": "Sitio no encontrado.",
       "errorTitle": "No se pudo completar la solicitud",
       "metersSuffix": "m",
-      "offGeofence": "Está a {{distance}} m — debe estar a menos de {{radius}} m del sitio para registrarse."
+      "offGeofence": "Está a {{distance}} millas — debe estar a menos de {{radius}} millas del sitio para registrarse."
     }
   },
   "fieldNewTicket": {
@@ -1406,7 +1406,7 @@
     "stamped": "La hora, el GPS y tu identidad se registrarán en este ticket.",
     "createdToast": "Entrada registrada y ticket creado",
     "createFailed": "No se pudo crear el ticket",
-    "offGeofence": "Está a {{distance}} m — debe estar a menos de {{radius}} m del sitio para registrarse."
+    "offGeofence": "Está a {{distance}} millas — debe estar a menos de {{radius}} millas del sitio para registrarse."
   },
   "fieldHome": {
     "portal": "Portal del Empleado de Campo",

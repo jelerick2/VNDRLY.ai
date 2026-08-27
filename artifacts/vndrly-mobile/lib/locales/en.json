@@ -283,7 +283,7 @@
     "errorDenyInvite": "Failed to deny ticket",
     "errorCheckIn": "Failed to check in",
     "errorCheckOut": "Failed to check out",
-    "offGeofence": "You are {{distance}} m away — must be within {{radius}} m of the site to check in.",
+    "offGeofence": "You are {{distance}} miles away — must be within {{radius}} miles of the site to check in.",
     "errorClose": "Failed to close for review",
     "markAwaitingPayment": "Awaiting Payment",
     "awaitingPaymentTitle": "Mark awaiting payment?",

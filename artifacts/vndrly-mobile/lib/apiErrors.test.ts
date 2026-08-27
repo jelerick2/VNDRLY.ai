@@ -177,18 +177,18 @@ describe("translateApiError", () => {
     }
   });
 
-  it("interpolates off_geofence with distance and radius", () => {
+  it("interpolates off_geofence with distance and radius in miles", () => {
     const t = makeT({
       "tickets.offGeofence":
-        "You're {{distance}}m away — must be within {{radius}}m.",
+        "You're {{distance}} miles away — must be within {{radius}} miles.",
     });
     const err = makeApiError({
       message: "Off geofence",
       status: 400,
-      data: { code: OFF_GEOFENCE, distanceMeters: 320, radiusMeters: 150 },
+      data: { code: OFF_GEOFENCE, distanceMeters: 106800, radiusMeters: 1609 },
     });
     expect(translateApiError(err, t)).toBe(
-      "You're 320m away — must be within 150m.",
+      "You're 66.4 miles away — must be within 1 miles.",
     );
   });
 
@@ -608,6 +608,13 @@ describe("translateApiError — Task #531 Spanish coverage", () => {
     it("tickets.offGeofence interpolation key exists in en + es", () => {
       expect(lookup(en, "tickets.offGeofence")).toBeDefined();
       expect(lookup(es, "tickets.offGeofence")).toBeDefined();
+    });
+
+    it("tickets.offGeofence EN/ES copy uses miles, not meters", () => {
+      expect(lookup(en, "tickets.offGeofence")).toMatch(/miles/);
+      expect(lookup(en, "tickets.offGeofence")).not.toMatch(/\{\{distance\}\} m /);
+      expect(lookup(es, "tickets.offGeofence")).toMatch(/millas/);
+      expect(lookup(es, "tickets.offGeofence")).not.toMatch(/\{\{distance\}\} m /);
     });
   });
 

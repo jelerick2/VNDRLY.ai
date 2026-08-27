@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import request from "supertest";
 import { attachTestErrorMiddleware, expectStatus } from "../test-utils/route-app";
 import { buildTestCookie } from "../test-utils/session";
+import { formatTooFarFromSiteMessage } from "@workspace/map-utils";
 
 // ── Tiny in-memory store with predicate-aware query evaluation ───────────────
 //
@@ -650,6 +651,11 @@ describe("POST /api/visits/check-in", () => {
     expect(res.body.code).toBe("off_geofence");
     expect(res.body.distanceMeters).toBeGreaterThan(site.siteRadiusMeters);
     expect(res.body.radiusMeters).toBe(site.siteRadiusMeters);
+    expect(res.body.message).toBe(
+      formatTooFarFromSiteMessage(res.body.distanceMeters, res.body.radiusMeters),
+    );
+    expect(res.body.message).toMatch(/miles/);
+    expect(res.body.message).not.toMatch(/\d+m away/);
     expect(fixtures.siteVisits).toHaveLength(0);
   });
 
