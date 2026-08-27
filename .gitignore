@@ -65,6 +65,8 @@ Thumbs.db
 # Local scratch / automation output
 .cache/
 .local/
+.worktrees/
+.superpowers/
 lib/e2e/scripts/.replit-profile/
 
 # Per-run output of `pnpm --filter @workspace/api-server run eval`. The
