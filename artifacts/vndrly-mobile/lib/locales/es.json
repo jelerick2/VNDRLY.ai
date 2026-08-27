@@ -443,6 +443,8 @@
     "phone": "Teléfono",
     "email": "Correo",
     "company": "Empresa",
+    "plateState": "Estado de la placa",
+    "plateStateRequired": "Se requiere el estado de la placa.",
     "vehiclePlate": "Placa del vehículo",
     "purpose": "Motivo de la visita",
     "purposePlaceholder": "Ej. entrega de equipo",

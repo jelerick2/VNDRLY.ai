@@ -21,6 +21,12 @@ export type GuestSession = {
   profile: GuestProfile;
 };
 
+export type GuestSessionRead = Omit<GuestSession, "token">;
+
+export type PreferredPlateStatesResponse = {
+  preferred: PlateStateCode[];
+};
+
 export type GuestSignUpInput = {
   firstName: string;
   lastName: string;
@@ -50,6 +56,10 @@ export async function startGuestSession(input: GuestSignUpInput): Promise<GuestS
   return data;
 }
 
+export async function fetchGuestSession(): Promise<GuestSessionRead> {
+  return apiFetch<GuestSessionRead>("/api/auth/guest/me");
+}
+
 export type SiteContext = {
   site: {
     id: number;
@@ -66,6 +76,10 @@ export type SiteContext = {
 
 export async function fetchSiteContext(siteCode: string): Promise<SiteContext> {
   return apiFetch<SiteContext>(`/api/visits/site-context/${encodeURIComponent(siteCode)}`);
+}
+
+export async function fetchPreferredPlateStates(siteId: number): Promise<PreferredPlateStatesResponse> {
+  return apiFetch<PreferredPlateStatesResponse>(`/api/visits/sites/${siteId}/preferred-plate-states`);
 }
 
 export type ActiveVisit = {

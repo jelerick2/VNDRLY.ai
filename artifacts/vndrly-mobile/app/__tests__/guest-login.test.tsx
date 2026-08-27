@@ -37,6 +37,7 @@ const ES_STRINGS: Record<string, string> = {
   "visitor.error": "Error",
   "visitor.requireName": "El nombre y el apellido son obligatorios.",
   "visitor.requireSafety": "Por favor confirme que acepta las reglas de seguridad.",
+  "visitor.plateStateRequired": "Se requiere el estado de la placa.",
   "common.required": "Obligatorio",
   "errors.guest.name_required": "El nombre y apellido son obligatorios.",
   "errors.guest.safety_required":
@@ -177,7 +178,81 @@ function toggleSwitch(testId: string): void {
   fireEvent.click(checkbox);
 }
 
+function tap(el: HTMLElement): void {
+  fireEvent.pointerDown(el);
+  fireEvent.pointerUp(el);
+  fireEvent.click(el);
+}
+
+function selectPlateState(name: string): void {
+  tap(screen.getByRole("button", { name: /^(Select plate state|Selected plate state:)/ }));
+  tap(screen.getByRole("button", { name: `${name}, state option` }));
+}
+
 describe("GuestLoginScreen — sign-up form", () => {
+  it("renders the national state fallback immediately before the plate input and keeps all 51 choices", () => {
+    render(<GuestLoginScreen />);
+
+    const trigger = screen.getByRole("button", { name: "Select plate state" });
+    const plateInput = firstByTestId("guest-vehicle-plate");
+    expect(trigger.compareDocumentPosition(plateInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    tap(trigger);
+    const stateOptions = screen.getAllByRole("button", { name: /state option$/ });
+    expect(stateOptions).toHaveLength(51);
+    expect(stateOptions.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
+      "California (CA), state option",
+      "Texas (TX), state option",
+      "New York (NY), state option",
+    ]);
+  });
+
+  it("blocks a nonblank plate without state and exposes an accessible error", () => {
+    render(<GuestLoginScreen />);
+    setText("guest-first-name", "Jane");
+    setText("guest-last-name", "Doe");
+    setText("guest-vehicle-plate", "ABC123");
+    toggleSwitch("guest-safety-switch");
+
+    fireEvent.click(firstByTestId("guest-submit-btn"));
+
+    expect(startGuestSessionMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe("Se requiere el estado de la placa.");
+  });
+
+  it("sends a normalized state separately from the plate number", async () => {
+    render(<GuestLoginScreen />);
+    setText("guest-first-name", "Jane");
+    setText("guest-last-name", "Doe");
+    selectPlateState("Texas (TX)");
+    setText("guest-vehicle-plate", " abc123 ");
+    toggleSwitch("guest-safety-switch");
+
+    fireEvent.click(firstByTestId("guest-submit-btn"));
+
+    await waitFor(() => expect(startGuestSessionMock).toHaveBeenCalledTimes(1));
+    expect(startGuestSessionMock.mock.calls[0][0]).toMatchObject({
+      plateState: "TX",
+      vehiclePlate: "ABC123",
+    });
+  });
+
+  it("does not send a selected state when the plate is blank", async () => {
+    render(<GuestLoginScreen />);
+    setText("guest-first-name", "Jane");
+    setText("guest-last-name", "Doe");
+    selectPlateState("Texas (TX)");
+    toggleSwitch("guest-safety-switch");
+
+    fireEvent.click(firstByTestId("guest-submit-btn"));
+
+    await waitFor(() => expect(startGuestSessionMock).toHaveBeenCalledTimes(1));
+    expect(startGuestSessionMock.mock.calls[0][0]).toMatchObject({
+      plateState: undefined,
+      vehiclePlate: undefined,
+    });
+  });
+
   it("renders the title, all required inputs, and the submit button", () => {
     render(<GuestLoginScreen />);
 
@@ -222,6 +297,7 @@ describe("GuestLoginScreen — sign-up form", () => {
     setText("guest-phone", " 555-1234 ");
     setText("guest-email", " jane@example.com ");
     setText("guest-company", " Acme ");
+    selectPlateState("Texas (TX)");
     setText("guest-vehicle-plate", " ABC123 ");
     setText("guest-purpose", " Inspection ");
     toggleSwitch("guest-safety-switch");
@@ -240,6 +316,7 @@ describe("GuestLoginScreen — sign-up form", () => {
       email: "jane@example.com",
       company: "Acme",
       vehiclePlate: "ABC123",
+      plateState: "TX",
       purpose: "Inspection",
       safetyAcknowledged: true,
     });
@@ -268,6 +345,7 @@ describe("GuestLoginScreen — sign-up form", () => {
       email: undefined,
       company: undefined,
       vehiclePlate: undefined,
+      plateState: undefined,
       purpose: undefined,
       safetyAcknowledged: true,
     });

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -18,6 +18,14 @@ import {
   View,
 } from "react-native";
 import ScreenSafeArea from "@/components/ScreenSafeArea";
+import PlateStatePicker from "@/components/PlateStatePicker";
+
+import {
+  NATIONAL_PLATE_STATE_FALLBACK,
+  normalizePlateNumber,
+  normalizePlateState,
+  type PlateStateCode,
+} from "@workspace/plate-state";
 
 import AmberButton from "@/components/AmberButton";
 import VisitorHostPicker from "@/components/VisitorHostPicker";
@@ -27,6 +35,8 @@ import { translateApiError } from "@/lib/apiErrors";
 import { captureAndUploadImage } from "@/lib/photos";
 import {
   fetchActiveVisit,
+  fetchGuestSession,
+  fetchPreferredPlateStates,
   fetchSiteContext,
   guestLogout,
   visitorCheckOut,
@@ -81,6 +91,9 @@ export default function VisitorCheckInScreen() {
   const [hostKey, setHostKey] = useState<string | null>(null);
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
+  const [plateStateError, setPlateStateError] = useState<string | null>(null);
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -94,6 +107,7 @@ export default function VisitorCheckInScreen() {
   // form. Tracked here so any 401 — from queries or mutations — can flip
   // it on without prop-drilling.
   const [sessionExpired, setSessionExpired] = useState(false);
+  const restoredGuestProfile = useRef(false);
 
   const onScanned = ({ data }: { data: string }) => {
     if (!scanning) return;
@@ -130,6 +144,12 @@ export default function VisitorCheckInScreen() {
     retry: false,
   });
 
+  const guestQuery = useQuery({
+    queryKey: ["guest-session"],
+    queryFn: fetchGuestSession,
+    retry: false,
+  });
+
   const ctxQuery = useQuery<SiteContext>({
     queryKey: ["site-context", confirmedCode],
     queryFn: () => fetchSiteContext(confirmedCode!),
@@ -137,16 +157,32 @@ export default function VisitorCheckInScreen() {
     retry: false,
   });
 
+  const preferredPlateStates = useQuery({
+    queryKey: ["preferred-plate-states", ctxQuery.data?.site.id],
+    queryFn: () => fetchPreferredPlateStates(ctxQuery.data!.site.id),
+    enabled: Boolean(ctxQuery.data?.site.id),
+    retry: false,
+  });
+  const orderedStatePreferences = preferredPlateStates.data?.preferred
+    ?? NATIONAL_PLATE_STATE_FALLBACK;
+
+  useEffect(() => {
+    if (!guestQuery.data || restoredGuestProfile.current) return;
+    restoredGuestProfile.current = true;
+    setVehiclePlate(normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "");
+    setPlateState(normalizePlateState(guestQuery.data.profile.plateState));
+  }, [guestQuery.data]);
+
   // Background queries swallow rejected promises into `query.error`, so the
-  // catch blocks on the mutations can't see them. Watch the two query
+  // catch blocks on the mutations can't see them. Watch all three query
   // errors here and flip into the session-expired screen the same way a
   // mutation 401 would.
   useEffect(() => {
     if (sessionExpired) return;
-    if (is401(activeQuery.error) || is401(ctxQuery.error)) {
+    if (is401(activeQuery.error) || is401(guestQuery.error) || is401(ctxQuery.error)) {
       setSessionExpired(true);
     }
-  }, [activeQuery.error, ctxQuery.error, sessionExpired]);
+  }, [activeQuery.error, guestQuery.error, ctxQuery.error, sessionExpired]);
 
   const onConfirmSite = () => {
     const code = siteCode.trim().toUpperCase();
@@ -168,6 +204,10 @@ export default function VisitorCheckInScreen() {
   };
 
   const onCheckIn = async () => {
+    if (vehiclePlate.trim() && !plateState) {
+      setPlateStateError(t("visitor.plateStateRequired"));
+      return;
+    }
     const ctx = ctxQuery.data;
     if (!ctx || !hostKey) {
       Alert.alert(t("visitor.error"), t("visitor.pickHost"));
@@ -180,18 +220,25 @@ export default function VisitorCheckInScreen() {
         hostKey,
         purpose,
         durationStr: duration,
+        vehiclePlate,
+        plateState,
         platePhotoUrl: platePhotoUrl ?? undefined,
         vehiclePhotoUrl: vehiclePhotoUrl ?? undefined,
       });
       if (!result.ok) {
         if (result.reason === "no-host") {
           Alert.alert(t("visitor.error"), t("visitor.pickHost"));
+        } else if (result.reason === "missing-state") {
+          setPlateStateError(t("visitor.plateStateRequired"));
         } else if (result.reason === "location-denied") {
           Alert.alert(t("visitor.error"), t("visitor.locationDenied"));
         }
         return;
       }
       await qc.invalidateQueries({ queryKey: ["visit-active"] });
+      setVehiclePlate("");
+      setPlateState(null);
+      setPlateStateError(null);
     } catch (e) {
       if (is401(e)) {
         setSessionExpired(true);
@@ -222,6 +269,9 @@ export default function VisitorCheckInScreen() {
       setSiteCode("");
       setHostKey(null);
       setPurpose("");
+      setVehiclePlate("");
+      setPlateState(null);
+      setPlateStateError(null);
       setPlatePhotoUrl(null);
       setVehiclePhotoUrl(null);
     } catch (e) {
@@ -401,36 +451,62 @@ export default function VisitorCheckInScreen() {
                   </View>
                 </View>
               ) : ctxQuery.data && siteConfirmed ? (
-                <VisitorHostPicker
-                  ctx={ctxQuery.data}
-                  hostKey={hostKey}
-                  onSelectHost={setHostKey}
-                  purpose={purpose}
-                  onPurposeChange={setPurpose}
-                  duration={duration}
-                  onDurationChange={setDuration}
-                  busy={busy}
-                  platePhotoAttached={!!platePhotoUrl}
-                  vehiclePhotoAttached={!!vehiclePhotoUrl}
-                  onCapturePlatePhoto={() => onCaptureEvidence("plate")}
-                  onCaptureVehiclePhoto={() => onCaptureEvidence("vehicle")}
-                  onSubmit={onCheckIn}
-                  onChangeSite={onChangeSite}
-                  labels={{
-                    changeSite: t("visitor.changeSite"),
-                    whoVisiting: t("visitor.whoVisiting"),
-                    noHosts: t("visitor.noHosts"),
-                    purpose: t("visitor.purpose"),
-                    purposePlaceholder: t("visitor.purposePlaceholder"),
-                    expectedMinutes: t("visitor.expectedMinutes"),
-                    vehicleEvidence: t("visitor.vehicleEvidence"),
-                    capturePlatePhoto: t("visitor.capturePlatePhoto"),
-                    captureVehiclePhoto: t("visitor.captureVehiclePhoto"),
-                    attached: t("visitor.photoAttached"),
-                    checkIn: t("visitor.checkIn"),
-                    geofenceNote: t("visitor.geofenceNote"),
-                  }}
-                />
+                <View>
+                  <View style={[styles.vehicleFields, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.plateState")}</Text>
+                    <PlateStatePicker
+                      value={plateState}
+                      onChange={(state) => {
+                        setPlateState(state);
+                        setPlateStateError(null);
+                      }}
+                      preferredStates={orderedStatePreferences}
+                      error={plateStateError ?? undefined}
+                    />
+                    <Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>{t("visitor.vehiclePlate")}</Text>
+                    <TextInput
+                      testID="visitor-vehicle-plate"
+                      value={vehiclePlate}
+                      onChangeText={(value) => {
+                        setVehiclePlate(value.toUpperCase());
+                        if (!value.trim()) setPlateStateError(null);
+                      }}
+                      autoCapitalize="characters"
+                      placeholderTextColor={colors.mutedForeground}
+                      style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+                    />
+                  </View>
+                  <VisitorHostPicker
+                    ctx={ctxQuery.data}
+                    hostKey={hostKey}
+                    onSelectHost={setHostKey}
+                    purpose={purpose}
+                    onPurposeChange={setPurpose}
+                    duration={duration}
+                    onDurationChange={setDuration}
+                    busy={busy}
+                    platePhotoAttached={!!platePhotoUrl}
+                    vehiclePhotoAttached={!!vehiclePhotoUrl}
+                    onCapturePlatePhoto={() => onCaptureEvidence("plate")}
+                    onCaptureVehiclePhoto={() => onCaptureEvidence("vehicle")}
+                    onSubmit={onCheckIn}
+                    onChangeSite={onChangeSite}
+                    labels={{
+                      changeSite: t("visitor.changeSite"),
+                      whoVisiting: t("visitor.whoVisiting"),
+                      noHosts: t("visitor.noHosts"),
+                      purpose: t("visitor.purpose"),
+                      purposePlaceholder: t("visitor.purposePlaceholder"),
+                      expectedMinutes: t("visitor.expectedMinutes"),
+                      vehicleEvidence: t("visitor.vehicleEvidence"),
+                      capturePlatePhoto: t("visitor.capturePlatePhoto"),
+                      captureVehiclePhoto: t("visitor.captureVehiclePhoto"),
+                      attached: t("visitor.photoAttached"),
+                      checkIn: t("visitor.checkIn"),
+                      geofenceNote: t("visitor.geofenceNote"),
+                    }}
+                  />
+                </View>
               ) : null}
             </View>
           )}
@@ -468,4 +544,5 @@ const styles = StyleSheet.create({
   scannerCancel: { position: "absolute", bottom: 18, paddingHorizontal: 22, paddingVertical: 10, borderRadius: 22 },
   scannerCancelText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   sessionExpiredContainer: { flex: 1, justifyContent: "center" },
+  vehicleFields: { borderWidth: 1, borderRadius: 12, padding: 16, marginTop: 16, marginBottom: 12 },
 });

@@ -61,6 +61,7 @@ const ES_STRINGS: Record<string, string> = {
   "visitor.sessionExpiredBody":
     "Las sesiones de visitante duran 24 horas. Inicie sesión de nuevo para continuar registrándose.",
   "visitor.signInAgain": "Iniciar sesión de nuevo",
+  "visitor.plateStateRequired": "Se requiere el estado de la placa.",
 };
 
 function interpolate(
@@ -122,20 +123,26 @@ vi.mock("@/lib/auth", () => ({
 
 const {
   fetchActiveVisitMock,
+  fetchGuestSessionMock,
   fetchSiteContextMock,
+  fetchPreferredPlateStatesMock,
   visitorCheckOutMock,
   guestLogoutMock,
   visitorCheckInMock,
 } = vi.hoisted(() => ({
   fetchActiveVisitMock: vi.fn(),
+  fetchGuestSessionMock: vi.fn(),
   fetchSiteContextMock: vi.fn(),
+  fetchPreferredPlateStatesMock: vi.fn(),
   visitorCheckOutMock: vi.fn(),
   guestLogoutMock: vi.fn(),
   visitorCheckInMock: vi.fn(),
 }));
 vi.mock("@/lib/guest", () => ({
   fetchActiveVisit: (...a: unknown[]) => fetchActiveVisitMock(...a),
+  fetchGuestSession: (...a: unknown[]) => fetchGuestSessionMock(...a),
   fetchSiteContext: (...a: unknown[]) => fetchSiteContextMock(...a),
+  fetchPreferredPlateStates: (...a: unknown[]) => fetchPreferredPlateStatesMock(...a),
   visitorCheckOut: (...a: unknown[]) => visitorCheckOutMock(...a),
   guestLogout: (...a: unknown[]) => guestLogoutMock(...a),
   visitorCheckIn: (...a: unknown[]) => visitorCheckInMock(...a),
@@ -204,6 +211,22 @@ beforeEach(() => {
   camPermRef.current = { granted: true };
   requestCamPermMock.mockImplementation(async () => ({ granted: true }));
   fetchActiveVisitMock.mockResolvedValue(null);
+  fetchGuestSessionMock.mockResolvedValue({
+    guestSessionId: 1,
+    role: "guest",
+    expiresAt: "2026-08-28T12:00:00.000Z",
+    profile: {
+      firstName: "Jane",
+      lastName: "Doe",
+      phone: null,
+      email: null,
+      company: null,
+      vehiclePlate: null,
+      plateState: null,
+      lastPurpose: null,
+    },
+  });
+  fetchPreferredPlateStatesMock.mockResolvedValue({ preferred: ["CA", "TX", "NY", "FL", "OH"] });
 });
 
 const SITE_CTX: SiteContext = {
@@ -260,6 +283,126 @@ function isDisabled(el: HTMLElement): boolean {
 }
 
 describe("VisitorCheckInScreen — full screen render flow", () => {
+  it("loads site-preferred states and renders the picker immediately before the plate input", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    fetchPreferredPlateStatesMock.mockResolvedValue({ preferred: ["OK", "TX"] });
+    renderScreen();
+
+    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("accept-site-btn"));
+
+    await waitFor(() => expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42));
+    const trigger = screen.getByRole("button", { name: "Select plate state" });
+    const plateInput = firstByTestId("visitor-vehicle-plate");
+    expect(trigger.compareDocumentPosition(plateInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    tap(trigger);
+    const options = screen.getAllByRole("button", { name: /state option$/ });
+    expect(options).toHaveLength(51);
+    expect(options.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
+      "Oklahoma (OK), state option",
+      "Texas (TX), state option",
+      "Alabama (AL), state option",
+    ]);
+  });
+
+  it("uses the national fallback when preferred-state ranking fails", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    fetchPreferredPlateStatesMock.mockRejectedValue(new Error("unavailable"));
+    renderScreen();
+
+    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("accept-site-btn"));
+    await waitFor(() => expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42));
+    tap(screen.getByRole("button", { name: "Select plate state" }));
+
+    const options = screen.getAllByRole("button", { name: /state option$/ });
+    expect(options.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
+      "California (CA), state option",
+      "Texas (TX), state option",
+      "New York (NY), state option",
+    ]);
+  });
+
+  it("restores normalized guest-session plate values across remounts and sends both fields", async () => {
+    fetchGuestSessionMock.mockResolvedValue({
+      guestSessionId: 1,
+      role: "guest",
+      expiresAt: "2026-08-28T12:00:00.000Z",
+      profile: {
+        firstName: "Jane",
+        lastName: "Doe",
+        phone: null,
+        email: null,
+        company: null,
+        vehiclePlate: "ABC123",
+        plateState: "TX",
+        lastPurpose: null,
+      },
+    });
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    requestForegroundPermissionsAsyncMock.mockResolvedValue({ status: "granted" });
+    getCurrentPositionAsyncMock.mockResolvedValue({ coords: { latitude: 1.23, longitude: 4.56 } });
+    visitorCheckInMock.mockResolvedValue({ id: 999 });
+
+    const firstRender = renderScreen();
+    await waitFor(() => expect(fetchGuestSessionMock).toHaveBeenCalled());
+    firstRender.unmount();
+    renderScreen();
+    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("accept-site-btn"));
+
+    expect(await screen.findByRole("button", { name: "Selected plate state: Texas (TX)" })).toBeTruthy();
+    expect((firstByTestId("visitor-vehicle-plate") as HTMLInputElement).value).toBe("ABC123");
+    tap(firstByTestId("host-option-partner:7"));
+    tap(firstByTestId("check-in-btn"));
+
+    await waitFor(() => expect(visitorCheckInMock).toHaveBeenCalledTimes(1));
+    expect(visitorCheckInMock.mock.calls[0][0]).toMatchObject({
+      plateState: "TX",
+      vehiclePlate: "ABC123",
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Select plate state" })).toBeTruthy();
+      expect((firstByTestId("visitor-vehicle-plate") as HTMLInputElement).value).toBe("");
+    });
+  });
+
+  it("blocks a restored plate without state before requesting location or check-in", async () => {
+    fetchGuestSessionMock.mockResolvedValue({
+      guestSessionId: 1,
+      role: "guest",
+      expiresAt: "2026-08-28T12:00:00.000Z",
+      profile: {
+        firstName: "Jane",
+        lastName: "Doe",
+        phone: null,
+        email: null,
+        company: null,
+        vehiclePlate: "ABC123",
+        plateState: null,
+        lastPurpose: null,
+      },
+    });
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    renderScreen();
+
+    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("accept-site-btn"));
+    tap(firstByTestId("host-option-partner:7"));
+    await waitFor(() => expect(isDisabled(firstByTestId("check-in-btn"))).toBe(false));
+    tap(firstByTestId("check-in-btn"));
+
+    expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
+    expect(visitorCheckInMock).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toBe("Se requiere el estado de la placa.");
+    });
+  });
+
   it("shows the site code form once the active-visit query resolves with no active visit", async () => {
     renderScreen();
     const codeInput = await findFirstByTestId("site-code-input");

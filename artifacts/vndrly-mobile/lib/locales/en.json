@@ -443,6 +443,8 @@
     "phone": "Phone",
     "email": "Email",
     "company": "Company",
+    "plateState": "Plate State",
+    "plateStateRequired": "A plate state is required.",
     "vehiclePlate": "Vehicle Plate",
     "purpose": "Purpose of Visit",
     "purposePlaceholder": "e.g. Equipment delivery",

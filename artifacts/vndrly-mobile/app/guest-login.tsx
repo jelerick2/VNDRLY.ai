@@ -14,6 +14,13 @@ import {
   View,
 } from "react-native";
 import ScreenSafeArea from "@/components/ScreenSafeArea";
+import PlateStatePicker from "@/components/PlateStatePicker";
+
+import {
+  NATIONAL_PLATE_STATE_FALLBACK,
+  normalizePlateNumber,
+  type PlateStateCode,
+} from "@workspace/plate-state";
 
 import AmberButton from "@/components/AmberButton";
 import LanguageToggle from "@/components/LanguageToggle";
@@ -30,6 +37,7 @@ export default function GuestLoginScreen() {
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
+  const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
   const [purpose, setPurpose] = useState("");
   const [safety, setSafety] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -46,13 +54,15 @@ export default function GuestLoginScreen() {
   const firstNameMissing = firstName.trim().length === 0;
   const lastNameMissing = lastName.trim().length === 0;
   const safetyMissing = !safety;
-  const isValid = !firstNameMissing && !lastNameMissing && !safetyMissing;
+  const plateStateMissing = vehiclePlate.trim().length > 0 && !plateState;
+  const isValid = !firstNameMissing && !lastNameMissing && !safetyMissing && !plateStateMissing;
 
   const showFirstNameHint =
     firstNameMissing && (firstNameTouched || attemptedSubmit);
   const showLastNameHint =
     lastNameMissing && (lastNameTouched || attemptedSubmit);
   const showSafetyHint = safetyMissing && attemptedSubmit;
+  const showPlateStateHint = plateStateMissing && attemptedSubmit;
 
   const onSubmit = async () => {
     if (!isValid) {
@@ -66,13 +76,15 @@ export default function GuestLoginScreen() {
     }
     setBusy(true);
     try {
+      const normalizedPlate = normalizePlateNumber(vehiclePlate);
       await startGuestSession({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
         company: company.trim() || undefined,
-        vehiclePlate: vehiclePlate.trim() || undefined,
+        vehiclePlate: normalizedPlate ?? undefined,
+        plateState: normalizedPlate ? plateState ?? undefined : undefined,
         purpose: purpose.trim() || undefined,
         safetyAcknowledged: safety,
       });
@@ -150,8 +162,23 @@ export default function GuestLoginScreen() {
           <Text style={labelStyle}>{t("visitor.company")}</Text>
           <TextInput testID="guest-company" value={company} onChangeText={setCompany} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
 
+          <Text style={labelStyle}>{t("visitor.plateState")}</Text>
+          <PlateStatePicker
+            value={plateState}
+            onChange={setPlateState}
+            preferredStates={NATIONAL_PLATE_STATE_FALLBACK}
+            error={showPlateStateHint ? t("visitor.plateStateRequired") : undefined}
+          />
+
           <Text style={labelStyle}>{t("visitor.vehiclePlate")}</Text>
-          <TextInput testID="guest-vehicle-plate" value={vehiclePlate} onChangeText={setVehiclePlate} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+          <TextInput
+            testID="guest-vehicle-plate"
+            value={vehiclePlate}
+            onChangeText={(value) => setVehiclePlate(value.toUpperCase())}
+            autoCapitalize="characters"
+            style={inputStyle}
+            placeholderTextColor={colors.mutedForeground}
+          />
 
           <Text style={labelStyle}>{t("visitor.purpose")}</Text>
           <TextInput testID="guest-purpose" value={purpose} onChangeText={setPurpose} style={inputStyle} placeholder={t("visitor.purposePlaceholder")} placeholderTextColor={colors.mutedForeground} />

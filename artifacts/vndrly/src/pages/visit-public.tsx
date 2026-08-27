@@ -1,11 +1,17 @@
 import { PngPillButton } from "@/components/png-pill-rollover";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { OFF_GEOFENCE } from "@workspace/visit-error-codes";
 import { visitsApi, type SiteContext, type VisitorRow } from "@/lib/visits-api";
+import {
+  NATIONAL_PLATE_STATE_FALLBACK,
+  normalizePlateNumber,
+  normalizePlateState,
+  type PlateStateCode,
+} from "@workspace/plate-state";
+import { PlateStatePicker } from "@/components/plate-state-picker";
 import { PngPillButton as PillButton } from "@/components/png-pill-rollover";
-import BlueButton from "@/components/blue-button";
 import PortalButton from "@/components/portal-button";
 import SidebarButton from "@/components/sidebar-button";
 import {
@@ -18,7 +24,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import backButtonImg from "@assets/Amber-back-button-logo-tuned.png";
 import headerBg from "@assets/VNDRLY_Header_1776977091600.png";
@@ -37,10 +42,9 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
   const [email, setEmail] = useState("");
   const [company, setCompany] = useState("");
   const [vehiclePlate, setVehiclePlate] = useState("");
-  const [vehicleState, setVehicleState] = useState("");
+  const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
   const [purpose, setPurpose] = useState("");
   const PURPOSE_MAX = 500;
-  const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
   function formatPhone(raw: string) {
     const d = raw.replace(/\D/g, "").slice(0, 10);
     if (d.length === 0) return "";
@@ -55,12 +59,34 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
 
   const [active, setActive] = useState<VisitorRow | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
+  const restoredGuestProfile = useRef(false);
 
   const ctxQuery = useQuery<SiteContext>({
     queryKey: ["site-context-public", siteCode],
     queryFn: () => visitsApi.getSiteContext(siteCode),
     enabled: !!siteCode,
   });
+  const preferredPlateStates = useQuery({
+    queryKey: ["preferred-plate-states-public", ctxQuery.data?.site.id],
+    queryFn: () => visitsApi.listPreferredPlateStates(ctxQuery.data!.site.id),
+    enabled: Boolean(ctxQuery.data?.site.id),
+    retry: false,
+  });
+  const orderedStatePreferences = preferredPlateStates.data?.preferred
+    ?? NATIONAL_PLATE_STATE_FALLBACK;
+
+  const guestQuery = useQuery({
+    queryKey: ["guest-session-public"],
+    queryFn: visitsApi.guestMe,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!guestQuery.data || restoredGuestProfile.current) return;
+    restoredGuestProfile.current = true;
+    setVehiclePlate(normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "");
+    setPlateState(normalizePlateState(guestQuery.data.profile.plateState));
+  }, [guestQuery.data]);
 
   const ctxPartnerLogoUrl = ctxQuery.data?.partner?.logoUrl ?? null;
   useEffect(() => {
@@ -124,18 +150,23 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
     setError(null);
     if (!firstName.trim() || !lastName.trim()) { setError(t("visitor.public.requireName")); return; }
     if (!safety) { setError(t("visitor.public.requireSafety")); return; }
+    const normalizedPlate = normalizePlateNumber(vehiclePlate);
+    if (normalizedPlate && !plateState) return;
     setBusy(true);
     try {
-      await visitsApi.startGuestSession({
+      const session = await visitsApi.startGuestSession({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim() || undefined,
         email: email.trim() || undefined,
         company: company.trim() || undefined,
-        vehiclePlate: vehiclePlate.trim() || undefined,
+        vehiclePlate: normalizedPlate ?? undefined,
+        plateState: normalizedPlate ? plateState ?? undefined : undefined,
         purpose: purpose.trim() || undefined,
         safetyAcknowledged: safety,
       });
+      setVehiclePlate(normalizePlateNumber(session.profile.vehiclePlate) ?? normalizedPlate ?? "");
+      setPlateState(normalizePlateState(session.profile.plateState) ?? (normalizedPlate ? plateState : null));
       setStep("checkin");
     } catch (e) {
       setError(e instanceof Error ? e.message : t("visitor.public.errorTitle"));
@@ -152,6 +183,8 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
 
   const onCheckIn = async () => {
     setError(null);
+    const normalizedPlate = normalizePlateNumber(vehiclePlate);
+    if (normalizedPlate && !plateState) return;
     const ctx = ctxQuery.data;
     if (!ctx || !hostKey) { setError(t("visitor.public.pickHost")); return; }
     const host = hostOptions.find((o) => o.key === hostKey);
@@ -167,6 +200,7 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
         hostVendorId: host.type === "vendor" ? host.id : undefined,
         purpose: purpose.trim() || undefined,
         expectedDurationMinutes: Number.isFinite(dur) && dur > 0 ? dur : undefined,
+        ...(normalizedPlate ? { vehiclePlate: normalizedPlate, plateState: plateState ?? undefined } : {}),
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
       });
@@ -203,6 +237,17 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
       await visitsApi.checkOut(active.id, lat, lng);
       try { await visitsApi.guestLogout(); } catch {}
       setActive(null);
+      setFirstName("");
+      setLastName("");
+      setPhone("");
+      setEmail("");
+      setCompany("");
+      setVehiclePlate("");
+      setPlateState(null);
+      setPurpose("");
+      setSafety(false);
+      setHostKey(null);
+      setDuration("60");
       setStep("signin");
     } catch (e) {
       setError(e instanceof Error ? e.message : t("visitor.public.errorTitle"));
@@ -327,19 +372,19 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                 <div><Label>{t("visitor.public.email")} *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="input-email" /></div>
               </div>
               <div><Label>{t("visitor.public.company")} *</Label><Input value={company} onChange={(e) => setCompany(e.target.value)} data-testid="input-company" /></div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
-                  <Label>{t("visitor.public.vehiclePlate")} *</Label>
-                  <Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())} maxLength={10} data-testid="input-vehicle-plate" />
+                  <Label>{t("visitor.public.vehicleState")}</Label>
+                  <PlateStatePicker
+                    value={plateState}
+                    onChange={setPlateState}
+                    preferredStates={orderedStatePreferences}
+                    error={vehiclePlate.trim() && !plateState ? t("gatekeeper.plateStateRequired") : undefined}
+                  />
                 </div>
                 <div>
-                  <Label>{t("visitor.public.vehicleState")} *</Label>
-                  <Select value={vehicleState} onValueChange={setVehicleState}>
-                    <SelectTrigger data-testid="select-vehicle-state"><SelectValue placeholder={t("visitor.public.selectState")} /></SelectTrigger>
-                    <SelectContent>
-                      {US_STATES.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
+                  <Label>{t("visitor.public.vehiclePlate")}</Label>
+                  <Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())} maxLength={10} data-testid="input-vehicle-plate" />
                 </div>
               </div>
               <div>
@@ -387,8 +432,7 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                   phone.trim().length > 0 &&
                   email.trim().length > 0 &&
                   company.trim().length > 0 &&
-                  vehiclePlate.trim().length > 0 &&
-                  vehicleState.length > 0 &&
+                  (!vehiclePlate.trim() || Boolean(plateState)) &&
                   purpose.trim().length > 0 &&
                   safety;
                 return formReady ? (
