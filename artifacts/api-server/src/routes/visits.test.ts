@@ -34,6 +34,28 @@ type Pred =
   | { kind: "and"; preds: Pred[] }
   | { kind: "true" };
 
+function requireIsolatedTestDatabaseUrl(env: {
+  DATABASE_URL?: string;
+  TEST_DATABASE_URL?: string;
+}): string {
+  const databaseUrl = env.DATABASE_URL?.trim();
+  const testDatabaseUrl = env.TEST_DATABASE_URL?.trim();
+  if (!databaseUrl || !testDatabaseUrl) {
+    throw new Error("schema contract requires DATABASE_URL and TEST_DATABASE_URL");
+  }
+
+  const databaseName = decodeURIComponent(new URL(databaseUrl).pathname.slice(1)).toLowerCase();
+  const testDatabaseName = decodeURIComponent(new URL(testDatabaseUrl).pathname.slice(1)).toLowerCase();
+  if (
+    !databaseName.endsWith("_test") ||
+    databaseName !== testDatabaseName
+  ) {
+    throw new Error("schema contract requires matching *_test DATABASE_URL and TEST_DATABASE_URL");
+  }
+
+  return databaseUrl;
+}
+
 function tableTag(name: string, cols: string[]) {
   const t: any = { __name: name };
   for (const c of cols) t[c] = { __table: name, __col: c };
@@ -454,13 +476,31 @@ async function startGuest(extras: Partial<Row> = {}) {
 }
 
 describe("plate state persistence schema contract", () => {
+  it("refuses a shared or mismatched database target", () => {
+    expect(() =>
+      requireIsolatedTestDatabaseUrl({
+        DATABASE_URL: "postgresql://test:test@example.test/vndrly",
+        TEST_DATABASE_URL: "postgresql://test:test@example.test/vndrly_test",
+      }),
+    ).toThrow(/matching \*_test/);
+  });
+
   it("stores and returns TX for guest sessions and site visits", async () => {
     // The route suite mocks @workspace/db, so this contract queries the
     // wrapper-provisioned database directly. The wrapper builds that schema
-    // from the real Drizzle tables before this test starts.
-    const isolatedPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    // from the real Drizzle tables before this test starts. The guard mirrors
+    // the wrapper's DATABASE_URL/TEST_DATABASE_URL convention before opening
+    // a connection, and the transaction leaves no persisted fixtures.
+    const isolatedClient = new pg.Client({
+      connectionString: requireIsolatedTestDatabaseUrl(process.env),
+    });
+    let transactionStarted = false;
     try {
-      const metadata = await isolatedPool.query<{
+      await isolatedClient.connect();
+      await isolatedClient.query("BEGIN");
+      transactionStarted = true;
+
+      const metadata = await isolatedClient.query<{
         table_name: string;
         data_type: string;
         is_nullable: string;
@@ -478,7 +518,7 @@ describe("plate state persistence schema contract", () => {
       ]);
 
       const suffix = `plate-state-${Date.now()}`;
-      const guest = await isolatedPool.query<{ id: number; plate_state: string }>(
+      const guest = await isolatedClient.query<{ id: number; plate_state: string }>(
         `INSERT INTO guest_sessions (token_jti, first_name, last_name, expires_at, plate_state)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, plate_state`,
@@ -486,19 +526,19 @@ describe("plate state persistence schema contract", () => {
       );
       expect(guest.rows[0]?.plate_state).toBe("TX");
 
-      const partner = await isolatedPool.query<{ id: number }>(
+      const partner = await isolatedClient.query<{ id: number }>(
         `INSERT INTO partners (name, contact_name, contact_email)
          VALUES ($1, $2, $3)
          RETURNING id`,
         [`Plate State ${suffix}`, "Schema Contract", `${suffix}@example.test`],
       );
-      const site = await isolatedPool.query<{ id: number }>(
+      const site = await isolatedClient.query<{ id: number }>(
         `INSERT INTO site_locations (partner_id, name, address, latitude, longitude, site_code)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
         [partner.rows[0]!.id, "Plate State Test Site", "1 Isolated Test Way", 31, -102, suffix.toUpperCase()],
       );
-      const visit = await isolatedPool.query<{ plate_state: string }>(
+      const visit = await isolatedClient.query<{ plate_state: string }>(
         `INSERT INTO site_visits (
           site_location_id, guest_session_id, first_name, last_name,
           host_type, host_partner_id, plate_state
@@ -508,7 +548,11 @@ describe("plate state persistence schema contract", () => {
       );
       expect(visit.rows[0]?.plate_state).toBe("TX");
     } finally {
-      await isolatedPool.end();
+      try {
+        if (transactionStarted) await isolatedClient.query("ROLLBACK");
+      } finally {
+        await isolatedClient.end();
+      }
     }
   });
 });
