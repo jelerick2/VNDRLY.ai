@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import cookieParser from "cookie-parser";
+import pg from "pg";
 import request from "supertest";
 import { attachTestErrorMiddleware, expectStatus } from "../test-utils/route-app";
 import { buildTestCookie } from "../test-utils/session";
@@ -451,6 +452,66 @@ async function startGuest(extras: Partial<Row> = {}) {
     body: res.body,
   };
 }
+
+describe("plate state persistence schema contract", () => {
+  it("stores and returns TX for guest sessions and site visits", async () => {
+    // The route suite mocks @workspace/db, so this contract queries the
+    // wrapper-provisioned database directly. The wrapper builds that schema
+    // from the real Drizzle tables before this test starts.
+    const isolatedPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    try {
+      const metadata = await isolatedPool.query<{
+        table_name: string;
+        data_type: string;
+        is_nullable: string;
+      }>(`
+        SELECT table_name, data_type, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND column_name = 'plate_state'
+          AND table_name IN ('guest_sessions', 'site_visits')
+        ORDER BY table_name
+      `);
+      expect(metadata.rows).toEqual([
+        { table_name: "guest_sessions", data_type: "text", is_nullable: "YES" },
+        { table_name: "site_visits", data_type: "text", is_nullable: "YES" },
+      ]);
+
+      const suffix = `plate-state-${Date.now()}`;
+      const guest = await isolatedPool.query<{ id: number; plate_state: string }>(
+        `INSERT INTO guest_sessions (token_jti, first_name, last_name, expires_at, plate_state)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, plate_state`,
+        [suffix, "Schema", "Contract", new Date(Date.now() + 60 * 60 * 1000), "TX"],
+      );
+      expect(guest.rows[0]?.plate_state).toBe("TX");
+
+      const partner = await isolatedPool.query<{ id: number }>(
+        `INSERT INTO partners (name, contact_name, contact_email)
+         VALUES ($1, $2, $3)
+         RETURNING id`,
+        [`Plate State ${suffix}`, "Schema Contract", `${suffix}@example.test`],
+      );
+      const site = await isolatedPool.query<{ id: number }>(
+        `INSERT INTO site_locations (partner_id, name, address, latitude, longitude, site_code)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [partner.rows[0]!.id, "Plate State Test Site", "1 Isolated Test Way", 31, -102, suffix.toUpperCase()],
+      );
+      const visit = await isolatedPool.query<{ plate_state: string }>(
+        `INSERT INTO site_visits (
+          site_location_id, guest_session_id, first_name, last_name,
+          host_type, host_partner_id, plate_state
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING plate_state`,
+        [site.rows[0]!.id, guest.rows[0]!.id, "Schema", "Contract", "partner", partner.rows[0]!.id, "TX"],
+      );
+      expect(visit.rows[0]?.plate_state).toBe("TX");
+    } finally {
+      await isolatedPool.end();
+    }
+  });
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("POST /api/auth/guest", () => {
