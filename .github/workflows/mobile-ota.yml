@@ -75,6 +75,9 @@ jobs:
           node scripts/mobile-release-impact.mjs
           --base-ref "${{ steps.production-build.outputs.base_ref }}"
 
+      - name: Build shared TypeScript declarations
+        run: pnpm run typecheck:libs
+
       - name: Typecheck mobile app
         run: pnpm --filter @workspace/vndrly-mobile run typecheck
 
