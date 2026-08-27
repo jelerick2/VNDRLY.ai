@@ -10,7 +10,9 @@ I prefer clear, concise explanations and an iterative development approach. Plea
 For this repository, the user's imperative instruction **"commit, push, deploy,
 and ship"** (or an unambiguous equivalent) is one complete release command. It
 remains in effect through troubleshooting and safe retries until the requested
-change is live. Do not pause to request approval again between these stages:
+change is live. Do not pause to request approval again between these stages.
+**"full ship"** is the same one-task authorization as **"commit, push, deploy,
+and ship"**.
 
 1. Commit the scoped, verified changes.
 2. Push the working branch.
