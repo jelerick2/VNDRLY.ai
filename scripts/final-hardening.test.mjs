@@ -9,6 +9,10 @@ import {
   parsePlateStateMigration,
   runPlateStateMigration,
 } from "./plate-state-migration.mjs";
+import {
+  parseNotesAdmissionMigration,
+  runNotesAdmissionMigration,
+} from "./notes-admission-migration.mjs";
 
 const repoRoot = new URL("../", import.meta.url);
 const { assertIsolatedTestDatabaseEnvironment, normalizeDatabaseTarget } =
@@ -574,15 +578,94 @@ test("migration execution is idempotent, narrow, and verifies nullable text colu
   );
 });
 
+test("the notes-admission migration accepts only the three checked-in additive statements", () => {
+  const sql = [
+    'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "notes" text;',
+    'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "check_out_notes" text;',
+    'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "admission_status" text;',
+  ].join("\n");
+
+  assert.deepEqual(parseNotesAdmissionMigration(sql), [
+    'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "notes" text',
+    'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "check_out_notes" text',
+    'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "admission_status" text',
+  ]);
+  assert.throws(
+    () => parseNotesAdmissionMigration(`${sql}\nDROP TABLE site_visits;`),
+    /exactly the approved additive notes and admission statements/,
+  );
+});
+
+test("notes-admission execution is idempotent, narrow, and verifies nullable text columns", async () => {
+  const queries = [];
+  const client = {
+    async query(text) {
+      queries.push(text);
+      if (/information_schema\.columns/.test(text)) {
+        return {
+          rows: [
+            {
+              column_name: "admission_status",
+              data_type: "text",
+              is_nullable: "YES",
+            },
+            {
+              column_name: "check_out_notes",
+              data_type: "text",
+              is_nullable: "YES",
+            },
+            {
+              column_name: "notes",
+              data_type: "text",
+              is_nullable: "YES",
+            },
+          ],
+        };
+      }
+      return { rows: [] };
+    },
+  };
+
+  await runNotesAdmissionMigration(
+    client,
+    [
+      'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "notes" text;',
+      'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "check_out_notes" text;',
+      'ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "admission_status" text;',
+    ].join("\n"),
+  );
+
+  assert.equal(queries.length, 4);
+  assert.match(queries[0], /^ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "notes"/);
+  assert.match(
+    queries[1],
+    /^ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "check_out_notes"/,
+  );
+  assert.match(
+    queries[2],
+    /^ALTER TABLE "site_visits" ADD COLUMN IF NOT EXISTS "admission_status"/,
+  );
+  assert.match(queries[3], /information_schema\.columns/);
+  assert.doesNotMatch(
+    queries.join("\n"),
+    /\b(?:DROP|TRUNCATE|DELETE|UPDATE|INSERT)\b/i,
+  );
+});
+
 test("deployment migrates and verifies before the API restart without blind schema push", () => {
   const commands = buildApiMigrationAndRestartCommands();
-  const migration = commands.indexOf("migrate:plate-state");
+  const plateState = commands.indexOf("migrate:plate-state");
+  const notesAdmission = commands.indexOf("migrate:notes-admission");
   const restart = commands.indexOf("systemctl restart vndrly-api");
 
-  assert.ok(migration >= 0, "deployment must invoke the plate-state migration");
+  assert.ok(plateState >= 0, "deployment must invoke the plate-state migration");
   assert.ok(
-    restart > migration,
-    "restart must happen only after migration succeeds",
+    notesAdmission >= 0,
+    "deployment must invoke the notes-admission migration",
+  );
+  assert.ok(
+    restart > plateState && restart > notesAdmission,
+    "restart must happen only after both migrations succeed",
   );
   assert.doesNotMatch(commands, /drizzle(?:-kit)?\s+push|DROP|TRUNCATE/i);
 });
