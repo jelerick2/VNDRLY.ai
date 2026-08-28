@@ -59,6 +59,31 @@ describe("parseGateVoiceEntry", () => {
       lastName: "Bob",
     });
   });
+
+  it("extracts optional spoken notes after purpose", () => {
+    expect(
+      parseGateVoiceEntry(
+        "plate ABC123 driver Bob Villa purpose delivery notes muddy specialty tag no state",
+      ),
+    ).toMatchObject({
+      vehiclePlate: "ABC123",
+      firstName: "Bob",
+      lastName: "Villa",
+      purpose: "delivery",
+      notes: "muddy specialty tag no state",
+    });
+  });
+
+  it("extracts notes on a spoken check-out", () => {
+    expect(parseGateVoiceCommand("Bob Villa checking out notes left early")).toMatchObject({
+      intent: "check-out",
+      fill: {
+        firstName: "Bob",
+        lastName: "Villa",
+        notes: "left early",
+      },
+    });
+  });
 });
 
 describe("parseGateVoiceCommand", () => {

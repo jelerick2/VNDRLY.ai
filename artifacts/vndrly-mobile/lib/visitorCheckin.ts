@@ -73,6 +73,7 @@ export type SubmitCheckInInput = {
   ctx: SiteContext;
   hostKey: string;
   purpose: string;
+  notes?: string;
   durationStr: string;
   vehiclePlate?: string;
   plateState?: PlateStateCode | null;
@@ -82,7 +83,7 @@ export type SubmitCheckInInput = {
 
 export type SubmitCheckInResult =
   | { ok: true; visitId: number }
-  | { ok: false; reason: "no-host" | "missing-state" | "location-denied"; message?: string };
+  | { ok: false; reason: "no-host" | "location-denied"; message?: string };
 
 /**
  * Orchestrates the check-in submit path used by the visitor screen:
@@ -98,9 +99,6 @@ export async function submitVisitorCheckIn(
   input: SubmitCheckInInput,
 ): Promise<SubmitCheckInResult> {
   const vehiclePlate = normalizePlateNumber(input.vehiclePlate);
-  if (vehiclePlate && !input.plateState) {
-    return { ok: false, reason: "missing-state" };
-  }
   const host = buildHostOptions(input.ctx).find((o) => o.key === input.hostKey);
   if (!host) return { ok: false, reason: "no-host" };
 
@@ -119,6 +117,7 @@ export async function submitVisitorCheckIn(
     hostPartnerId: host.type === "partner" ? host.id : undefined,
     hostVendorId: host.type === "vendor" ? host.id : undefined,
     purpose: input.purpose.trim() || undefined,
+    notes: input.notes?.trim() || undefined,
     expectedDurationMinutes: parseDurationMinutes(input.durationStr),
     ...(vehiclePlate ? { vehiclePlate, plateState: input.plateState ?? undefined } : {}),
     ...(input.platePhotoUrl ? { platePhotoUrl: input.platePhotoUrl } : {}),

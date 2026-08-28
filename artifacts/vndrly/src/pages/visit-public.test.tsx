@@ -229,7 +229,7 @@ describe("VisitPublicPage plate state", () => {
     ).toEqual(["California (CA)", "Texas (TX)", "New York (NY)"]);
   });
 
-  it("disables and blocks guest-session submission for a plate without state with an accessible error", async () => {
+  it("allows guest-session submission for a plate without state", async () => {
     renderPage();
     await screen.findByTestId("input-first-name");
     fillRequiredIdentity();
@@ -239,12 +239,13 @@ describe("VisitPublicPage plate state", () => {
 
     expect(
       (screen.getByTestId("button-guest-signin") as HTMLButtonElement).disabled,
-    ).toBe(true);
-    expect(screen.getByRole("alert").textContent).toBe(
-      "gatekeeper.plateStateRequired",
-    );
-    expect(api.startGuestSession).not.toHaveBeenCalled();
-    expect(geolocationMock).not.toHaveBeenCalled();
+    ).toBe(false);
+    fireEvent.click(screen.getByTestId("button-guest-signin"));
+    await waitFor(() => expect(api.startGuestSession).toHaveBeenCalledTimes(1));
+    expect(api.startGuestSession.mock.calls[0][0]).toMatchObject({
+      vehiclePlate: "ABC123",
+    });
+    expect(api.startGuestSession.mock.calls[0][0].plateState).toBeUndefined();
   });
 
   it("preserves the selected state across step navigation, sends both fields, and clears them after checkout", async () => {

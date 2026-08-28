@@ -15,6 +15,7 @@ export type GatekeeperVisitInput = {
   vehiclePlate: string;
   plateState: PlateStateCode | null;
   purpose: string;
+  notes?: string;
   durationStr: string;
   platePhotoUrl?: string;
   vehiclePhotoUrl?: string;
@@ -27,7 +28,6 @@ export type GatekeeperSubmitResult =
       reason:
         | "missing-name"
         | "missing-plate"
-        | "missing-state"
         | "no-host"
         | "location-denied";
     };
@@ -103,7 +103,10 @@ export async function deleteGateEvidence(
   });
 }
 
-export async function gatekeeperCheckOut(visitId: number): Promise<void> {
+export async function gatekeeperCheckOut(
+  visitId: number,
+  notes?: string,
+): Promise<void> {
   let latitude: number | undefined;
   let longitude: number | undefined;
   try {
@@ -120,8 +123,12 @@ export async function gatekeeperCheckOut(visitId: number): Promise<void> {
   }
   await apiFetch(`/api/visits/gate/${visitId}/check-out`, {
     method: "POST",
-    body: JSON.stringify({ latitude, longitude }),
+    body: JSON.stringify({ latitude, longitude, notes }),
   });
+}
+
+export async function gateAdmit(visitId: number): Promise<void> {
+  await apiFetch(`/api/visits/gate/${visitId}/admit`, { method: "POST" });
 }
 
 export async function submitGatekeeperVisit(
@@ -131,7 +138,6 @@ export async function submitGatekeeperVisit(
     return { ok: false, reason: "missing-name" };
   }
   if (!input.vehiclePlate.trim()) return { ok: false, reason: "missing-plate" };
-  if (!input.plateState) return { ok: false, reason: "missing-state" };
   const host = buildHostOptions(input.ctx).find((o) => o.key === input.hostKey);
   if (!host) return { ok: false, reason: "no-host" };
 
@@ -153,8 +159,9 @@ export async function submitGatekeeperVisit(
       hostPartnerId: host.type === "partner" ? host.id : undefined,
       hostVendorId: host.type === "vendor" ? host.id : undefined,
       vehiclePlate: input.vehiclePlate.trim() || undefined,
-      plateState: input.plateState,
+      plateState: input.plateState ?? undefined,
       purpose: input.purpose.trim() || undefined,
+      notes: input.notes?.trim() || undefined,
       expectedDurationMinutes: parseDurationMinutes(input.durationStr),
       ...(input.platePhotoUrl ? { platePhotoUrl: input.platePhotoUrl } : {}),
       ...(input.vehiclePhotoUrl

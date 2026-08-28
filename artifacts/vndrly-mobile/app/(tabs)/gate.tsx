@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Location from "expo-location";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -40,6 +41,7 @@ import {
   deleteGateEvidence,
   fetchGatekeeperRecentVisits,
   fetchGatekeeperVisits,
+  gateAdmit,
   gatekeeperCheckOut,
   readGatePlate,
   submitGatekeeperVisit,
@@ -69,6 +71,13 @@ import {
   reconcileAutomatedPlateUpdate,
   type PlateStateCode,
 } from "@workspace/plate-state";
+import {
+  evaluateGpsFence,
+  formatFenceMilesSentence,
+  GATE_DURATION_CHIPS,
+  onSiteDwell,
+  type GpsLockState,
+} from "@workspace/gate-booth";
 
 type DriverNameField = "firstName" | "lastName";
 type PlateAutoFillField =
@@ -135,6 +144,13 @@ export default function GatekeeperScreen() {
     selectedState: PlateStateCode;
   } | null>(null);
   const [purpose, setPurpose] = useState("");
+  const [notes, setNotes] = useState("");
+  const [checkOutNotes, setCheckOutNotes] = useState("");
+  const [gps, setGps] = useState<GpsLockState>("searching");
+  const [origin, setOrigin] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [duration, setDuration] = useState("60");
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
@@ -279,6 +295,7 @@ export default function GatekeeperScreen() {
       setPlateStateError(null);
       setOcrStateNotice(null);
       if (fill.purpose) setPurpose(fill.purpose);
+      if (fill.notes) setNotes(fill.notes);
       if (fill.duration) setDuration(fill.duration);
       plateAutoFillRef.current = null;
       setActiveNameField(null);
@@ -377,6 +394,7 @@ export default function GatekeeperScreen() {
     setPlateStateError(null);
     setOcrStateNotice(null);
     setPurpose("");
+    setNotes("");
     setDuration("60");
     setPlatePhotoUrl(null);
     setVehiclePhotoUrl(null);
@@ -386,12 +404,78 @@ export default function GatekeeperScreen() {
     setVoiceCheckoutMatches([]);
   };
 
-  const onLookupSite = () => {
-    const code = siteCode.trim().toUpperCase();
-    if (!code) return;
-    setConfirmedCode(code);
-    setHostKey(null);
-  };
+  useEffect(() => {
+    let cancelled = false;
+    let subscription: { remove: () => void } | null = null;
+    void (async () => {
+      setGps("searching");
+      try {
+        const perm = await Location.requestForegroundPermissionsAsync();
+        if (cancelled) return;
+        if (perm.status !== "granted") {
+          setGps("denied");
+          return;
+        }
+        subscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, distanceInterval: 8 },
+          (pos) => {
+            if (cancelled) return;
+            setGps("locked");
+            setOrigin({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            });
+          },
+        );
+      } catch {
+        if (!cancelled) setGps("unavailable");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
+  }, []);
+
+  const fence = evaluateGpsFence({
+    gps,
+    origin,
+    site: ctxQuery.data
+      ? {
+          latitude: ctxQuery.data.site.latitude,
+          longitude: ctxQuery.data.site.longitude,
+          siteRadiusMeters: ctxQuery.data.site.siteRadiusMeters,
+        }
+      : null,
+  });
+  const fenceCopy = formatFenceMilesSentence(fence);
+  const pendingVisits = (activeVisits.data ?? []).filter(
+    (visit) => visit.admissionStatus === "pending",
+  );
+  const onSiteVisits = (activeVisits.data ?? []).filter(
+    (visit) => visit.admissionStatus !== "pending",
+  );
+
+  const fenceSentence =
+    fenceCopy.kind === "searching"
+      ? t("gatekeeper.gpsSearching")
+      : fenceCopy.kind === "denied"
+        ? t("gatekeeper.gpsDenied")
+        : fenceCopy.kind === "unavailable"
+          ? t("gatekeeper.gpsUnavailable")
+          : fenceCopy.kind === "noSite"
+            ? t("gatekeeper.gpsNoSite")
+            : fenceCopy.kind === "inside"
+              ? t("gatekeeper.gpsMilesInside", {
+                  miles: fenceCopy.miles,
+                  site: ctxQuery.data?.site.name ?? "",
+                  radius: fenceCopy.radius,
+                })
+              : t("gatekeeper.gpsMilesTooFar", {
+                  miles: fenceCopy.miles,
+                  site: ctxQuery.data?.site.name ?? "",
+                  radius: fenceCopy.radius,
+                });
 
   const onCaptureEvidence = async (kind: "plate" | "vehicle") => {
     setBusy(true);
@@ -538,10 +622,6 @@ export default function GatekeeperScreen() {
       Alert.alert(t("visitor.error"), t("visitor.siteLookupFailed"));
       return;
     }
-    if (!plateState) {
-      setPlateStateError(t("gatekeeper.plateStateRequired"));
-      return;
-    }
     setPlateStateError(null);
     setBusy(true);
     try {
@@ -554,6 +634,7 @@ export default function GatekeeperScreen() {
         vehiclePlate,
         plateState,
         purpose,
+        notes,
         durationStr: duration,
         platePhotoUrl: platePhotoUrl ?? undefined,
         vehiclePhotoUrl: vehiclePhotoUrl ?? undefined,
@@ -564,11 +645,9 @@ export default function GatekeeperScreen() {
             ? t("gatekeeper.nameRequired")
             : result.reason === "missing-plate"
               ? t("gatekeeper.plateRequired")
-              : result.reason === "missing-state"
-                ? t("gatekeeper.plateStateRequired")
-                : result.reason === "no-host"
-                  ? t("visitor.pickHost")
-                  : t("visitor.locationDenied");
+              : result.reason === "no-host"
+                ? t("visitor.pickHost")
+                : t("visitor.locationDenied");
         Alert.alert(t("visitor.error"), message);
         return;
       }
@@ -589,10 +668,26 @@ export default function GatekeeperScreen() {
     }
   };
 
+  const onAdmit = async (visitId: number) => {
+    setBusy(true);
+    try {
+      await gateAdmit(visitId);
+      await qc.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
+    } catch (e) {
+      Alert.alert(
+        t("visitor.error"),
+        translateApiError(e, t, t("tickets.errorCheckIn")),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const onCheckOut = async (visitId: number) => {
     setBusy(true);
     try {
-      await gatekeeperCheckOut(visitId);
+      await gatekeeperCheckOut(visitId, checkOutNotes.trim() || undefined);
+      setCheckOutNotes("");
       await qc.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
       await qc.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
     } catch (e) {
@@ -632,54 +727,122 @@ export default function GatekeeperScreen() {
             </Text>
             {activeVisits.isLoading ? (
               <ActivityIndicator color={colors.primary} />
-            ) : activeVisits.data && activeVisits.data.length > 0 ? (
-              activeVisits.data.map((visit) => (
-                <View
-                  key={visit.id}
-                  style={[styles.visitRow, { borderColor: colors.border }]}
-                >
-                  <View style={styles.visitText}>
-                    <Text
-                      style={[styles.visitName, { color: colors.foreground }]}
-                    >
-                      {visit.firstName} {visit.lastName}
-                    </Text>
-                    <Text
-                      style={[styles.muted, { color: colors.mutedForeground }]}
-                    >
-                      {[
-                        visit.company,
-                        formatPlateForDisplay(
-                          visit.plateState,
-                          visit.vehiclePlate,
-                          t("gatekeeper.plateStateUnconfirmed"),
-                        ),
-                        visit.siteName,
-                      ]
-                        .filter(Boolean)
-                        .join(" - ")}
-                    </Text>
-                    <Text
-                      style={[styles.muted, { color: colors.mutedForeground }]}
-                    >
-                      {new Date(visit.checkInTime).toLocaleString()}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    testID={`gate-checkout-${visit.id}`}
-                    disabled={busy}
-                    onPress={() => onCheckOut(visit.id)}
-                    style={[styles.iconButton, { borderColor: colors.primary }]}
-                  >
-                    <Feather name="log-out" size={18} color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
-              ))
-            ) : (
+            ) : pendingVisits.length === 0 && onSiteVisits.length === 0 ? (
               <Text style={[styles.muted, { color: colors.mutedForeground }]}>
                 {t("gatekeeper.noActive")}
               </Text>
+            ) : (
+              <>
+                {pendingVisits.length > 0 ? (
+                  <Text style={[styles.label, { color: colors.foreground }]}>
+                    {t("gatekeeper.pendingAdmit")}
+                  </Text>
+                ) : null}
+                {pendingVisits.map((visit) => (
+                  <View
+                    key={visit.id}
+                    style={[styles.visitRow, { borderColor: colors.border }]}
+                  >
+                    <View style={styles.visitText}>
+                      <Text
+                        style={[styles.visitName, { color: colors.foreground }]}
+                      >
+                        {visit.firstName} {visit.lastName}
+                      </Text>
+                      <Text
+                        style={[styles.muted, { color: colors.mutedForeground }]}
+                      >
+                        {[
+                          visit.company,
+                          formatPlateForDisplay(
+                            visit.plateState,
+                            visit.vehiclePlate,
+                            t("gatekeeper.plateStateUnconfirmed"),
+                          ),
+                          visit.siteName,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      testID={`gate-admit-${visit.id}`}
+                      disabled={busy}
+                      onPress={() => onAdmit(visit.id)}
+                      style={[styles.iconButton, { borderColor: colors.primary }]}
+                    >
+                      <Text style={[styles.admitLabel, { color: colors.primary }]}>
+                        {t("gatekeeper.admit")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {onSiteVisits.map((visit) => {
+                  const dwell = onSiteDwell({
+                    checkInTime: visit.checkInTime,
+                    expectedDurationMinutes: visit.expectedDurationMinutes,
+                  });
+                  return (
+                    <View
+                      key={visit.id}
+                      style={[styles.visitRow, { borderColor: colors.border }]}
+                    >
+                      <View style={styles.visitText}>
+                        <Text
+                          style={[styles.visitName, { color: colors.foreground }]}
+                        >
+                          {visit.firstName} {visit.lastName}
+                        </Text>
+                        <Text
+                          style={[styles.muted, { color: colors.mutedForeground }]}
+                        >
+                          {[
+                            visit.company,
+                            formatPlateForDisplay(
+                              visit.plateState,
+                              visit.vehiclePlate,
+                              t("gatekeeper.plateStateUnconfirmed"),
+                            ),
+                            visit.siteName,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </Text>
+                        <Text
+                          style={[styles.muted, { color: colors.mutedForeground }]}
+                        >
+                          {t("gatekeeper.minutesOnSite", {
+                            minutes: dwell.minutesOnSite,
+                          })}
+                          {dwell.overdue
+                            ? ` · ${t("gatekeeper.overdue", { minutes: dwell.overdueMinutes })}`
+                            : ""}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        testID={`gate-checkout-${visit.id}`}
+                        disabled={busy}
+                        onPress={() => onCheckOut(visit.id)}
+                        style={[styles.iconButton, { borderColor: colors.primary }]}
+                      >
+                        <Feather name="log-out" size={18} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </>
             )}
+            <Text style={[styles.label, { color: colors.foreground }]}>
+              {t("gatekeeper.checkOutNotes")}
+            </Text>
+            <TextInput
+              testID="gate-checkout-notes"
+              value={checkOutNotes}
+              onChangeText={setCheckOutNotes}
+              style={inputStyle}
+              placeholder={t("gatekeeper.notesPlaceholder")}
+              placeholderTextColor={colors.mutedForeground}
+            />
             {voiceCheckoutMatches.length > 0 ? (
               <View style={[styles.voiceConfirm, { borderColor: colors.primary }]}>
                 <Text style={[styles.voiceConfirmTitle, { color: colors.foreground }]}>
@@ -761,6 +924,89 @@ export default function GatekeeperScreen() {
                 </View>
               </View>
             ) : null}
+            <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+              {t("gatekeeper.handsFreeHint")}
+            </Text>
+            <View style={styles.twoCol}>
+              <TouchableOpacity
+                testID="gate-capture-tag-photo"
+                onPress={() => onCaptureEvidence("plate")}
+                disabled={busy}
+                style={[
+                  styles.photoButton,
+                  { borderColor: colors.border, opacity: busy ? 0.6 : 1 },
+                ]}
+              >
+                <Feather
+                  name={platePhotoUrl ? "check-circle" : "camera"}
+                  size={16}
+                  color={
+                    platePhotoUrl ? colors.primary : colors.mutedForeground
+                  }
+                />
+                <Text style={[styles.photoLabel, { color: colors.foreground }]}>
+                  {t("gatekeeper.tagPhoto")}
+                  {platePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="gate-capture-vehicle-photo"
+                onPress={() => onCaptureEvidence("vehicle")}
+                disabled={busy}
+                style={[
+                  styles.photoButton,
+                  { borderColor: colors.border, opacity: busy ? 0.6 : 1 },
+                ]}
+              >
+                <Feather
+                  name={vehiclePhotoUrl ? "check-circle" : "truck"}
+                  size={16}
+                  color={
+                    vehiclePhotoUrl ? colors.primary : colors.mutedForeground
+                  }
+                />
+                <Text style={[styles.photoLabel, { color: colors.foreground }]}>
+                  {t("gatekeeper.vehiclePhoto")}
+                  {vehiclePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <PlateStatePicker
+              value={plateState}
+              onChange={(state) => {
+                setPlateState(state);
+                setPlateStateError(null);
+                setOcrStateNotice((notice) =>
+                  notice ? { ...notice, selectedState: state } : null,
+                );
+              }}
+              preferredStates={orderedStatePreferences}
+              error={plateStateError ?? undefined}
+            />
+            {ocrStateNotice ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[styles.muted, { color: colors.mutedForeground }]}
+              >
+                {t(
+                  ocrStateNotice.selectedState === ocrStateNotice.suggestedState
+                    ? "gatekeeper.plateStateSuggested"
+                    : "gatekeeper.plateStateCorrected",
+                  { state: ocrStateNotice.selectedState },
+                )}
+              </Text>
+            ) : null}
+            <Text style={[styles.label, { color: colors.foreground, fontSize: 18 }]}>
+              {t("visitor.vehiclePlate")} *
+            </Text>
+            <TextInput
+              testID="gate-vehicle-plate"
+              value={vehiclePlate}
+              onChangeText={(value) => setVehiclePlate(value.toUpperCase())}
+              autoCapitalize="characters"
+              style={[inputStyle, styles.plateInput]}
+              placeholderTextColor={colors.mutedForeground}
+            />
             <View style={styles.twoCol}>
               <View style={styles.field}>
                 <Text style={[styles.label, { color: colors.foreground }]}>
@@ -853,89 +1099,15 @@ export default function GatekeeperScreen() {
               style={inputStyle}
               placeholderTextColor={colors.mutedForeground}
             />
-            <PlateStatePicker
-              value={plateState}
-              onChange={(state) => {
-                setPlateState(state);
-                setPlateStateError(null);
-                setOcrStateNotice((notice) =>
-                  notice ? { ...notice, selectedState: state } : null,
-                );
-              }}
-              preferredStates={orderedStatePreferences}
-              error={plateStateError ?? undefined}
-            />
-            {ocrStateNotice ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                style={[styles.muted, { color: colors.mutedForeground }]}
-              >
-                {t(
-                  ocrStateNotice.selectedState === ocrStateNotice.suggestedState
-                    ? "gatekeeper.plateStateSuggested"
-                    : "gatekeeper.plateStateCorrected",
-                  { state: ocrStateNotice.selectedState },
-                )}
-              </Text>
-            ) : null}
-            <Text style={[styles.label, { color: colors.foreground }]}>
-              {t("visitor.vehiclePlate")} *
-            </Text>
-            <TextInput
-              testID="gate-vehicle-plate"
-              value={vehiclePlate}
-              onChangeText={(value) => setVehiclePlate(value.toUpperCase())}
-              autoCapitalize="characters"
-              style={inputStyle}
-              placeholderTextColor={colors.mutedForeground}
-            />
-            <View style={styles.twoCol}>
-              <TouchableOpacity
-                testID="gate-capture-tag-photo"
-                onPress={() => onCaptureEvidence("plate")}
-                disabled={busy}
-                style={[
-                  styles.photoButton,
-                  { borderColor: colors.border, opacity: busy ? 0.6 : 1 },
-                ]}
-              >
-                <Feather
-                  name={platePhotoUrl ? "check-circle" : "camera"}
-                  size={16}
-                  color={
-                    platePhotoUrl ? colors.primary : colors.mutedForeground
-                  }
-                />
-                <Text style={[styles.photoLabel, { color: colors.foreground }]}>
-                  {t("gatekeeper.tagPhoto")}
-                  {platePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                testID="gate-capture-vehicle-photo"
-                onPress={() => onCaptureEvidence("vehicle")}
-                disabled={busy}
-                style={[
-                  styles.photoButton,
-                  { borderColor: colors.border, opacity: busy ? 0.6 : 1 },
-                ]}
-              >
-                <Feather
-                  name={vehiclePhotoUrl ? "check-circle" : "truck"}
-                  size={16}
-                  color={
-                    vehiclePhotoUrl ? colors.primary : colors.mutedForeground
-                  }
-                />
-                <Text style={[styles.photoLabel, { color: colors.foreground }]}>
-                  {t("gatekeeper.vehiclePhoto")}
-                  {vehiclePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
-                </Text>
-              </TouchableOpacity>
-            </View>
 
             <Text style={[styles.label, { color: colors.foreground }]}>
               {t("gatekeeper.currentLocation")}
+            </Text>
+            <Text
+              testID="gate-gps-pill"
+              style={[styles.muted, { color: colors.mutedForeground }]}
+            >
+              {fenceSentence}
             </Text>
             {assignedSites.map((site) => {
               const selected = confirmedCode === site.siteCode;
@@ -960,49 +1132,14 @@ export default function GatekeeperScreen() {
                   <Text
                     style={[
                       styles.siteOptionName,
-                      { color: colors.foreground },
+                      { color: colors.foreground, fontSize: 20 },
                     ]}
                   >
                     {site.name}
                   </Text>
-                  <Text
-                    style={[styles.muted, { color: colors.mutedForeground }]}
-                  >
-                    {site.siteCode}
-                  </Text>
                 </TouchableOpacity>
               );
             })}
-
-            <Text style={[styles.label, { color: colors.foreground }]}>
-              {t("gatekeeper.siteCode")}
-            </Text>
-            <View style={styles.lookupRow}>
-              <TextInput
-                testID="gate-site-code"
-                value={siteCode}
-                onChangeText={setSiteCode}
-                autoCapitalize="characters"
-                placeholder={t("visitor.siteCodePlaceholder")}
-                placeholderTextColor={colors.mutedForeground}
-                style={[
-                  styles.input,
-                  {
-                    flex: 1,
-                    borderColor: colors.border,
-                    color: colors.foreground,
-                    backgroundColor: colors.card,
-                  },
-                ]}
-              />
-              <TouchableOpacity
-                testID="gate-site-lookup"
-                onPress={onLookupSite}
-                style={[styles.iconButton, { borderColor: colors.primary }]}
-              >
-                <Feather name="search" size={18} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
             {ctxQuery.isLoading ? (
               <View style={styles.loading}>
                 <ActivityIndicator color={colors.primary} />
@@ -1021,11 +1158,21 @@ export default function GatekeeperScreen() {
                   forgetPlateAutoFill("purpose");
                   setPurpose(value);
                 }}
+                notes={notes}
+                onNotesChange={setNotes}
                 duration={duration}
                 onDurationChange={(value) => {
                   forgetPlateAutoFill("duration");
                   setDuration(value);
                 }}
+                durationChips={GATE_DURATION_CHIPS.map((chip) => ({
+                  id: chip.id,
+                  minutes: chip.minutes,
+                  label: t(
+                    `gatekeeper.duration${chip.id === "30m" ? "30m" : chip.id === "2h" ? "2h" : chip.id === "allDay" ? "AllDay" : "Overnight"}`,
+                  ),
+                }))}
+                extraSubmitDisabled={!fence.canSubmit}
                 busy={busy}
                 onSubmit={onCheckIn}
                 onChangeSite={() => {
@@ -1038,9 +1185,11 @@ export default function GatekeeperScreen() {
                   noHosts: t("visitor.noHosts"),
                   purpose: t("visitor.purpose"),
                   purposePlaceholder: t("visitor.purposePlaceholder"),
+                  notes: t("gatekeeper.notes"),
+                  notesPlaceholder: t("gatekeeper.notesPlaceholder"),
                   expectedMinutes: t("visitor.expectedMinutes"),
                   checkIn: t("visitor.checkIn"),
-                  geofenceNote: t("visitor.geofenceNote"),
+                  geofenceNote: t("gatekeeper.gpsRequiredToSubmit"),
                 }}
               />
             ) : null}
@@ -1058,6 +1207,8 @@ const styles = StyleSheet.create({
   subtitle: { fontFamily: "Inter_400Regular", fontSize: 13, marginTop: -8 },
   card: { borderWidth: 1, borderRadius: 12, gap: 10, padding: 14 },
   cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
+  plateInput: { fontFamily: "Inter_700Bold", fontSize: 22, minHeight: 56 },
+  admitLabel: { fontFamily: "Inter_700Bold", fontSize: 13 },
   twoCol: { flexDirection: "row", gap: 10 },
   field: { flex: 1, minWidth: 0 },
   photoButton: {

@@ -38,12 +38,21 @@ import {
   fetchActiveVisit,
   fetchGuestSession,
   fetchPreferredPlateStates,
+  fetchPublicSites,
   fetchSiteContext,
   guestLogout,
   visitorCheckOut,
+  type PublicSite,
   type SiteContext,
 } from "@/lib/guest";
 import { extractSiteCode, submitVisitorCheckIn } from "@/lib/visitorCheckin";
+import {
+  evaluateGpsFence,
+  formatFenceMilesSentence,
+  GATE_DURATION_CHIPS,
+  sortSitesByNameAndDistance,
+  type GpsLockState,
+} from "@workspace/gate-booth";
 
 // Mirrors `app/(tabs)/scan.tsx`: when the host build doesn't actually have
 // the expo-camera native view registered (Expo Go / un-rebuilt dev client),
@@ -92,10 +101,17 @@ export default function VisitorCheckInScreen() {
   const [siteConfirmed, setSiteConfirmed] = useState(false);
   const [hostKey, setHostKey] = useState<string | null>(null);
   const [purpose, setPurpose] = useState("");
+  const [notes, setNotes] = useState("");
+  const [checkOutNotes, setCheckOutNotes] = useState("");
   const [duration, setDuration] = useState("60");
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
   const [plateStateError, setPlateStateError] = useState<string | null>(null);
+  const [gps, setGps] = useState<GpsLockState>("searching");
+  const [origin, setOrigin] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -154,6 +170,12 @@ export default function VisitorCheckInScreen() {
     retry: false,
   });
 
+  const publicSites = useQuery<PublicSite[]>({
+    queryKey: ["public-sites"],
+    queryFn: fetchPublicSites,
+    retry: false,
+  });
+
   const ctxQuery = useQuery<SiteContext>({
     queryKey: ["site-context", confirmedCode],
     queryFn: () => fetchSiteContext(confirmedCode!),
@@ -199,10 +221,77 @@ export default function VisitorCheckInScreen() {
     }
   }, [activeQuery.error, guestQuery.error, ctxQuery.error, sessionExpired]);
 
-  const onConfirmSite = () => {
-    const code = siteCode.trim().toUpperCase();
-    if (!code) return;
-    setConfirmedCode(code);
+  useEffect(() => {
+    let cancelled = false;
+    let subscription: { remove: () => void } | null = null;
+    void (async () => {
+      setGps("searching");
+      try {
+        const perm = await Location.requestForegroundPermissionsAsync();
+        if (cancelled) return;
+        if (perm.status !== "granted") {
+          setGps("denied");
+          return;
+        }
+        subscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, distanceInterval: 8 },
+          (pos) => {
+            if (cancelled) return;
+            setGps("locked");
+            setOrigin({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+            });
+          },
+        );
+      } catch {
+        if (!cancelled) setGps("unavailable");
+      }
+    })();
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
+  }, []);
+
+  const rankedSites = sortSitesByNameAndDistance(
+    publicSites.data ?? [],
+    origin,
+  );
+  const fence = evaluateGpsFence({
+    gps,
+    origin,
+    site: ctxQuery.data
+      ? {
+          latitude: ctxQuery.data.site.latitude,
+          longitude: ctxQuery.data.site.longitude,
+          siteRadiusMeters: ctxQuery.data.site.siteRadiusMeters,
+        }
+      : null,
+  });
+  const fenceCopy = formatFenceMilesSentence(fence);
+  const fenceSentence =
+    fenceCopy.kind === "searching"
+      ? t("visitor.gpsSearching")
+      : fenceCopy.kind === "denied"
+        ? t("visitor.locationDenied")
+        : fenceCopy.kind === "unavailable"
+          ? t("visitor.gpsUnavailable")
+          : fenceCopy.kind === "noSite"
+            ? t("visitor.gpsNoSite")
+            : fenceCopy.kind === "inside"
+              ? t("visitor.gpsMilesInside", {
+                  miles: fenceCopy.miles,
+                  radius: fenceCopy.radius,
+                })
+              : t("visitor.gpsMilesTooFar", {
+                  miles: fenceCopy.miles,
+                  radius: fenceCopy.radius,
+                });
+
+  const pickSite = (site: PublicSite) => {
+    setSiteCode(site.siteCode);
+    setConfirmedCode(site.siteCode);
     setSiteConfirmed(false);
     setHostKey(null);
   };
@@ -219,21 +308,19 @@ export default function VisitorCheckInScreen() {
   };
 
   const onCheckIn = async () => {
-    if (vehiclePlate.trim() && !plateState) {
-      setPlateStateError(t("visitor.plateStateRequired"));
-      return;
-    }
     const ctx = ctxQuery.data;
     if (!ctx || !hostKey) {
       Alert.alert(t("visitor.error"), t("visitor.pickHost"));
       return;
     }
+    setPlateStateError(null);
     setBusy(true);
     try {
       const result = await submitVisitorCheckIn({
         ctx,
         hostKey,
         purpose,
+        notes,
         durationStr: duration,
         vehiclePlate,
         plateState,
@@ -243,8 +330,6 @@ export default function VisitorCheckInScreen() {
       if (!result.ok) {
         if (result.reason === "no-host") {
           Alert.alert(t("visitor.error"), t("visitor.pickHost"));
-        } else if (result.reason === "missing-state") {
-          setPlateStateError(t("visitor.plateStateRequired"));
         } else if (result.reason === "location-denied") {
           Alert.alert(t("visitor.error"), t("visitor.locationDenied"));
         }
@@ -285,12 +370,14 @@ export default function VisitorCheckInScreen() {
           lng = pos.coords.longitude;
         }
       } catch {}
-      await visitorCheckOut(v.id, lat, lng);
+      await visitorCheckOut(v.id, lat, lng, checkOutNotes.trim() || undefined);
       await qc.invalidateQueries({ queryKey: ["visit-active"] });
       setConfirmedCode(null);
       setSiteCode("");
       setHostKey(null);
       setPurpose("");
+      setNotes("");
+      setCheckOutNotes("");
       setVehiclePlate("");
       setPlateState(null);
       setPlateStateError(null);
@@ -448,6 +535,24 @@ export default function VisitorCheckInScreen() {
                 {t("visitor.checkedInAt")}:{" "}
                 {new Date(active.checkInTime).toLocaleString()}
               </Text>
+              <Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>
+                {t("visitor.checkOutNotes")}
+              </Text>
+              <TextInput
+                testID="visitor-checkout-notes"
+                value={checkOutNotes}
+                onChangeText={setCheckOutNotes}
+                placeholder={t("visitor.notesPlaceholder")}
+                placeholderTextColor={colors.mutedForeground}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                    backgroundColor: colors.card,
+                  },
+                ]}
+              />
               <AmberButton
                 onPress={onCheckOut}
                 loading={busy}
@@ -465,7 +570,7 @@ export default function VisitorCheckInScreen() {
                   setScanning(false);
                   Alert.alert(
                     t("visitor.error"),
-                    "Camera unavailable in this build. Please type the site code instead.",
+                    t("visitor.cameraUnavailablePickSite"),
                   );
                 }}
               >
@@ -507,34 +612,43 @@ export default function VisitorCheckInScreen() {
           ) : (
             <View>
               <Text style={[styles.label, { color: colors.foreground }]}>
-                {t("visitor.siteCodeLabel")}
+                {t("visitor.selectSite")}
               </Text>
-              <View style={styles.row}>
-                <TextInput
-                  testID="site-code-input"
-                  value={siteCode}
-                  onChangeText={setSiteCode}
-                  autoCapitalize="characters"
-                  placeholder={t("visitor.siteCodePlaceholder")}
-                  placeholderTextColor={colors.mutedForeground}
-                  style={[
-                    styles.input,
-                    {
-                      flex: 1,
-                      borderColor: colors.border,
-                      color: colors.foreground,
-                      backgroundColor: colors.card,
-                    },
-                  ]}
-                />
-                <TouchableOpacity
-                  testID="site-lookup-btn"
-                  onPress={onConfirmSite}
-                  style={[styles.lookupBtn, { borderColor: colors.primary }]}
-                >
-                  <Feather name="search" size={18} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                {fenceSentence}
+              </Text>
+              {publicSites.isLoading ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                rankedSites.map((site) => (
+                  <TouchableOpacity
+                    key={site.id}
+                    testID={`visitor-site-option-${site.id}`}
+                    onPress={() => pickSite(site)}
+                    style={[
+                      styles.card,
+                      {
+                        borderColor:
+                          confirmedCode === site.siteCode
+                            ? colors.primary
+                            : colors.border,
+                        backgroundColor: colors.card,
+                        marginTop: 10,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.cardTitle, { color: colors.foreground }]}>
+                      {site.name}
+                    </Text>
+                    <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                      {site.address}
+                      {site.distanceMeters != null
+                        ? ` · ${t("visitor.miAway", { mi: (site.distanceMeters / 1609.344).toFixed(1) })}`
+                        : ""}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
               <TouchableOpacity
                 testID="open-scanner-btn"
                 onPress={openScanner}
@@ -637,7 +751,7 @@ export default function VisitorCheckInScreen() {
                     ]}
                   >
                     <Text style={[styles.label, { color: colors.foreground }]}>
-                      {t("visitor.plateState")}
+                      {t("visitor.plateStateOptional")}
                     </Text>
                     <PlateStatePicker
                       value={plateState}
@@ -690,19 +804,31 @@ export default function VisitorCheckInScreen() {
                     onCaptureVehiclePhoto={() => onCaptureEvidence("vehicle")}
                     onSubmit={onCheckIn}
                     onChangeSite={onChangeSite}
+                    notes={notes}
+                    onNotesChange={setNotes}
+                    extraSubmitDisabled={!fence.canSubmit}
+                    durationChips={GATE_DURATION_CHIPS.map((chip) => ({
+                      id: chip.id,
+                      minutes: chip.minutes,
+                      label: t(
+                        `gatekeeper.duration${chip.id === "30m" ? "30m" : chip.id === "2h" ? "2h" : chip.id === "allDay" ? "AllDay" : "Overnight"}`,
+                      ),
+                    }))}
                     labels={{
                       changeSite: t("visitor.changeSite"),
                       whoVisiting: t("visitor.whoVisiting"),
                       noHosts: t("visitor.noHosts"),
                       purpose: t("visitor.purpose"),
                       purposePlaceholder: t("visitor.purposePlaceholder"),
+                      notes: t("visitor.notes"),
+                      notesPlaceholder: t("visitor.notesPlaceholder"),
                       expectedMinutes: t("visitor.expectedMinutes"),
                       vehicleEvidence: t("visitor.vehicleEvidence"),
                       capturePlatePhoto: t("visitor.capturePlatePhoto"),
                       captureVehiclePhoto: t("visitor.captureVehiclePhoto"),
                       attached: t("visitor.photoAttached"),
                       checkIn: t("visitor.checkIn"),
-                      geofenceNote: t("visitor.geofenceNote"),
+                      geofenceNote: fenceSentence,
                     }}
                   />
                 </View>

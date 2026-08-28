@@ -10,6 +10,20 @@ describe("parseGateVoiceEntry", () => {
     });
   });
 
+  it("extracts optional spoken notes after purpose", () => {
+    expect(
+      parseGateVoiceEntry(
+        "plate ABC123 driver Bob Villa purpose delivery notes muddy specialty tag no state",
+      ),
+    ).toMatchObject({
+      vehiclePlate: "ABC123",
+      firstName: "Bob",
+      lastName: "Villa",
+      purpose: "delivery",
+      notes: "muddy specialty tag no state",
+    });
+  });
+
   it.each([
     ["TX plate ABC 123 driver Bob Villa", "TX"],
     ["Texas, plate ABC 123 driver Bob Villa", "TX"],

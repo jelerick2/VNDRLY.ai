@@ -14,6 +14,9 @@ export type VisitorRow = {
   platePhotoUrl: string | null;
   vehiclePhotoUrl: string | null;
   purpose: string | null;
+  notes?: string | null;
+  checkOutNotes?: string | null;
+  admissionStatus?: "pending" | "admitted";
   expectedDurationMinutes: number | null;
   hostType: "partner" | "vendor";
   hostPartnerId: number | null;
@@ -210,6 +213,7 @@ export const visitsApi = {
     hostPartnerId?: number;
     hostVendorId?: number;
     purpose?: string;
+    notes?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
     plateState?: string;
@@ -223,10 +227,10 @@ export const visitsApi = {
       body: JSON.stringify(input),
     }),
   myActive: () => jf<VisitorRow | null>(`/api/visits/me/active`),
-  checkOut: (id: number, latitude?: number, longitude?: number) =>
+  checkOut: (id: number, latitude?: number, longitude?: number, notes?: string) =>
     jf<VisitorRow>(`/api/visits/${id}/check-out`, {
       method: "POST",
-      body: JSON.stringify({ latitude, longitude }),
+      body: JSON.stringify({ latitude, longitude, notes }),
     }),
   gateCheckIn: (input: {
     firstName: string;
@@ -239,6 +243,7 @@ export const visitsApi = {
     hostPartnerId?: number;
     hostVendorId?: number;
     purpose?: string;
+    notes?: string;
     expectedDurationMinutes?: number;
     vehiclePlate?: string;
     plateState?: string;
@@ -251,10 +256,14 @@ export const visitsApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-  gateCheckOut: (id: number, latitude?: number, longitude?: number) =>
+  gateCheckOut: (id: number, latitude?: number, longitude?: number, notes?: string) =>
     jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, {
       method: "POST",
-      body: JSON.stringify({ latitude, longitude }),
+      body: JSON.stringify({ latitude, longitude, notes }),
+    }),
+  gateAdmit: (id: number) =>
+    jf<VisitorRow>(`/api/visits/gate/${id}/admit`, {
+      method: "POST",
     }),
   readPlate: (input: { objectPath: string }) =>
     jf<PlateOcrCandidate>(`/api/visits/gate/read-plate`, {

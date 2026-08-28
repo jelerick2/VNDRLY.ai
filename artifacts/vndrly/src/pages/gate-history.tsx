@@ -1,13 +1,22 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Search } from "lucide-react";
+import { FileText, Loader2, Search, Sheet } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import BlueButton from "@/components/blue-button";
 import ContentPaneBackLink from "@/components/content-pane-back-link";
+import GreenButton from "@/components/green-button";
+import RedButton from "@/components/red-button";
 import { Card, CardContent, CARD_INNER_TILE_CLASS } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FIELD_OPS_PAGE_CLASS } from "@/lib/field-ops-content-pane";
 import { filterGateHistory, gateHistoryFromIso } from "@/lib/gate-history";
+import {
+  exportExcel,
+  exportPdf,
+  exportWord,
+  toGateLogRows,
+} from "@/lib/gatekeeper-log-export";
 import { listAllVisits } from "@/lib/visits-api";
 import { formatPlateForDisplay } from "@/lib/plate-display";
 
@@ -24,6 +33,22 @@ export default function GateHistoryPage() {
     () => filterGateHistory(visits.data ?? [], query),
     [query, visits.data],
   );
+  const [exporting, setExporting] = useState(false);
+  const exportRows = useMemo(
+    () => toGateLogRows(visits.data ?? []),
+    [visits.data],
+  );
+  const exportCompleteLog = async (format: "pdf" | "excel" | "word") => {
+    setExporting(true);
+    try {
+      const all = toGateLogRows(await listAllVisits());
+      if (format === "pdf") await exportPdf(all);
+      else if (format === "excel") exportExcel(all);
+      else exportWord(all);
+    } finally {
+      setExporting(false);
+    }
+  };
   const displayPlate = (state: string | null | undefined, plate: string | null | undefined) =>
     formatPlateForDisplay(state, plate, t("gatekeeper.plateStateUnconfirmed"));
 
@@ -51,6 +76,33 @@ export default function GateHistoryPage() {
           className="pl-9"
           data-testid="input-gate-history-search"
         />
+      </div>
+
+      <div className="grid max-w-xl grid-cols-3 gap-2">
+        <RedButton
+          onClick={() => void exportCompleteLog("pdf")}
+          disabled={!exportRows.length || exporting}
+          data-testid="button-gate-export-pdf"
+        >
+          <FileText className="mr-1 h-4 w-4" />
+          PDF
+        </RedButton>
+        <GreenButton
+          onClick={() => void exportCompleteLog("excel")}
+          disabled={!exportRows.length || exporting}
+          data-testid="button-gate-export-excel"
+        >
+          <Sheet className="mr-1 h-4 w-4" />
+          Excel
+        </GreenButton>
+        <BlueButton
+          onClick={() => void exportCompleteLog("word")}
+          disabled={!exportRows.length || exporting}
+          data-testid="button-gate-export-word"
+        >
+          <FileText className="mr-1 h-4 w-4" />
+          Word
+        </BlueButton>
       </div>
 
       <Card>

@@ -23,6 +23,7 @@ export type GateEntryDraft = {
   vehiclePlate: string;
   plateState: PlateStateCode | null;
   purpose: string;
+  notes: string;
   expectedDuration: string;
 };
 
@@ -47,6 +48,7 @@ const DRAFT_STRING_KEYS: GateEntryStringKey[] = [
   "company",
   "vehiclePlate",
   "purpose",
+  "notes",
   "expectedDuration",
 ];
 
@@ -58,6 +60,7 @@ export function emptyGateDraft(): GateEntryDraft {
     vehiclePlate: "",
     plateState: null,
     purpose: "",
+    notes: "",
     expectedDuration: "60",
   };
 }
@@ -70,6 +73,7 @@ export function fillFromVisit(visit: VisitorRow): GateEntryDraft {
     vehiclePlate: (visit.vehiclePlate ?? "").toUpperCase(),
     plateState: normalizePlateState(visit.plateState),
     purpose: visit.purpose ?? "",
+    notes: visit.notes ?? "",
     expectedDuration:
       visit.expectedDurationMinutes != null ? String(visit.expectedDurationMinutes) : "",
   };
@@ -380,10 +384,6 @@ export function evaluateGateMemory(input: {
   if (!activeField || length < minSuggestionLength) {
     return { suggestions: [], fill: null };
   }
-  if (activeField === "vehiclePlate" && !draft.plateState) {
-    return { suggestions: [], fill: null };
-  }
-
   const matches = rankedMatches(
     visits.filter((visit) => visitMatchesDraft(visit, draft, activeField)),
     draft,

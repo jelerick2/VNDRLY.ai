@@ -46,6 +46,8 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
   const [purpose, setPurpose] = useState("");
+  const [notes, setNotes] = useState("");
+  const [checkOutNotes, setCheckOutNotes] = useState("");
   const PURPOSE_MAX = 500;
   function formatPhone(raw: string) {
     const d = raw.replace(/\D/g, "").slice(0, 10);
@@ -192,7 +194,6 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
       return;
     }
     const normalizedPlate = normalizePlateNumber(vehiclePlate);
-    if (normalizedPlate && !plateState) return;
     setBusy(true);
     try {
       // The guest cookie is replaced by this call, so evict the previous
@@ -253,7 +254,6 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
   const onCheckIn = async () => {
     setError(null);
     const normalizedPlate = normalizePlateNumber(vehiclePlate);
-    if (normalizedPlate && !plateState) return;
     const ctx = ctxQuery.data;
     if (!ctx || !hostKey) {
       setError(t("visitor.public.pickHost"));
@@ -271,6 +271,7 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
         hostPartnerId: host.type === "partner" ? host.id : undefined,
         hostVendorId: host.type === "vendor" ? host.id : undefined,
         purpose: purpose.trim() || undefined,
+        notes: notes.trim() || undefined,
         expectedDurationMinutes:
           Number.isFinite(dur) && dur > 0 ? dur : undefined,
         ...(normalizedPlate
@@ -327,7 +328,7 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
         lat = pos.coords.latitude;
         lng = pos.coords.longitude;
       } catch {}
-      await visitsApi.checkOut(active.id, lat, lng);
+      await visitsApi.checkOut(active.id, lat, lng, checkOutNotes.trim() || undefined);
       await queryClient.cancelQueries({ queryKey: ["visit-active-public"] });
       queryClient.removeQueries({ queryKey: ["visit-active-public"] });
       try {
@@ -541,11 +542,7 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                     value={plateState}
                     onChange={setPlateState}
                     preferredStates={orderedStatePreferences}
-                    error={
-                      vehiclePlate.trim() && !plateState
-                        ? t("gatekeeper.plateStateRequired")
-                        : undefined
-                    }
+                    error={undefined}
                   />
                 </div>
                 <div>
@@ -609,7 +606,6 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                   phone.trim().length > 0 &&
                   email.trim().length > 0 &&
                   company.trim().length > 0 &&
-                  (!vehiclePlate.trim() || Boolean(plateState)) &&
                   purpose.trim().length > 0 &&
                   safety;
                 return formReady ? (
@@ -679,6 +675,15 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                 />
               </div>
               <div>
+                <Label>{t("visitor.public.notes")}</Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={t("visitor.public.notesPlaceholder")}
+                  data-testid="input-visitor-notes"
+                />
+              </div>
+              <div>
                 <Label>{t("visitor.public.expectedMinutes")}</Label>
                 <Input
                   type="number"
@@ -734,6 +739,15 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                   </span>{" "}
                   {new Date(active.checkInTime).toLocaleString()}
                 </div>
+              </div>
+              <div>
+                <Label>{t("visitor.public.checkOutNotes")}</Label>
+                <Textarea
+                  value={checkOutNotes}
+                  onChange={(e) => setCheckOutNotes(e.target.value)}
+                  placeholder={t("visitor.public.notesPlaceholder")}
+                  data-testid="input-visitor-checkout-notes"
+                />
               </div>
               <PillButton
                 color="blue"

@@ -262,7 +262,43 @@ describe("submitVisitorCheckIn", () => {
       hostPartnerId: 7,
       hostVendorId: undefined,
       purpose: "Inspection",
+      notes: undefined,
       expectedDurationMinutes: 45,
+      latitude: 1.23,
+      longitude: 4.56,
+    });
+  });
+
+  it("submits a plate without state and persists optional notes", async () => {
+    requestForegroundPermissionsAsyncMock.mockResolvedValueOnce({
+      status: "granted",
+    });
+    getCurrentPositionAsyncMock.mockResolvedValueOnce({
+      coords: { latitude: 1.23, longitude: 4.56 },
+    });
+    visitorCheckInMock.mockResolvedValueOnce({ id: 42 });
+
+    const result = await submitVisitorCheckIn({
+      ctx: baseCtx,
+      hostKey: "partner:7",
+      purpose: "Delivery",
+      notes: "  no readable state  ",
+      durationStr: "30",
+      vehiclePlate: "SPEC1",
+      plateState: null,
+    });
+
+    expect(result).toEqual({ ok: true, visitId: 42 });
+    expect(visitorCheckInMock).toHaveBeenCalledWith({
+      siteLocationId: 42,
+      hostType: "partner",
+      hostPartnerId: 7,
+      hostVendorId: undefined,
+      purpose: "Delivery",
+      notes: "no readable state",
+      expectedDurationMinutes: 30,
+      vehiclePlate: "SPEC1",
+      plateState: undefined,
       latitude: 1.23,
       longitude: 4.56,
     });
@@ -290,6 +326,7 @@ describe("submitVisitorCheckIn", () => {
       hostPartnerId: undefined,
       hostVendorId: 12,
       purpose: undefined,
+      notes: undefined,
       expectedDurationMinutes: undefined,
       latitude: 10,
       longitude: 20,

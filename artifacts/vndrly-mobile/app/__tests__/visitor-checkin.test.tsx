@@ -105,12 +105,14 @@ const {
   requestCamPermMock: vi.fn(async () => ({ granted: true })),
   camPermRef: { current: { granted: true } as { granted: boolean } },
 }));
+const watchPositionAsyncMock = vi.hoisted(() => vi.fn());
 vi.mock("expo-location", () => ({
   Accuracy: { High: 4, Balanced: 3 },
   requestForegroundPermissionsAsync: (...a: unknown[]) =>
     requestForegroundPermissionsAsyncMock(...a),
   getCurrentPositionAsync: (...a: unknown[]) =>
     getCurrentPositionAsyncMock(...a),
+  watchPositionAsync: (...a: unknown[]) => watchPositionAsyncMock(...a),
 }));
 vi.mock("expo-camera", () => ({
   CameraView: () => null,
@@ -147,6 +149,7 @@ const {
   fetchGuestSessionMock,
   fetchSiteContextMock,
   fetchPreferredPlateStatesMock,
+  fetchPublicSitesMock,
   visitorCheckOutMock,
   guestLogoutMock,
   visitorCheckInMock,
@@ -155,6 +158,7 @@ const {
   fetchGuestSessionMock: vi.fn(),
   fetchSiteContextMock: vi.fn(),
   fetchPreferredPlateStatesMock: vi.fn(),
+  fetchPublicSitesMock: vi.fn(),
   visitorCheckOutMock: vi.fn(),
   guestLogoutMock: vi.fn(),
   visitorCheckInMock: vi.fn(),
@@ -165,6 +169,7 @@ vi.mock("@/lib/guest", () => ({
   fetchSiteContext: (...a: unknown[]) => fetchSiteContextMock(...a),
   fetchPreferredPlateStates: (...a: unknown[]) =>
     fetchPreferredPlateStatesMock(...a),
+  fetchPublicSites: (...a: unknown[]) => fetchPublicSitesMock(...a),
   visitorCheckOut: (...a: unknown[]) => visitorCheckOutMock(...a),
   guestLogout: (...a: unknown[]) => guestLogoutMock(...a),
   visitorCheckIn: (...a: unknown[]) => visitorCheckInMock(...a),
@@ -252,6 +257,25 @@ beforeEach(() => {
   fetchPreferredPlateStatesMock.mockResolvedValue({
     preferred: ["CA", "TX", "NY", "FL", "OH"],
   });
+  fetchPublicSitesMock.mockResolvedValue([
+    {
+      id: 42,
+      name: "Acme HQ",
+      address: "123 Main St",
+      latitude: 37.7,
+      longitude: -122.4,
+      siteRadiusMeters: 100,
+      siteCode: "ACME-HQ",
+    },
+  ]);
+  requestForegroundPermissionsAsyncMock.mockResolvedValue({ status: "granted" });
+  getCurrentPositionAsyncMock.mockResolvedValue({
+    coords: { latitude: 37.7, longitude: -122.4 },
+  });
+  watchPositionAsyncMock.mockImplementation(async (_opts, cb) => {
+    cb({ coords: { latitude: 37.7, longitude: -122.4 } });
+    return { remove: vi.fn() };
+  });
 });
 
 const SITE_CTX: SiteContext = {
@@ -317,10 +341,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     });
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("site-code-input"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
     tap(await findFirstByTestId("accept-site-btn"));
 
     await waitFor(() =>
@@ -353,10 +374,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     fetchPreferredPlateStatesMock.mockRejectedValue(new Error("unavailable"));
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("site-code-input"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
     tap(await findFirstByTestId("accept-site-btn"));
     await waitFor(() =>
       expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42, "ACME-HQ"),
@@ -404,10 +422,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     await waitFor(() => expect(fetchGuestSessionMock).toHaveBeenCalled());
     firstRender.unmount();
     renderScreen();
-    fireEvent.change(await findFirstByTestId("site-code-input"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
     tap(await findFirstByTestId("accept-site-btn"));
 
     expect(
@@ -458,10 +473,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
 
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
     const visitorA = renderScreen(queryClient);
-    fireEvent.change(await findFirstByTestId("site-code-input"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
     tap(await findFirstByTestId("accept-site-btn"));
     expect(
       ((await findFirstByTestId("visitor-vehicle-plate")) as HTMLInputElement)
@@ -487,10 +499,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     });
 
     renderScreen(queryClient);
-    fireEvent.change(await findFirstByTestId("site-code-input"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
     tap(await findFirstByTestId("accept-site-btn"));
     const visitorBPlate = (await findFirstByTestId(
       "visitor-vehicle-plate",
@@ -505,7 +514,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     expect(fetchGuestSessionMock).toHaveBeenCalledTimes(2);
   });
 
-  it("blocks a restored plate without state before requesting location or check-in", async () => {
+  it("allows a restored plate without state to check in", async () => {
     fetchGuestSessionMock.mockResolvedValue({
       guestSessionId: 1,
       role: "guest",
@@ -524,10 +533,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("site-code-input"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
     tap(await findFirstByTestId("accept-site-btn"));
     tap(firstByTestId("host-option-partner:7"));
     await waitFor(() =>
@@ -535,18 +541,16 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     );
     tap(firstByTestId("check-in-btn"));
 
-    expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
-    expect(visitorCheckInMock).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toBe("Estado obligatorio");
+    await waitFor(() => expect(visitorCheckInMock).toHaveBeenCalledTimes(1));
+    expect(visitorCheckInMock.mock.calls[0][0]).toMatchObject({
+      vehiclePlate: "ABC123",
+      plateState: undefined,
     });
   });
 
-  it("shows the site code form once the active-visit query resolves with no active visit", async () => {
+  it("shows the site name list once the active-visit query resolves with no active visit", async () => {
     renderScreen();
-    const codeInput = await findFirstByTestId("site-code-input");
-    expect(codeInput).toBeTruthy();
-    expect(firstByTestId("site-lookup-btn")).toBeTruthy();
+    expect(await findFirstByTestId("visitor-site-option-42")).toBeTruthy();
     expect(firstByTestId("open-scanner-btn")).toBeTruthy();
     // The site-context query stays disabled until a code is confirmed.
     expect(fetchSiteContextMock).not.toHaveBeenCalled();
@@ -573,7 +577,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
       expect(screen.getAllByText("visitor.checkOut").length).toBeGreaterThan(0);
     });
     // The site code form is NOT rendered while an active visit is in progress.
-    expect(screen.queryAllByTestId("site-code-input").length).toBe(0);
+    expect(screen.queryAllByTestId("visitor-site-option-42").length).toBe(0);
     // The purpose label and value are separate Text children inside one row,
     // so use a regex that tolerates the "visitor.purpose: Inspection" join.
     expect(screen.getAllByText(/Inspection/).length).toBeGreaterThan(0);
@@ -589,7 +593,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     await waitFor(() => {
       expect(screen.getAllByText("visitor.cancel").length).toBeGreaterThan(0);
     });
-    expect(screen.queryAllByTestId("site-code-input").length).toBe(0);
+    expect(screen.queryAllByTestId("visitor-site-option-42").length).toBe(0);
     expect(requestCamPermMock).not.toHaveBeenCalled(); // perm already granted
   });
 
@@ -606,9 +610,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     renderScreen();
 
     // 1. Type the site code and tap the lookup button.
-    const codeInput = await findFirstByTestId("site-code-input");
-    fireEvent.change(codeInput, { target: { value: "acme-hq" } });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
 
     // 2. Wait for the confirmation card; it shows the site name from the API.
     const acceptBtn = await findFirstByTestId("accept-site-btn");
@@ -650,12 +652,13 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
       hostPartnerId: 7,
       hostVendorId: undefined,
       purpose: undefined,
+      notes: undefined,
       expectedDurationMinutes: 60,
       latitude: 1.23,
       longitude: 4.56,
     });
-    expect(requestForegroundPermissionsAsyncMock).toHaveBeenCalledTimes(1);
-    expect(getCurrentPositionAsyncMock).toHaveBeenCalledTimes(1);
+    expect(requestForegroundPermissionsAsyncMock).toHaveBeenCalled();
+    expect(getCurrentPositionAsyncMock).toHaveBeenCalled();
   });
 
   it("lets gatekeepers attach plate and vehicle photos before check-in", async () => {
@@ -673,9 +676,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
 
     renderScreen();
 
-    const codeInput = await findFirstByTestId("site-code-input");
-    fireEvent.change(codeInput, { target: { value: "acme-hq" } });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
     tap(await findFirstByTestId("accept-site-btn"));
     await findFirstByTestId("check-in-btn");
     tap(firstByTestId("host-option-partner:7"));
@@ -705,6 +706,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
       hostPartnerId: 7,
       hostVendorId: undefined,
       purpose: undefined,
+      notes: undefined,
       expectedDurationMinutes: 60,
       platePhotoUrl: "/uploads/visits/plate.jpg",
       vehiclePhotoUrl: "/uploads/visits/truck.jpg",
@@ -721,9 +723,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
 
     renderScreen();
 
-    const codeInput = await findFirstByTestId("site-code-input");
-    fireEvent.change(codeInput, { target: { value: "ACME-HQ" } });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
 
     const acceptBtn = await findFirstByTestId("accept-site-btn");
     tap(acceptBtn);
@@ -731,15 +731,9 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     await findFirstByTestId("check-in-btn");
     tap(firstByTestId("host-option-vendor:11"));
     await waitFor(() => {
-      expect(isDisabled(firstByTestId("check-in-btn"))).toBe(false);
+      expect(isDisabled(firstByTestId("check-in-btn"))).toBe(true);
     });
-
     tap(firstByTestId("check-in-btn"));
-
-    await waitFor(() => {
-      expect(requestForegroundPermissionsAsyncMock).toHaveBeenCalledTimes(1);
-    });
-    expect(getCurrentPositionAsyncMock).not.toHaveBeenCalled();
     expect(visitorCheckInMock).not.toHaveBeenCalled();
   });
 });
@@ -773,9 +767,7 @@ describe("VisitorCheckInScreen — localized API error rendering", () => {
 
     renderScreen();
 
-    const codeInput = await findFirstByTestId("site-code-input");
-    fireEvent.change(codeInput, { target: { value: "ACME-HQ" } });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
 
     const acceptBtn = await findFirstByTestId("accept-site-btn");
     tap(acceptBtn);
@@ -907,7 +899,7 @@ describe("VisitorCheckInScreen — Task #112 expired session", () => {
     // The normal screen chrome (header sign-out link, site code form) is gone
     // — the visitor only has one obvious next action.
     expect(screen.queryAllByText("nav.signOut").length).toBe(0);
-    expect(screen.queryAllByTestId("site-code-input").length).toBe(0);
+    expect(screen.queryAllByTestId("visitor-site-option-42").length).toBe(0);
   });
 
   it("clears the dead token and routes to /guest-login when the visitor taps Sign in again", async () => {
@@ -938,9 +930,7 @@ describe("VisitorCheckInScreen — Task #112 expired session", () => {
 
     renderScreen();
 
-    const codeInput = await findFirstByTestId("site-code-input");
-    fireEvent.change(codeInput, { target: { value: "ACME-HQ" } });
-    tap(firstByTestId("site-lookup-btn"));
+    tap(await findFirstByTestId("visitor-site-option-42"));
 
     const acceptBtn = await findFirstByTestId("accept-site-btn");
     tap(acceptBtn);

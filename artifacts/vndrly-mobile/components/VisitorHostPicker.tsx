@@ -22,6 +22,10 @@ export interface VisitorHostPickerProps {
   onCaptureVehiclePhoto?: () => void;
   onSubmit: () => void;
   onChangeSite: () => void;
+  extraSubmitDisabled?: boolean;
+  notes?: string;
+  onNotesChange?: (v: string) => void;
+  durationChips?: Array<{ id: string; minutes: number; label: string }>;
   labels: {
     changeSite: string;
     whoVisiting: string;
@@ -35,6 +39,8 @@ export interface VisitorHostPickerProps {
     attached?: string;
     checkIn: string;
     geofenceNote: string;
+    notes?: string;
+    notesPlaceholder?: string;
   };
 }
 
@@ -53,11 +59,16 @@ export default function VisitorHostPicker({
   onCaptureVehiclePhoto,
   onSubmit,
   onChangeSite,
+  extraSubmitDisabled = false,
+  notes,
+  onNotesChange,
+  durationChips,
   labels,
 }: VisitorHostPickerProps) {
   const colors = useColors();
   const hostOptions = buildHostOptions(ctx);
-  const submitDisabled = !canSubmitCheckIn(hostKey, ctx, busy);
+  const submitDisabled =
+    !canSubmitCheckIn(hostKey, ctx, busy) || extraSubmitDisabled;
 
   return (
     <View
@@ -112,7 +123,44 @@ export default function VisitorHostPicker({
         placeholder={labels.purposePlaceholder}
       />
 
+      {onNotesChange ? (
+        <>
+          <Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>
+            {labels.notes ?? "Notes"}
+          </Text>
+          <TextInput
+            testID="notes-input"
+            value={notes ?? ""}
+            onChangeText={onNotesChange}
+            style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.background }]}
+            placeholderTextColor={colors.mutedForeground}
+            placeholder={labels.notesPlaceholder}
+            multiline
+          />
+        </>
+      ) : null}
+
       <Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>{labels.expectedMinutes}</Text>
+      {durationChips && durationChips.length > 0 ? (
+        <View style={styles.chipRow}>
+          {durationChips.map((chip) => (
+            <TouchableOpacity
+              key={chip.id}
+              testID={`duration-chip-${chip.id}`}
+              onPress={() => onDurationChange(String(chip.minutes))}
+              style={[
+                styles.chip,
+                {
+                  borderColor: duration === String(chip.minutes) ? colors.primary : colors.border,
+                  backgroundColor: duration === String(chip.minutes) ? colors.accent : "transparent",
+                },
+              ]}
+            >
+              <Text style={[styles.chipLabel, { color: colors.foreground }]}>{chip.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
       <TextInput
         testID="duration-input"
         value={duration}
@@ -191,6 +239,9 @@ const styles = StyleSheet.create({
   hostOption: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 8 },
   hostLabel: { fontFamily: "Inter_500Medium", fontSize: 14 },
   input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontFamily: "Inter_400Regular", fontSize: 16 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 8 },
+  chipLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   evidenceSection: { marginTop: 14 },
   evidenceRow: { flexDirection: "row", gap: 8 },
   evidenceButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 12 },
