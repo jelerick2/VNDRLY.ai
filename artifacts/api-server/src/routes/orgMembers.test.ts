@@ -826,7 +826,7 @@ vi.mock("bcryptjs", () => ({
 
 
 
-function adminCookie(userId = 1) {
+function adminCookie(userId = 1, exp?: number) {
   // System admin: session.role === "admin" satisfies the early-return
   // in requireOrgAdmin so we don't need to set up an org membership for
   // the caller.
@@ -836,7 +836,7 @@ function adminCookie(userId = 1) {
     partnerId: null,
     vendorId: null,
   };
-  return buildTestCookie(session);
+  return buildTestCookie(session, exp === undefined ? {} : { exp });
 }
 
 function partnerCookie(userId: number, partnerId: number, displayName = "Partner Owner") {
@@ -1660,19 +1660,44 @@ describe("GET /api/auth/me — resolveContext", () => {
 
     const res = await request(app)
       .get("/api/auth/me")
-      .set("Cookie", adminCookie(admin.id));
+      // Keep an unrelated session field containing the stale-id digit
+      // sequence so this regression cannot fall back to scanning arbitrary
+      // serialized response text.
+      .set("Cookie", adminCookie(admin.id, 9_999_999_999));
 
     expectStatus(res, 200);
-    expect(res.body.role).toBe("admin");
-    expect(res.body.partnerId).toBeNull();
-    expect(res.body.vendorId).toBeNull();
-    expect(res.body.activeMembershipId).toBeNull();
-    expect(res.body.availableMemberships).toEqual([]);
-    expect(res.body.requiresContextChoice).toBe(false);
-    // Belt-and-braces: nothing in the response should leak the stale ids.
-    const serialised = JSON.stringify(res.body);
-    expect(serialised).not.toContain("999");
-    expect(serialised).not.toContain("888");
+    expect({
+      role: res.body.role,
+      partnerId: res.body.partnerId,
+      vendorId: res.body.vendorId,
+      vendorRole: res.body.vendorRole,
+      vendorPeopleId: res.body.vendorPeopleId,
+      activeMembershipId: res.body.activeMembershipId,
+      availableMemberships: res.body.availableMemberships,
+      requiresContextChoice: res.body.requiresContextChoice,
+    }).toEqual({
+      role: "admin",
+      partnerId: null,
+      vendorId: null,
+      vendorRole: null,
+      vendorPeopleId: null,
+      activeMembershipId: null,
+      availableMemberships: [],
+      requiresContextChoice: false,
+    });
+
+    // Belt-and-braces only over organization-context fields. Session claims
+    // such as `exp` are intentionally outside this assertion and may contain
+    // the same decimal digit sequences without representing an org id.
+    const returnedOrgIds = [
+      res.body.partnerId,
+      res.body.vendorId,
+      ...res.body.availableMemberships.map(
+        (membership: { orgId: unknown }) => membership.orgId,
+      ),
+    ];
+    expect(returnedOrgIds).not.toContain(999);
+    expect(returnedOrgIds).not.toContain(888);
   });
 
   it("admin user with one partner membership picks it up via resolveContext", async () => {
