@@ -15,7 +15,7 @@ import {
 //
 // task-69 (visit-public.spec.ts) already drives the happy and
 // off-geofence flows at a tall desktop viewport so the long sign-in form
-// + Radix Select popper all fit on screen. That's not what real visitors
+// and portaled plate-state picker fit on screen. That's not what real visitors
 // see — they hit this page from a phone after scanning a QR poster at
 // the gate. This spec re-runs the sign-in / check-in / check-out flow at
 // two common phone resolutions and asserts:
@@ -98,20 +98,15 @@ async function fillSignInFormSmall(page: Page) {
     await el.scrollIntoViewIfNeeded();
     await el.fill(value);
   }
-  const stateTrigger = page.locator('[data-testid="select-vehicle-state"]');
+  const stateTrigger = page.locator('[data-testid="plate-state-picker-trigger"]');
   await stateTrigger.scrollIntoViewIfNeeded();
-  // The Radix Select popper portals into <body> and positions itself
-  // relative to the trigger. On a short phone viewport, leaving the
-  // trigger near the bottom can push the popper off-screen — scroll it
-  // to the top of the viewport first so the option list has room below.
+  // The picker portals into <body> and positions itself relative to the
+  // trigger, so leave room below it on short phone viewports.
   await stateTrigger.evaluate((el) =>
     el.scrollIntoView({ block: "start", behavior: "instant" as ScrollBehavior }),
   );
   await stateTrigger.click();
-  // Use keyboard navigation to pick AL — robust against any popper-
-  // overflow quirk on tiny viewports, where mouse-clicking a portaled
-  // option that renders just outside the visible area is unreliable.
-  await page.keyboard.press("Enter");
+  await page.getByRole("option", { name: "Alabama (AL)" }).click();
   const purpose = page.locator('[data-testid="input-purpose"]');
   await purpose.scrollIntoViewIfNeeded();
   await purpose.fill("Mobile e2e visit");
@@ -268,7 +263,7 @@ for (const viewport of VIEWPORTS) {
       '[data-testid="input-email"]',
       '[data-testid="input-company"]',
       '[data-testid="input-vehicle-plate"]',
-      '[data-testid="select-vehicle-state"]',
+      '[data-testid="plate-state-picker-trigger"]',
       '[data-testid="input-purpose"]',
       '[data-testid="safety-row"]',
       '[data-testid="button-guest-signin"]',

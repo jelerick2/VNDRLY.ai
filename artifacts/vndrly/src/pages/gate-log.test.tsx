@@ -158,7 +158,7 @@ describe("Gate Log page", () => {
     expect(screen.getByTestId("gate-log-visits-by-day")).toBeTruthy();
     expect(screen.getByTestId("gate-log-top-companies").textContent).toContain("Acme Pump");
     expect(screen.getByTestId("gate-log-history").textContent).toContain("OK • OK-GATE1");
-    expect(screen.getByTestId("gate-log-history").textContent).toContain("State unconfirmed");
+    expect(screen.getByTestId("gate-log-history").textContent).toContain("Unconfirmed state");
 
     fireEvent.change(screen.getByTestId("gate-log-search"), { target: { value: "solo" } });
     expect(screen.getAllByTestId("gate-log-history-row")).toHaveLength(1);

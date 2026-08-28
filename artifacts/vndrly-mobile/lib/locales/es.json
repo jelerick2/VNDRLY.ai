@@ -62,6 +62,21 @@
     "signOut": "Cerrar Sesión",
     "notifications": "Notificaciones"
   },
+  "plateStatePicker": {
+    "label": "Estado de la placa",
+    "select": "Seleccionar estado de la placa",
+    "selected": "Estado de la placa seleccionado: {{state}} ({{code}})",
+    "search": "Buscar estados",
+    "noResults": "No se encontraron estados.",
+    "preferred": "Estados preferidos",
+    "all": "Todos los estados",
+    "close": "Cerrar",
+    "closePicker": "Cerrar selector de estado de la placa",
+    "openHint": "Abre el selector de estado de la placa.",
+    "options": "Opciones de estado de la placa",
+    "option": "{{state}} ({{code}}), opción de estado",
+    "errorHint": "Error: {{error}}"
+  },
   "gatekeeper": {
     "voiceEntry": "Voz",
     "voiceListening": "Escuchando los datos de entrada…",
@@ -74,8 +89,10 @@
     "newEntry": "Nueva entrada",
     "nameRequired": "Nombre y apellido son obligatorios.",
     "plateRequired": "Se requiere una matrícula.",
-    "plateStateRequired": "Se requiere el estado de la placa.",
+    "plateStateRequired": "Estado obligatorio",
     "plateStateUnconfirmed": "Estado sin confirmar",
+    "plateStateSuggested": "Estado sugerido: {{state}}",
+    "plateStateCorrected": "Estado corregido: {{state}}",
     "checkedInTitle": "Entrada registrada",
     "checkedInBody": "Registro de entrada guardado.",
     "tagPhoto": "Foto de placa",
@@ -445,7 +462,7 @@
     "email": "Correo",
     "company": "Empresa",
     "plateState": "Estado de la placa",
-    "plateStateRequired": "Se requiere el estado de la placa.",
+    "plateStateRequired": "Estado obligatorio",
     "vehiclePlate": "Placa del vehículo",
     "purpose": "Motivo de la visita",
     "purposePlaceholder": "Ej. entrega de equipo",
@@ -497,6 +514,8 @@
     "notFound": "No encontramos lo que buscabas.",
     "conflict": "Esa acción no se puede completar en este momento.",
     "validationFailed": "Falta información o no es válida. Revisa el formulario e inténtalo de nuevo.",
+    "missing-state": "Estado obligatorio",
+    "invalid-state": "Estado no válido",
     "invalid_query": "Esa búsqueda tiene filtros inválidos. Revísalos e inténtalo de nuevo.",
     "audit_trail": {
       "export_forbidden": "La exportación del registro de auditoría está restringida a roles de administrador, socio o proveedor."

@@ -48,7 +48,20 @@ const ES_STRINGS: Record<string, string> = {
   "visitor.error": "Error",
   "visitor.requireName": "El nombre y el apellido son obligatorios.",
   "visitor.requireSafety": "Por favor confirme que acepta las reglas de seguridad.",
-  "visitor.plateStateRequired": "Se requiere el estado de la placa.",
+  "visitor.plateStateRequired": "Estado obligatorio",
+  "plateStatePicker.label": "Estado de la placa",
+  "plateStatePicker.select": "Seleccionar estado de la placa",
+  "plateStatePicker.selected": "Estado de la placa seleccionado: {{state}} ({{code}})",
+  "plateStatePicker.search": "Buscar estados",
+  "plateStatePicker.noResults": "No se encontraron estados.",
+  "plateStatePicker.preferred": "Estados preferidos",
+  "plateStatePicker.all": "Todos los estados",
+  "plateStatePicker.close": "Cerrar",
+  "plateStatePicker.closePicker": "Cerrar selector de estado de la placa",
+  "plateStatePicker.openHint": "Abre el selector de estado de la placa.",
+  "plateStatePicker.options": "Opciones de estado de la placa",
+  "plateStatePicker.option": "{{state}} ({{code}}), opción de estado",
+  "plateStatePicker.errorHint": "Error: {{error}}",
   "common.required": "Obligatorio",
   "errors.guest.name_required": "El nombre y apellido son obligatorios.",
   "errors.guest.safety_required":
@@ -71,7 +84,12 @@ const ES_STRINGS: Record<string, string> = {
 // not by exercising the language toggle itself.
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (k: string) => ES_STRINGS[k] ?? k,
+    t: (k: string, options?: Record<string, unknown>) => {
+      const template = ES_STRINGS[k] ?? k;
+      return template.replace(/\{\{(\w+)\}\}/g, (_, name) =>
+        String(options?.[name] ?? ""),
+      );
+    },
     i18n: { language: "en", changeLanguage: () => Promise.resolve() },
   }),
   initReactI18next: { type: "3rdParty", init: () => undefined },
@@ -157,6 +175,7 @@ beforeEach(() => {
       email: null,
       company: null,
       vehiclePlate: null,
+      plateState: null,
       lastPurpose: null,
     },
   });
@@ -196,25 +215,25 @@ function tap(el: HTMLElement): void {
 }
 
 function selectPlateState(name: string): void {
-  tap(screen.getByRole("button", { name: /^(Select plate state|Selected plate state:)/ }));
-  tap(screen.getByRole("button", { name: `${name}, state option` }));
+  tap(screen.getByRole("button", { name: /^(Seleccionar estado de la placa|Estado de la placa seleccionado:)/ }));
+  tap(screen.getByRole("button", { name: `${name}, opción de estado` }));
 }
 
 describe("GuestLoginScreen — sign-up form", () => {
   it("renders the national state fallback immediately before the plate input and keeps all 51 choices", () => {
     render(<GuestLoginScreen />);
 
-    const trigger = screen.getByRole("button", { name: "Select plate state" });
+    const trigger = screen.getByRole("button", { name: "Seleccionar estado de la placa" });
     const plateInput = firstByTestId("guest-vehicle-plate");
     expect(trigger.compareDocumentPosition(plateInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     tap(trigger);
-    const stateOptions = screen.getAllByRole("button", { name: /state option$/ });
+    const stateOptions = screen.getAllByRole("button", { name: /opción de estado$/ });
     expect(stateOptions).toHaveLength(51);
     expect(stateOptions.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
-      "California (CA), state option",
-      "Texas (TX), state option",
-      "New York (NY), state option",
+      "California (CA), opción de estado",
+      "Texas (TX), opción de estado",
+      "New York (NY), opción de estado",
     ]);
   });
 
@@ -228,7 +247,7 @@ describe("GuestLoginScreen — sign-up form", () => {
     fireEvent.click(firstByTestId("guest-submit-btn"));
 
     expect(startGuestSessionMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe("Se requiere el estado de la placa.");
+    expect(screen.getByRole("alert").textContent).toBe("Estado obligatorio");
   });
 
   it("sends a normalized state separately from the plate number", async () => {

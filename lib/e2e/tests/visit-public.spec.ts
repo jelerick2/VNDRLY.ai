@@ -19,11 +19,8 @@ import {
 // context level so we can drive both the in-radius (happy path) and the
 // out-of-radius (off-geofence) error rendering.
 //
-// We use a tall viewport so the long signin form (and the Radix Select
-// popper for the vehicle-state field, which is portaled below the
-// trigger) all fit on screen at once. Without this, the option list can
-// render outside the viewport and Playwright cannot scroll it into view
-// from inside Radix's popper portal.
+// We use a tall viewport so the long sign-in form and portaled plate-state
+// picker fit on screen at once.
 const VIEWPORT = { width: 1280, height: 1600 } as const;
 
 const SITE_LAT = 40.0;
@@ -52,8 +49,8 @@ async function fillSignInForm(page: Page) {
   await page.locator('[data-testid="input-email"]').fill("jane.visitor@example.com");
   await page.locator('[data-testid="input-company"]').fill("E2E Test Co");
   await page.locator('[data-testid="input-vehicle-plate"]').fill("E2EPLATE");
-  await page.locator('[data-testid="select-vehicle-state"]').click();
-  await page.getByRole("option", { name: "AL" }).click();
+  await page.locator('[data-testid="plate-state-picker-trigger"]').click();
+  await page.getByRole("option", { name: "Alabama (AL)" }).click();
   await page.locator('[data-testid="input-purpose"]').fill("E2E test visit");
   // The safety acknowledgement is a row-shaped tap target wrapping a
   // visual-only Radix Switch. Click the row to toggle the underlying

@@ -59,7 +59,7 @@ function asApiError(e: unknown): ApiError | null {
 // sentence as a code — otherwise we'd look up `errors.Site not found` and
 // fall through to the generic status-family translation instead of the
 // real code-based lookup attached on a sibling field.
-const CODE_SHAPE = /^[a-z][a-z0-9_.]*$/;
+const CODE_SHAPE = /^[a-z][a-z0-9_.-]*$/;
 function isStructuredCode(value: unknown): value is string {
   return typeof value === "string" && CODE_SHAPE.test(value);
 }

@@ -132,7 +132,12 @@ describe("Visit public page — Spanish copy", () => {
     await user.type(screen.getByTestId("input-phone"), "5555550123");
     await user.type(screen.getByTestId("input-email"), "juan@example.com");
     await user.type(screen.getByTestId("input-company"), "Acme");
-    await user.click(screen.getByRole("button", { name: "Select plate state" }));
+    await user.click(
+      screen.getByRole("button", { name: "Seleccionar estado de la placa" }),
+    );
+    expect(screen.getByRole("dialog", { name: "Estado de la placa" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Buscar estados" })).toBeTruthy();
+    expect(screen.getByText("Estados preferidos")).toBeTruthy();
     await user.click(screen.getByRole("option", { name: "California (CA)" }));
     await user.type(screen.getByTestId("input-vehicle-plate"), "ABC123");
     await user.type(screen.getByTestId("input-purpose"), "entrega");

@@ -103,6 +103,10 @@ export default function GatekeeperScreen() {
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
   const [plateStateError, setPlateStateError] = useState<string | null>(null);
+  const [ocrStateNotice, setOcrStateNotice] = useState<{
+    suggestedState: PlateStateCode;
+    selectedState: PlateStateCode;
+  } | null>(null);
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
@@ -270,6 +274,7 @@ export default function GatekeeperScreen() {
     setVehiclePlate("");
     setPlateState(null);
     setPlateStateError(null);
+    setOcrStateNotice(null);
     setPurpose("");
     setDuration("60");
     setPlatePhotoUrl(null);
@@ -291,6 +296,7 @@ export default function GatekeeperScreen() {
       const result = await captureAndUploadImage({ maxBytes: 8 * 1024 * 1024, purpose: "gate-evidence" });
       if (!result) return;
       if (kind === "plate") {
+        setOcrStateNotice(null);
         void deleteGateEvidence(platePhotoUrl).catch(() => undefined);
         setPlatePhotoUrl(result.objectPath);
         const candidate = await readGatePlate(result.objectPath).catch(() => null);
@@ -303,6 +309,10 @@ export default function GatekeeperScreen() {
           if (normalizedState) {
             setPlateState(normalizedState);
             setPlateStateError(null);
+            setOcrStateNotice({
+              suggestedState: normalizedState,
+              selectedState: normalizedState,
+            });
           }
         }
       }
@@ -559,10 +569,26 @@ export default function GatekeeperScreen() {
               onChange={(state) => {
                 setPlateState(state);
                 setPlateStateError(null);
+                setOcrStateNotice((notice) => notice
+                  ? { ...notice, selectedState: state }
+                  : null);
               }}
               preferredStates={orderedStatePreferences}
               error={plateStateError ?? undefined}
             />
+            {ocrStateNotice ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                style={[styles.muted, { color: colors.mutedForeground }]}
+              >
+                {t(
+                  ocrStateNotice.selectedState === ocrStateNotice.suggestedState
+                    ? "gatekeeper.plateStateSuggested"
+                    : "gatekeeper.plateStateCorrected",
+                  { state: ocrStateNotice.selectedState },
+                )}
+              </Text>
+            ) : null}
             <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.vehiclePlate")} *</Text>
             <TextInput testID="gate-vehicle-plate" value={vehiclePlate} onChangeText={(value) => setVehiclePlate(value.toUpperCase())} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
             <View style={styles.twoCol}>

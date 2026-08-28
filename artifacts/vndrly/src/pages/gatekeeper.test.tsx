@@ -16,7 +16,25 @@ const api = vi.hoisted(() => ({
 const liveMonitor = vi.hoisted(() => ({ flash: null as Record<string, unknown> | null }));
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      const strings: Record<string, string> = {
+        "plateStatePicker.label": "Plate state",
+        "plateStatePicker.select": "Select plate state",
+        "plateStatePicker.selected": "Selected plate state: {{state}} ({{code}})",
+        "plateStatePicker.search": "Search states",
+        "plateStatePicker.noResults": "No states found.",
+        "plateStatePicker.preferred": "Preferred states",
+        "plateStatePicker.all": "All states",
+        "gatekeeper.plateStateSuggested": "Suggested state: {{state}}",
+        "gatekeeper.plateStateCorrected": "State corrected: {{state}}",
+      };
+      const template = strings[key] ?? key;
+      return template.replace(/\{\{(\w+)\}\}/g, (_, name) =>
+        String(options?.[name] ?? ""),
+      );
+    },
+  }),
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -273,8 +291,10 @@ describe("GatekeeperPage plate state", () => {
     fireEvent.change(plateInput, { target: { files: [file] } });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" })).toBeTruthy();
+      expect(screen.getByText("Suggested state: TX")).toBeTruthy();
     });
     await selectState("Oklahoma (OK)");
+    expect(screen.getByText("State corrected: OK")).toBeTruthy();
     fireEvent.change(screen.getByTestId("input-gate-first-name"), { target: { value: "Jordan" } });
     fireEvent.change(screen.getByTestId("input-gate-last-name"), { target: { value: "Hale" } });
     fireEvent.click(screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }));
@@ -286,6 +306,7 @@ describe("GatekeeperPage plate state", () => {
     });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Select plate state" })).toBeTruthy();
+      expect(screen.queryByText("State corrected: OK")).toBeNull();
     });
   });
 

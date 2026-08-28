@@ -16,7 +16,23 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      const strings: Record<string, string> = {
+        "plateStatePicker.label": "Plate state",
+        "plateStatePicker.select": "Select plate state",
+        "plateStatePicker.selected": "Selected plate state: {{state}} ({{code}})",
+        "plateStatePicker.search": "Search states",
+        "plateStatePicker.noResults": "No states found.",
+        "plateStatePicker.preferred": "Preferred states",
+        "plateStatePicker.all": "All states",
+      };
+      const template = strings[key] ?? key;
+      return template.replace(/\{\{(\w+)\}\}/g, (_, name) =>
+        String(options?.[name] ?? ""),
+      );
+    },
+  }),
 }));
 
 vi.mock("@/lib/visits-api", () => ({ visitsApi: api }));

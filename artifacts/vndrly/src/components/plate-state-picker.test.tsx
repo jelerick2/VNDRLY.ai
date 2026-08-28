@@ -1,7 +1,9 @@
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+import i18n from "@/lib/i18n";
 
 vi.stubGlobal(
   "ResizeObserver",
@@ -19,6 +21,10 @@ Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
 
 import { PlateStatePicker } from "./plate-state-picker";
 
+afterEach(async () => {
+  await i18n.changeLanguage("en");
+});
+
 function renderPicker(
   overrides: Partial<React.ComponentProps<typeof PlateStatePicker>> = {},
 ) {
@@ -35,6 +41,7 @@ describe("PlateStatePicker", () => {
   it("puts preferred states first, followed by one alphabetical catalog remainder", async () => {
     const user = userEvent.setup();
     renderPicker();
+    expect(screen.getByTestId("plate-state-picker-trigger")).toBeTruthy();
     await user.click(screen.getByRole("button", { name: "Select plate state" }));
 
     const options = screen.getAllByRole("option");
@@ -52,13 +59,15 @@ describe("PlateStatePicker", () => {
     ]);
     expect(new Set(labels).size).toBe(labels.length);
     expect(labels).toContain("District of Columbia (DC)");
+    expect(screen.getByText("Preferred states")).toBeTruthy();
+    expect(screen.getByText("All states")).toBeTruthy();
   });
 
   it("filters Texas from the accessible search field and reports the chosen code", async () => {
     const user = userEvent.setup();
     const { props } = renderPicker();
     await user.click(screen.getByRole("button", { name: "Select plate state" }));
-    await user.type(screen.getByRole("combobox", { name: "Search plate states" }), "tex");
+    await user.type(screen.getByRole("combobox", { name: "Search states" }), "tex");
 
     await user.click(screen.getByRole("option", { name: "Texas (TX)" }));
     expect(props.onChange).toHaveBeenCalledWith("TX");
@@ -74,7 +83,7 @@ describe("PlateStatePicker", () => {
     expect(trigger.getAttribute("aria-describedby")).toBe(error.id);
     expect(error.textContent).toBe("Choose a valid state.");
     await user.click(trigger);
-    expect(screen.queryByRole("dialog", { name: "Plate state picker" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Plate state" })).toBeNull();
     expect(props.onChange).not.toHaveBeenCalled();
   });
 
@@ -83,8 +92,8 @@ describe("PlateStatePicker", () => {
     renderPicker();
     await user.click(screen.getByRole("button", { name: "Select plate state" }));
 
-    expect(screen.getByRole("dialog", { name: "Plate state picker" })).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "Search plate states" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Plate state" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Search states" })).toBeTruthy();
   });
 
   it("selects the highlighted command option with Arrow Down and Enter", async () => {
@@ -92,7 +101,7 @@ describe("PlateStatePicker", () => {
     const { props } = renderPicker();
     await user.click(screen.getByRole("button", { name: "Select plate state" }));
 
-    const search = screen.getByRole("combobox", { name: "Search plate states" });
+    const search = screen.getByRole("combobox", { name: "Search states" });
     await user.click(search);
     await user.keyboard("{ArrowDown}{Enter}");
 
@@ -104,7 +113,7 @@ describe("PlateStatePicker", () => {
     const onChange = vi.fn();
     const { rerender } = renderPicker({ onChange });
     await user.click(screen.getByRole("button", { name: "Select plate state" }));
-    await user.type(screen.getByRole("combobox", { name: "Search plate states" }), "tex");
+    await user.type(screen.getByRole("combobox", { name: "Search states" }), "tex");
 
     rerender(
       <PlateStatePicker
@@ -115,8 +124,26 @@ describe("PlateStatePicker", () => {
       />,
     );
 
-    expect(screen.queryByRole("dialog", { name: "Plate state picker" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Plate state" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Select plate state" }));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("localizes the picker controls, grouping, and empty search state", async () => {
+    await i18n.changeLanguage("es");
+    const user = userEvent.setup();
+    renderPicker();
+
+    await user.click(
+      screen.getByRole("button", { name: "Seleccionar estado de la placa" }),
+    );
+
+    expect(screen.getByRole("dialog", { name: "Estado de la placa" })).toBeTruthy();
+    expect(screen.getByText("Estados preferidos")).toBeTruthy();
+    expect(screen.getByText("Todos los estados")).toBeTruthy();
+
+    const search = screen.getByRole("combobox", { name: "Buscar estados" });
+    await user.type(search, "zzzz");
+    expect(screen.getByText("No se encontraron estados.")).toBeTruthy();
   });
 });

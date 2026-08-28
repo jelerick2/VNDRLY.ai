@@ -27,7 +27,29 @@ vi.mock("react-native-safe-area-context", async () => {
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: (key: string, options?: Record<string, unknown>) => {
+      const strings: Record<string, string> = {
+        "plateStatePicker.label": "Plate state",
+        "plateStatePicker.select": "Select plate state",
+        "plateStatePicker.selected": "Selected plate state: {{state}} ({{code}})",
+        "plateStatePicker.search": "Search states",
+        "plateStatePicker.noResults": "No states found.",
+        "plateStatePicker.preferred": "Preferred states",
+        "plateStatePicker.all": "All states",
+        "plateStatePicker.close": "Close",
+        "plateStatePicker.closePicker": "Close plate state picker",
+        "plateStatePicker.openHint": "Opens the plate state picker.",
+        "plateStatePicker.options": "Plate state options",
+        "plateStatePicker.option": "{{state}} ({{code}}), state option",
+        "plateStatePicker.errorHint": "Error: {{error}}",
+        "gatekeeper.plateStateSuggested": "Suggested state: {{state}}",
+        "gatekeeper.plateStateCorrected": "State corrected: {{state}}",
+      };
+      const template = strings[key] ?? key;
+      return template.replace(/\{\{(\w+)\}\}/g, (_, name) =>
+        String(options?.[name] ?? ""),
+      );
+    },
   }),
 }));
 
@@ -512,9 +534,11 @@ describe("GatekeeperScreen", () => {
     tap(firstByTestId("gate-capture-tag-photo"));
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" })).toBeTruthy();
+      expect(screen.getByText("Suggested state: TX")).toBeTruthy();
     });
     tap(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" }));
     tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
+    expect(screen.getByText("State corrected: OK")).toBeTruthy();
 
     fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Jordan" } });
     fireEvent.change(firstByTestId("gate-last-name"), { target: { value: "Hale" } });
@@ -530,6 +554,7 @@ describe("GatekeeperScreen", () => {
     });
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Select plate state" })).toBeTruthy();
+      expect(screen.queryByText("State corrected: OK")).toBeNull();
     });
   });
 

@@ -1,6 +1,11 @@
 import React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import i18next, { type i18n as I18nInstance } from "i18next";
+import { I18nextProvider, initReactI18next } from "react-i18next";
+
+import en from "@/lib/locales/en.json";
+import es from "@/lib/locales/es.json";
 
 const TestRenderer = require("react-test-renderer") as {
   act: (callback: () => void) => void;
@@ -24,7 +29,30 @@ vi.mock("@/hooks/useColors", () => ({
 
 import PlateStatePicker from "./PlateStatePicker";
 
-afterEach(cleanup);
+let testI18n: I18nInstance;
+
+beforeAll(async () => {
+  testI18n = i18next.createInstance();
+  await testI18n.use(initReactI18next).init({
+    lng: "en",
+    fallbackLng: "en",
+    compatibilityJSON: "v4",
+    interpolation: { escapeValue: false },
+    resources: {
+      en: { translation: en },
+      es: { translation: es },
+    },
+  });
+});
+
+afterEach(async () => {
+  cleanup();
+  await testI18n.changeLanguage("en");
+});
+
+afterAll(async () => {
+  await testI18n.changeLanguage("en");
+});
 
 function renderPicker(
   overrides: Partial<React.ComponentProps<typeof PlateStatePicker>> = {},
@@ -35,7 +63,14 @@ function renderPicker(
     preferredStates: ["OK", "TX", "NM"],
     ...overrides,
   };
-  return { props, ...render(<PlateStatePicker {...props} />) };
+  return {
+    props,
+    ...render(
+      <I18nextProvider i18n={testI18n}>
+        <PlateStatePicker {...props} />
+      </I18nextProvider>,
+    ),
+  };
 }
 
 function tap(element: HTMLElement) {
@@ -64,12 +99,14 @@ describe("PlateStatePicker", () => {
     ]);
     expect(new Set(labels).size).toBe(labels.length);
     expect(labels).toContain("District of Columbia (DC)");
+    expect(screen.getByText("Preferred states")).toBeTruthy();
+    expect(screen.getByText("All states")).toBeTruthy();
   });
 
   it("filters Texas from the accessible search field and reports the chosen code", () => {
     const { props } = renderPicker();
     tap(screen.getByRole("button", { name: "Select plate state" }));
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search plate states" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search states" }), {
       target: { value: "tex" },
     });
 
@@ -85,7 +122,7 @@ describe("PlateStatePicker", () => {
 
     expect(screen.getByRole("alert").textContent).toBe("Choose a valid state.");
     tap(trigger);
-    expect(screen.queryByRole("dialog", { name: "Plate state picker" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Plate state" })).toBeNull();
     expect(props.onChange).not.toHaveBeenCalled();
   });
 
@@ -93,8 +130,8 @@ describe("PlateStatePicker", () => {
     renderPicker();
     tap(screen.getByRole("button", { name: "Select plate state" }));
 
-    expect(screen.getByRole("dialog", { name: "Plate state picker" })).toBeTruthy();
-    expect(screen.getByRole("searchbox", { name: "Search plate states" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Plate state" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Search states" })).toBeTruthy();
   });
 
   it("uses the native accessibility hint to announce its error", () => {
@@ -102,12 +139,14 @@ describe("PlateStatePicker", () => {
     let native: ReturnType<typeof TestRenderer.create>;
     TestRenderer.act(() => {
       native = TestRenderer.create(
-        <PlateStatePicker
-          value={null}
-          onChange={vi.fn()}
-          preferredStates={[]}
-          error="Choose a valid state."
-        />,
+        <I18nextProvider i18n={testI18n}>
+          <PlateStatePicker
+            value={null}
+            onChange={vi.fn()}
+            preferredStates={[]}
+            error="Choose a valid state."
+          />
+        </I18nextProvider>,
       );
     });
 
@@ -121,21 +160,39 @@ describe("PlateStatePicker", () => {
     const onChange = vi.fn();
     const { rerender } = renderPicker({ onChange });
     tap(screen.getByRole("button", { name: "Select plate state" }));
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search plate states" }), {
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search states" }), {
       target: { value: "tex" },
     });
 
     rerender(
-      <PlateStatePicker
-        value={null}
-        onChange={onChange}
-        preferredStates={["OK", "TX", "NM"]}
-        disabled
-      />,
+      <I18nextProvider i18n={testI18n}>
+        <PlateStatePicker
+          value={null}
+          onChange={onChange}
+          preferredStates={["OK", "TX", "NM"]}
+          disabled
+        />
+      </I18nextProvider>,
     );
 
-    expect(screen.queryByRole("dialog", { name: "Plate state picker" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Plate state" })).toBeNull();
     tap(screen.getByRole("button", { name: "Select plate state" }));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("localizes the picker controls, grouping, and empty search state", async () => {
+    await testI18n.changeLanguage("es");
+    renderPicker();
+
+    tap(screen.getByRole("button", { name: "Seleccionar estado de la placa" }));
+
+    expect(screen.getByRole("dialog", { name: "Estado de la placa" })).toBeTruthy();
+    expect(screen.getByText("Estados preferidos")).toBeTruthy();
+    expect(screen.getByText("Todos los estados")).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar estados" }), {
+      target: { value: "zzzz" },
+    });
+    expect(screen.getByText("No se encontraron estados.")).toBeTruthy();
   });
 });

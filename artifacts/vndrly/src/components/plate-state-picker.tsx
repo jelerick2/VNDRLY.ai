@@ -1,10 +1,12 @@
 import * as React from "react";
 import {
+  normalizePlateState,
   orderPlateStates,
   US_PLATE_STATES,
   type PlateStateCode,
 } from "@workspace/plate-state";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -30,8 +32,6 @@ export interface PlateStatePickerProps {
   error?: string;
 }
 
-const selectLabel = "Select plate state";
-
 export function PlateStatePicker({
   value,
   onChange,
@@ -39,6 +39,7 @@ export function PlateStatePicker({
   disabled = false,
   error,
 }: PlateStatePickerProps) {
+  const { t } = useTranslation();
   const errorId = React.useId();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -50,8 +51,22 @@ export function PlateStatePicker({
     () => orderPlateStates(preferredStates, query),
     [preferredStates, query],
   );
+  const preferredCodes = React.useMemo(() => {
+    const codes = new Set<PlateStateCode>();
+    for (const candidate of preferredStates) {
+      const code = normalizePlateState(candidate);
+      if (code) codes.add(code);
+    }
+    return codes;
+  }, [preferredStates]);
+  const preferredOptions = states.filter((state) => preferredCodes.has(state.code));
+  const remainingOptions = states.filter((state) => !preferredCodes.has(state.code));
+  const selectLabel = t("plateStatePicker.select");
   const triggerLabel = selectedState
-    ? `Selected plate state: ${selectedState.name} (${selectedState.code})`
+    ? t("plateStatePicker.selected", {
+        state: selectedState.name,
+        code: selectedState.code,
+      })
     : selectLabel;
 
   React.useEffect(() => {
@@ -88,6 +103,7 @@ export function PlateStatePicker({
               "w-full justify-between font-normal",
               error && "border-destructive",
             )}
+            data-testid="plate-state-picker-trigger"
             disabled={disabled}
             type="button"
             variant="outline"
@@ -97,39 +113,63 @@ export function PlateStatePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          aria-label="Plate state picker"
+          aria-label={t("plateStatePicker.label")}
           className="w-[var(--radix-popover-trigger-width)] p-2"
           role="dialog"
         >
-          <Command label="Search plate states" loop shouldFilter={false}>
+          <Command label={t("plateStatePicker.search")} loop shouldFilter={false}>
             <CommandInput
-              aria-label="Search plate states"
+              aria-label={t("plateStatePicker.search")}
               onValueChange={setQuery}
-              placeholder="Search states"
+              placeholder={t("plateStatePicker.search")}
               value={query}
             />
             <CommandList>
-              <CommandEmpty>No states found.</CommandEmpty>
-              <CommandGroup>
-                {states.map((state) => {
-                  const isSelected = state.code === value;
-                  return (
-                    <CommandItem
-                      aria-selected={isSelected}
-                      key={state.code}
-                      onSelect={() => selectState(state.code)}
-                      role="option"
-                      value={`${state.name} ${state.code}`}
-                    >
-                      <Check
-                        aria-hidden="true"
-                        className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")}
-                      />
-                      {state.name} ({state.code})
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
+              <CommandEmpty>{t("plateStatePicker.noResults")}</CommandEmpty>
+              {preferredOptions.length > 0 ? (
+                <CommandGroup heading={t("plateStatePicker.preferred")}>
+                  {preferredOptions.map((state) => {
+                    const isSelected = state.code === value;
+                    return (
+                      <CommandItem
+                        aria-selected={isSelected}
+                        key={state.code}
+                        onSelect={() => selectState(state.code)}
+                        role="option"
+                        value={`${state.name} ${state.code}`}
+                      >
+                        <Check
+                          aria-hidden="true"
+                          className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")}
+                        />
+                        {state.name} ({state.code})
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              ) : null}
+              {remainingOptions.length > 0 ? (
+                <CommandGroup heading={t("plateStatePicker.all")}>
+                  {remainingOptions.map((state) => {
+                    const isSelected = state.code === value;
+                    return (
+                      <CommandItem
+                        aria-selected={isSelected}
+                        key={state.code}
+                        onSelect={() => selectState(state.code)}
+                        role="option"
+                        value={`${state.name} ${state.code}`}
+                      >
+                        <Check
+                          aria-hidden="true"
+                          className={cn("size-4", isSelected ? "opacity-100" : "opacity-0")}
+                        />
+                        {state.name} ({state.code})
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              ) : null}
             </CommandList>
           </Command>
         </PopoverContent>

@@ -1357,8 +1357,7 @@
       "email": "Correo",
       "company": "Empresa",
       "vehiclePlate": "Placa",
-      "vehicleState": "Estado",
-      "selectState": "Estado",
+      "vehicleState": "Estado de la placa",
       "safetyAck": "Seguiré todas las reglas de seguridad del sitio.",
       "continue": "Continuar",
       "whoVisiting": "¿A quién visita?",
@@ -3745,6 +3744,8 @@
     "notFound": "No encontramos lo que buscabas.",
     "conflict": "Esa acción no se puede completar en este momento.",
     "validationFailed": "Falta información o no es válida. Revisa el formulario e inténtalo de nuevo.",
+    "missing-state": "Estado obligatorio",
+    "invalid-state": "Estado no válido",
     "network": {
       "unreachable": "VNDRLY no puede conectarse con el servicio en este momento. Revisa tu conexión; si otros sitios funcionan, es posible que el host, DNS o firewall de VNDRLY necesite atención."
     },
@@ -4767,6 +4768,15 @@
     "history": "Historial",
     "aria": "Navegación del portal de portería"
   },
+  "plateStatePicker": {
+    "label": "Estado de la placa",
+    "select": "Seleccionar estado de la placa",
+    "selected": "Estado de la placa seleccionado: {{state}} ({{code}})",
+    "search": "Buscar estados",
+    "noResults": "No se encontraron estados.",
+    "preferred": "Estados preferidos",
+    "all": "Todos los estados"
+  },
   "gatekeeper": {
     "voiceListening": "Escuchando: diga la matrícula, el nombre del conductor, la empresa, el propósito y la duración.",
     "voiceUnavailable": "La entrada por voz no es compatible con este navegador.",
@@ -4808,7 +4818,9 @@
     "company": "Empresa",
     "vehiclePlate": "Placa",
     "plateStateUnconfirmed": "Estado sin confirmar",
-    "plateStateRequired": "Se requiere el estado de la placa.",
+    "plateStateRequired": "Estado obligatorio",
+    "plateStateSuggested": "Estado sugerido: {{state}}",
+    "plateStateCorrected": "Estado corregido: {{state}}",
     "siteCode": "Código del sitio",
     "locationUnavailable": "Se requiere ubicación para el registro en portería.",
     "locationDenied": "Permita el acceso a la ubicación para registrar esta entrada.",

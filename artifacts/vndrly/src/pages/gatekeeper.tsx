@@ -141,6 +141,10 @@ export default function GatekeeperPage() {
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [plateState, setPlateState] = useState<PlateStateCode | null>(null);
   const [plateStateError, setPlateStateError] = useState<string | null>(null);
+  const [ocrStateNotice, setOcrStateNotice] = useState<{
+    suggestedState: PlateStateCode;
+    selectedState: PlateStateCode;
+  } | null>(null);
   const [purpose, setPurpose] = useState("");
   const [duration, setDuration] = useState("60");
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
@@ -408,6 +412,7 @@ export default function GatekeeperPage() {
     setFirstName(""); setLastName(""); setCompany("");
     setVehiclePlate(""); setPurpose(""); setDuration("60"); setHostKey("");
     setPlateState(null); setPlateStateError(null);
+    setOcrStateNotice(null);
     setPlatePhotoUrl(null); setVehiclePhotoUrl(null);
     setActiveMemoryField(null);
     setMemoryDeleting(false);
@@ -433,7 +438,10 @@ export default function GatekeeperPage() {
   const capture = async (file: File | undefined, kind: "plate" | "vehicle") => {
     if (!file) return;
     setBusy(true); setError(null);
-    if (kind === "plate") setPlateOcrStatus("reading");
+    if (kind === "plate") {
+      setPlateOcrStatus("reading");
+      setOcrStateNotice(null);
+    }
     try {
       if (kind === "vehicle") {
         const next = await uploadEvidence(file, t);
@@ -458,6 +466,10 @@ export default function GatekeeperPage() {
           if (normalizedState) {
             setPlateState(normalizedState);
             setPlateStateError(null);
+            setOcrStateNotice({
+              suggestedState: normalizedState,
+              selectedState: normalizedState,
+            });
           }
         }
         setPlateOcrStatus("read");
@@ -691,6 +703,9 @@ export default function GatekeeperPage() {
                   onChange={(stateCode) => {
                     setPlateState(stateCode);
                     setPlateStateError(null);
+                    setOcrStateNotice((notice) => notice
+                      ? { ...notice, selectedState: stateCode }
+                      : null);
                   }}
                   preferredStates={orderedStatePreferences}
                   error={plateStateError ?? undefined}
@@ -725,6 +740,16 @@ export default function GatekeeperPage() {
             {plateOcrStatus === "reading" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateReading")}</p>}
             {plateOcrStatus === "read" && ocrPlate && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateRead", { plate: ocrPlate })}</p>}
             {plateOcrStatus === "unreadable" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateUnreadable")}</p>}
+            {ocrStateNotice ? (
+              <p className="text-sm text-muted-foreground" role="status">
+                {t(
+                  ocrStateNotice.selectedState === ocrStateNotice.suggestedState
+                    ? "gatekeeper.plateStateSuggested"
+                    : "gatekeeper.plateStateCorrected",
+                  { state: ocrStateNotice.selectedState },
+                )}
+              </p>
+            ) : null}
             <div>
               <Label>{t("gatekeeper.currentLocation")} *</Label>
               {assignedSites.length > 0 ? (

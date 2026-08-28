@@ -10,10 +10,12 @@ import {
 } from "react-native";
 
 import {
+  normalizePlateState,
   orderPlateStates,
   US_PLATE_STATES,
   type PlateStateCode,
 } from "@workspace/plate-state";
+import { useTranslation } from "react-i18next";
 
 import { useColors } from "@/hooks/useColors";
 
@@ -25,8 +27,6 @@ export interface PlateStatePickerProps {
   error?: string;
 }
 
-const selectLabel = "Select plate state";
-
 export function PlateStatePicker({
   value,
   onChange,
@@ -34,6 +34,7 @@ export function PlateStatePicker({
   disabled = false,
   error,
 }: PlateStatePickerProps) {
+  const { t } = useTranslation();
   const colors = useColors();
   const errorId = useId();
   const [open, setOpen] = useState(false);
@@ -46,8 +47,22 @@ export function PlateStatePicker({
     () => orderPlateStates(preferredStates, query),
     [preferredStates, query],
   );
+  const preferredCodes = useMemo(() => {
+    const codes = new Set<PlateStateCode>();
+    for (const candidate of preferredStates) {
+      const code = normalizePlateState(candidate);
+      if (code) codes.add(code);
+    }
+    return codes;
+  }, [preferredStates]);
+  const preferredOptions = states.filter((state) => preferredCodes.has(state.code));
+  const remainingOptions = states.filter((state) => !preferredCodes.has(state.code));
+  const selectLabel = t("plateStatePicker.select");
   const triggerLabel = selectedState
-    ? `Selected plate state: ${selectedState.name} (${selectedState.code})`
+    ? t("plateStatePicker.selected", {
+        state: selectedState.name,
+        code: selectedState.code,
+      })
     : selectLabel;
 
   useEffect(() => {
@@ -73,7 +88,9 @@ export function PlateStatePicker({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={triggerLabel}
-        accessibilityHint={error ? `Error: ${error}` : "Opens the plate state picker."}
+        accessibilityHint={error
+          ? t("plateStatePicker.errorHint", { error })
+          : t("plateStatePicker.openHint")}
         accessibilityState={{ disabled, expanded: open }}
         disabled={disabled}
         onPress={() => {
@@ -110,69 +127,121 @@ export function PlateStatePicker({
 
       {open ? (
         <Modal transparent animationType="slide" onRequestClose={close} visible>
-        <View style={styles.backdrop}>
-          <View
-            role="dialog"
-            aria-label="Plate state picker"
-            accessibilityViewIsModal
-            style={[styles.dialog, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <View style={styles.dialogHeader}>
-              <Text style={[styles.title, { color: colors.foreground }]}>Plate state</Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close plate state picker"
-                onPress={close}
-                style={styles.closeButton}
-              >
-                <Text style={[styles.closeText, { color: colors.primary }]}>Close</Text>
-              </Pressable>
-            </View>
-            <TextInput
-              role="searchbox"
-              accessibilityLabel="Search plate states"
-              autoCapitalize="none"
-              autoCorrect={false}
-              onChangeText={setQuery}
-              placeholder="Search states"
-              placeholderTextColor={colors.mutedForeground}
-              style={[
-                styles.search,
-                { borderColor: colors.border, color: colors.foreground },
-              ]}
-              value={query}
-            />
-            <ScrollView
-              accessibilityLabel="Plate state options"
-              keyboardShouldPersistTaps="handled"
-              style={styles.options}
+          <View style={styles.backdrop}>
+            <View
+              role="dialog"
+              aria-label={t("plateStatePicker.label")}
+              accessibilityViewIsModal
+              style={[styles.dialog, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
-              {states.map((state) => {
-                const isSelected = state.code === value;
-                return (
-                  <Pressable
-                    key={state.code}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${state.name} (${state.code}), state option`}
-                    accessibilityState={{ selected: isSelected }}
-                    onPress={() => selectState(state.code)}
-                    style={[
-                      styles.option,
-                      {
-                        backgroundColor: isSelected ? colors.background : "transparent",
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.optionText, { color: colors.foreground }]}>
-                      {state.name} ({state.code})
+              <View style={styles.dialogHeader}>
+                <Text style={[styles.title, { color: colors.foreground }]}>
+                  {t("plateStatePicker.label")}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("plateStatePicker.closePicker")}
+                  onPress={close}
+                  style={styles.closeButton}
+                >
+                  <Text style={[styles.closeText, { color: colors.primary }]}>
+                    {t("plateStatePicker.close")}
+                  </Text>
+                </Pressable>
+              </View>
+              <TextInput
+                role="searchbox"
+                accessibilityLabel={t("plateStatePicker.search")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setQuery}
+                placeholder={t("plateStatePicker.search")}
+                placeholderTextColor={colors.mutedForeground}
+                style={[
+                  styles.search,
+                  { borderColor: colors.border, color: colors.foreground },
+                ]}
+                value={query}
+              />
+              <ScrollView
+                accessibilityLabel={t("plateStatePicker.options")}
+                keyboardShouldPersistTaps="handled"
+                style={styles.options}
+              >
+                {states.length === 0 ? (
+                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                    {t("plateStatePicker.noResults")}
+                  </Text>
+                ) : null}
+                {preferredOptions.length > 0 ? (
+                  <View>
+                    <Text style={[styles.groupLabel, { color: colors.mutedForeground }]}>
+                      {t("plateStatePicker.preferred")}
                     </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                    {preferredOptions.map((state) => {
+                      const isSelected = state.code === value;
+                      return (
+                        <Pressable
+                          key={state.code}
+                          accessibilityRole="button"
+                          accessibilityLabel={t("plateStatePicker.option", {
+                            state: state.name,
+                            code: state.code,
+                          })}
+                          accessibilityState={{ selected: isSelected }}
+                          onPress={() => selectState(state.code)}
+                          style={[
+                            styles.option,
+                            {
+                              backgroundColor: isSelected ? colors.background : "transparent",
+                              borderColor: colors.border,
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.optionText, { color: colors.foreground }]}>
+                            {state.name} ({state.code})
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+                {remainingOptions.length > 0 ? (
+                  <View>
+                    <Text style={[styles.groupLabel, { color: colors.mutedForeground }]}>
+                      {t("plateStatePicker.all")}
+                    </Text>
+                    {remainingOptions.map((state) => {
+                      const isSelected = state.code === value;
+                      return (
+                        <Pressable
+                          key={state.code}
+                          accessibilityRole="button"
+                          accessibilityLabel={t("plateStatePicker.option", {
+                            state: state.name,
+                            code: state.code,
+                          })}
+                          accessibilityState={{ selected: isSelected }}
+                          onPress={() => selectState(state.code)}
+                          style={[
+                            styles.option,
+                            {
+                              backgroundColor: isSelected ? colors.background : "transparent",
+                              borderColor: colors.border,
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.optionText, { color: colors.foreground }]}>
+                            {state.name} ({state.code})
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </ScrollView>
+            </View>
           </View>
-        </View>
         </Modal>
       ) : null}
     </View>
@@ -216,6 +285,8 @@ const styles = StyleSheet.create({
   title: { fontFamily: "Inter_700Bold", fontSize: 20 },
   closeButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: 6 },
   closeText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 15, paddingVertical: 18, textAlign: "center" },
+  groupLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, paddingHorizontal: 12, paddingVertical: 8 },
   search: {
     borderRadius: 10,
     borderWidth: 1,

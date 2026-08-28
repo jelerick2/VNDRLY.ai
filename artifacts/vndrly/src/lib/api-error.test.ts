@@ -149,6 +149,22 @@ describe("translateApiError — Task #531 Spanish coverage (office web)", () => 
   });
 });
 
+describe("translateApiError — state-aware plate validation", () => {
+  it.each([
+    ["missing-state", "Estado obligatorio"],
+    ["invalid-state", "Estado no válido"],
+  ] as const)("translates hyphenated %s API codes", async (code, expected) => {
+    const t = await makeI18n("es");
+    const err = makeApiError({
+      message: "English server fallback",
+      status: 400,
+      data: { code },
+    });
+
+    expect(translateApiError(err, t)).toBe(expected);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Task #568 regression coverage: the office web routes (auth, vendors,
 // partners, invoices, reports, etc.) attach a structured `code` field

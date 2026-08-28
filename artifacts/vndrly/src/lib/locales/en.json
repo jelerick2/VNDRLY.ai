@@ -1357,8 +1357,7 @@
       "email": "Email",
       "company": "Company",
       "vehiclePlate": "Vehicle plate",
-      "vehicleState": "State",
-      "selectState": "State",
+      "vehicleState": "Plate state",
       "safetyAck": "I will follow all site safety rules.",
       "continue": "Continue",
       "whoVisiting": "Who are you visiting?",
@@ -3745,6 +3744,8 @@
     "notFound": "We couldn't find what you were looking for.",
     "conflict": "That action can't be completed right now.",
     "validationFailed": "Some information is missing or invalid. Please check the form and try again.",
+    "missing-state": "State required",
+    "invalid-state": "Invalid state",
     "network": {
       "unreachable": "VNDRLY can't reach the service right now. Check your connection; if other sites work, the VNDRLY host, DNS, or firewall may need attention."
     },
@@ -4767,6 +4768,15 @@
     "history": "History",
     "aria": "Gate portal navigation"
   },
+  "plateStatePicker": {
+    "label": "Plate state",
+    "select": "Select plate state",
+    "selected": "Selected plate state: {{state}} ({{code}})",
+    "search": "Search states",
+    "noResults": "No states found.",
+    "preferred": "Preferred states",
+    "all": "All states"
+  },
   "gatekeeper": {
     "voiceListening": "Listening — say the plate, driver name, company, purpose, and duration.",
     "voiceUnavailable": "Voice entry is not supported in this browser.",
@@ -4807,8 +4817,10 @@
     "lastName": "Last name",
     "company": "Company",
     "vehiclePlate": "Vehicle plate",
-    "plateStateUnconfirmed": "State unconfirmed",
-    "plateStateRequired": "A plate state is required.",
+    "plateStateUnconfirmed": "Unconfirmed state",
+    "plateStateRequired": "State required",
+    "plateStateSuggested": "Suggested state: {{state}}",
+    "plateStateCorrected": "State corrected: {{state}}",
     "siteCode": "Site code",
     "locationUnavailable": "Location is required for gate check-in.",
     "locationDenied": "Allow location access to record this gate entry.",

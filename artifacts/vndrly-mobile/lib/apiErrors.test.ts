@@ -141,6 +141,20 @@ describe("getApiErrorCode", () => {
 });
 
 describe("translateApiError", () => {
+  it.each([
+    ["missing-state", "Estado obligatorio"],
+    ["invalid-state", "Estado no válido"],
+  ] as const)("translates hyphenated %s API codes", (code, expected) => {
+    const t = makeT({ [`errors.${code}`]: expected });
+    const err = makeApiError({
+      message: "English server fallback",
+      status: 400,
+      data: { code },
+    });
+
+    expect(translateApiError(err, t)).toBe(expected);
+  });
+
   it("uses the structured code for new endpoints (err.data.error)", () => {
     const t = makeT({
       "errors.site_not_found": "We couldn't find that site.",

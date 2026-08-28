@@ -37,7 +37,7 @@ function asApiError(e: unknown): ApiErrorish | null {
 // either miss the translation or fall through to the generic status-family
 // fallback instead of the real code-based lookup attached on a sibling
 // `code` field. Mirrors the mobile helper's `isStructuredCode()` guard.
-const CODE_SHAPE = /^[a-z][a-z0-9_.]*$/;
+const CODE_SHAPE = /^[a-z][a-z0-9_.-]*$/;
 function isStructuredCode(value: unknown): value is string {
   return typeof value === "string" && CODE_SHAPE.test(value);
 }
