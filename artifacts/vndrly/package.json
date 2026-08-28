@@ -87,6 +87,7 @@
   },
   "dependencies": {
     "@workspace/form1099": "workspace:*",
+    "@workspace/gate-booth": "workspace:*",
     "@workspace/map-utils": "workspace:*",
     "i18next": "^26.0.5",
     "i18next-browser-languagedetector": "^8.2.1",

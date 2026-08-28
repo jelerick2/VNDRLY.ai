@@ -44,6 +44,9 @@ export const siteVisitsTable = pgTable(
     platePhotoUrl: text("plate_photo_url"),
     vehiclePhotoUrl: text("vehicle_photo_url"),
     purpose: text("purpose"),
+    notes: text("notes"),
+    checkOutNotes: text("check_out_notes"),
+    admissionStatus: text("admission_status"),
     expectedDurationMinutes: integer("expected_duration_minutes"),
 
     // Host can be a partner OR a vendor (the visitor picks exactly one).

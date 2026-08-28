@@ -1,0 +1,19 @@
+{
+  "name": "@workspace/gate-booth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workspace/map-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  }
+}

@@ -84,6 +84,7 @@ import {
   VISIT_PLATE_OCR_UNAVAILABLE,
   OFF_GEOFENCE,
 } from "@workspace/visit-error-codes";
+import { trimVisitNotes } from "@workspace/gate-booth";
 
 const COOKIE_NAME = "vndrly_session";
 const GUEST_COOKIE_NAME = "vndrly_guest";
@@ -135,6 +136,10 @@ function validatePlateInput(
     };
   }
   return { ok: true, vehiclePlate, plateState };
+}
+
+function admissionStatusOf(value: string | null | undefined): "pending" | "admitted" {
+  return value === "pending" ? "pending" : "admitted";
 }
 
 async function validateGateEvidencePath(
@@ -601,6 +606,9 @@ const visitListProjection = {
   platePhotoUrl: siteVisitsTable.platePhotoUrl,
   vehiclePhotoUrl: siteVisitsTable.vehiclePhotoUrl,
   purpose: siteVisitsTable.purpose,
+  notes: siteVisitsTable.notes,
+  checkOutNotes: siteVisitsTable.checkOutNotes,
+  admissionStatus: siteVisitsTable.admissionStatus,
   expectedDurationMinutes: siteVisitsTable.expectedDurationMinutes,
   hostType: siteVisitsTable.hostType,
   hostPartnerId: siteVisitsTable.hostPartnerId,
@@ -884,6 +892,7 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
     plateState?: string;
     platePhotoUrl?: string;
     vehiclePhotoUrl?: string;
+    notes?: string;
     latitude?: number;
     longitude?: number;
   };
@@ -1071,6 +1080,8 @@ router.post("/visits/gate/check-in", async (req, res): Promise<void> => {
         typeof b.purpose === "string" && b.purpose.trim()
           ? b.purpose.trim()
           : null,
+      notes: trimVisitNotes(b.notes),
+      admissionStatus: "admitted",
       expectedDurationMinutes: expectedDuration,
       hostType: b.hostType,
       hostPartnerId: b.hostType === "partner" ? b.hostPartnerId! : null,
@@ -1144,7 +1155,7 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
     res.status(400).json({ message: "Invalid id", code: VISIT_INVALID_ID });
     return;
   }
-  const b = (req.body ?? {}) as { latitude?: number; longitude?: number };
+  const b = (req.body ?? {}) as { latitude?: number; longitude?: number; notes?: string };
   const [visit] = await db
     .select()
     .from(siteVisitsTable)
@@ -1177,6 +1188,7 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
       checkOutTime: new Date(),
       checkOutLatitude: typeof b.latitude === "number" ? b.latitude : null,
       checkOutLongitude: typeof b.longitude === "number" ? b.longitude : null,
+      checkOutNotes: trimVisitNotes(b.notes) ?? visit.checkOutNotes,
     })
     .where(eq(siteVisitsTable.id, id))
     .returning();
@@ -1205,7 +1217,62 @@ router.post("/visits/gate/:id/check-out", async (req, res): Promise<void> => {
     siteName: siteRow?.name ?? null,
   });
 
-  res.json({ ...updated, plateState: normalizePlateState(updated.plateState) });
+  res.json({
+    ...updated,
+    plateState: normalizePlateState(updated.plateState),
+    admissionStatus: admissionStatusOf(updated.admissionStatus),
+  });
+});
+
+// ---------- POST /api/visits/gate/:id/admit (authenticated gatekeeper) ----------
+router.post("/visits/gate/:id/admit", async (req, res): Promise<void> => {
+  const session = await requireGatekeeperSession(req, res);
+  if (!session) return;
+  const id = parseInt(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ message: "Invalid id", code: VISIT_INVALID_ID });
+    return;
+  }
+  const [visit] = await db
+    .select()
+    .from(siteVisitsTable)
+    .where(eq(siteVisitsTable.id, id));
+  if (!visit) {
+    res.status(404).json({ message: "Visit not found", code: VISIT_NOT_FOUND });
+    return;
+  }
+  const [gateAssignment] = await db
+    .select({ id: siteWorkAssignmentsTable.id })
+    .from(siteWorkAssignmentsTable)
+    .where(
+      and(
+        eq(siteWorkAssignmentsTable.siteLocationId, visit.siteLocationId),
+        eq(siteWorkAssignmentsTable.vendorId, session.vendorId!),
+      ),
+    )
+    .limit(1);
+  if (!gateAssignment) {
+    res.status(404).json({ message: "Visit not found", code: VISIT_NOT_FOUND });
+    return;
+  }
+  if (visit.checkOutTime) {
+    res.json({
+      ...visit,
+      plateState: normalizePlateState(visit.plateState),
+      admissionStatus: admissionStatusOf(visit.admissionStatus),
+    });
+    return;
+  }
+  const [updated] = await db
+    .update(siteVisitsTable)
+    .set({ admissionStatus: "admitted" })
+    .where(eq(siteVisitsTable.id, id))
+    .returning();
+  res.json({
+    ...updated,
+    plateState: normalizePlateState(updated.plateState),
+    admissionStatus: "admitted",
+  });
 });
 
 // ---------- POST /api/visits/check-in (guest) ----------
@@ -1223,6 +1290,7 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
     plateState?: string;
     platePhotoUrl?: string;
     vehiclePhotoUrl?: string;
+    notes?: string;
     latitude?: number;
     longitude?: number;
   };
@@ -1423,6 +1491,8 @@ router.post("/visits/check-in", async (req, res): Promise<void> => {
       platePhotoUrl,
       vehiclePhotoUrl,
       purpose: b.purpose ?? ctx.guest.lastPurpose ?? null,
+      notes: trimVisitNotes(b.notes),
+      admissionStatus: "pending",
       expectedDurationMinutes: expectedDuration,
       hostType: b.hostType,
       hostPartnerId: b.hostType === "partner" ? b.hostPartnerId! : null,
@@ -1497,7 +1567,7 @@ router.post("/visits/:id/check-out", async (req, res): Promise<void> => {
     res.status(400).json({ message: "Invalid id", code: VISIT_INVALID_ID });
     return;
   }
-  const b = (req.body ?? {}) as { latitude?: number; longitude?: number };
+  const b = (req.body ?? {}) as { latitude?: number; longitude?: number; notes?: string };
   const [visit] = await db
     .select()
     .from(siteVisitsTable)
@@ -1516,6 +1586,7 @@ router.post("/visits/:id/check-out", async (req, res): Promise<void> => {
       checkOutTime: new Date(),
       checkOutLatitude: typeof b.latitude === "number" ? b.latitude : null,
       checkOutLongitude: typeof b.longitude === "number" ? b.longitude : null,
+      checkOutNotes: trimVisitNotes(b.notes) ?? visit.checkOutNotes,
     })
     .where(eq(siteVisitsTable.id, id))
     .returning();
