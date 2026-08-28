@@ -15,6 +15,7 @@ import { eq, sql, and, isNull, asc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { DEMO_USERS } from "../lib/demo-users";
+import { syncDemoUsersInDatabase } from "../lib/demo-user-seed-db";
 import { logger } from "../lib/logger";
 import { SESSION_SECRET } from "../lib/session";
 import { loginBrandQueryFromContext } from "../lib/loginBrandQuery";
@@ -780,181 +781,31 @@ if (process.env.NODE_ENV === "development") {
 
   router.post("/auth/seed", async (_req, res) => {
     try {
-      const hash = (pw: string) => bcrypt.hashSync(pw, 10);
+      // Resolve the organizations by stable names/contact emails and let
+      // PostgreSQL allocate their ids. This is deliberately additive: the
+      // route never updates or deletes an existing organization row, and a
+      // single transaction keeps a fresh schema from observing half a demo
+      // bootstrap. The persistence seam is exercised independently with a
+      // DB-free in-memory contract test.
+      const result = await syncDemoUsersInDatabase();
 
-      const existing = await db
-        .select({ id: usersTable.id, username: usersTable.username })
-        .from(usersTable);
-      const existingByName = new Map(
-        existing.map((u) => [u.username.toLowerCase(), u.id] as const),
-      );
-
-      const inserted: { id: number; demo: (typeof DEMO_USERS)[number] }[] = [];
-      const passwordReset: string[] = [];
-
-      // Sync each demo user (and its memberships) atomically. New users
-      // are inserted alongside their membership rows in a single
-      // transaction so a fresh DB never has a "user without membership"
-      // window. Existing users have any missing memberships filled in
-      // idempotently AND their password is re-hashed back to the
-      // canonical demo password whenever the stored hash has drifted
-      // (e.g. a SQL import from another environment left a stale hash
-      // behind). Without this, demo logins silently 401 and the only
-      // recovery is hand-editing bcrypt hashes — see Task #739.
-      for (const demo of DEMO_USERS) {
-        // Build the canonical membership list for this demo. If the
-        // demo declares memberships explicitly we use them; otherwise
-        // derive a single one from the demo's `partnerId`/`vendorId`
-        // metadata. Admins (no partner, no vendor) get no membership
-        // row. Field-employee demos must keep the field_employee
-        // in-org role so resolveContext lights up the field portal.
-        const derivedRole: "admin" | "field_employee" =
-          demo.role === "field_employee" ? "field_employee" : "admin";
-        const desired =
-          demo.memberships && demo.memberships.length > 0
-            ? demo.memberships
-            : demo.partnerId
-              ? [
-                  {
-                    orgType: "partner" as const,
-                    orgId: demo.partnerId,
-                    role: derivedRole,
-                  },
-                ]
-              : demo.vendorId
-                ? [
-                    {
-                      orgType: "vendor" as const,
-                      orgId: demo.vendorId,
-                      role: derivedRole,
-                    },
-                  ]
-                : [];
-
-        await db.transaction(async (tx) => {
-          let userId = existingByName.get(demo.username.toLowerCase()) ?? null;
-          let userActiveMembershipId: number | null = null;
-
-          if (userId === null) {
-            const [newRow] = await tx
-              .insert(usersTable)
-              .values({
-                username: demo.username,
-                passwordHash: hash(demo.password),
-                role: demo.role,
-                displayName: demo.displayName,
-                preferredLanguage: normalizeLanguage(
-                  demo.preferredLanguage ?? null,
-                ),
-              })
-              .returning({ id: usersTable.id });
-            userId = newRow.id;
-            inserted.push({ id: userId, demo });
-          } else {
-            const [u] = await tx
-              .select({
-                activeMembershipId: usersTable.activeMembershipId,
-                passwordHash: usersTable.passwordHash,
-                mustChangePassword: usersTable.mustChangePassword,
-              })
-              .from(usersTable)
-              .where(eq(usersTable.id, userId));
-            userActiveMembershipId = u?.activeMembershipId ?? null;
-
-            // Idempotent password recovery: if the stored hash no longer
-            // verifies against the canonical demo password (drifted from
-            // a stale import, a manual edit, or a /change-password call),
-            // re-hash it back to demo and clear mustChangePassword.
-            //
-            // We deliberately do NOT bump session_version here. This is
-            // a dev-only seed that runs idempotently (and is auto-invoked
-            // by the demo-login picker on every page load), so any
-            // transient hash drift would otherwise cascade into invalidating
-            // every active demo session — including the agent / browser
-            // session that triggered the seed. Per-user TXs commit
-            // independently, so a partial-failure response could leave
-            // sv bumped on accounts that succeeded earlier in the loop,
-            // which is exactly the footgun that broke the @vndrly.com
-            // accounts in May 2026. The restored password alone is enough
-            // for a clean next login; existing sessions carry userId + sv,
-            // not the password, so they keep working.
-            const passwordOk =
-              !!u && bcrypt.compareSync(demo.password, u.passwordHash);
-            if (!passwordOk) {
-              await tx
-                .update(usersTable)
-                .set({
-                  passwordHash: hash(demo.password),
-                  mustChangePassword: false,
-                })
-                .where(eq(usersTable.id, userId));
-              passwordReset.push(demo.username);
-              logger.warn(
-                { username: demo.username, userId },
-                "auth/seed: restored drifted demo password (existing sessions preserved)",
-              );
-            } else if (u?.mustChangePassword) {
-              // Hash already matches but the must-change flag is still
-              // set from a prior admin reset. Clear it so the demo user
-              // is not stuck in the force-change modal.
-              await tx
-                .update(usersTable)
-                .set({ mustChangePassword: false })
-                .where(eq(usersTable.id, userId));
-            }
-          }
-
-          const existingMemberships = await tx
-            .select()
-            .from(userOrgMembershipsTable)
-            .where(eq(userOrgMembershipsTable.userId, userId));
-
-          for (const m of desired) {
-            const already = existingMemberships.find((row) =>
-              m.orgType === "partner"
-                ? row.partnerId === m.orgId
-                : row.vendorId === m.orgId,
-            );
-            if (already) continue;
-            await tx.insert(userOrgMembershipsTable).values({
-              userId,
-              orgType: m.orgType,
-              partnerId: m.orgType === "partner" ? m.orgId : null,
-              vendorId: m.orgType === "vendor" ? m.orgId : null,
-              role: m.role,
-            });
-          }
-
-          // For users with multiple memberships, leave activeMembershipId
-          // null so the post-login picker is shown the first time they
-          // log in. Single-membership users get activeMembershipId set
-          // to that membership so the switcher is hidden by default.
-          const allMyMemberships = await tx
-            .select()
-            .from(userOrgMembershipsTable)
-            .where(eq(userOrgMembershipsTable.userId, userId));
-          if (
-            allMyMemberships.length === 1 &&
-            userActiveMembershipId !== allMyMemberships[0].id
-          ) {
-            await tx
-              .update(usersTable)
-              .set({ activeMembershipId: allMyMemberships[0].id })
-              .where(eq(usersTable.id, userId));
-          }
-        });
+      for (const username of result.passwordReset) {
+        logger.warn(
+          { username },
+          "auth/seed: restored drifted demo password (existing sessions preserved)",
+        );
       }
 
       return res.json({
         message:
-          existing.length === 0
+          result.existingUserCount === 0
             ? "Seed users created"
             : "Synced demo users + memberships",
-        added: inserted.map((i) => i.demo.username),
+        added: result.added,
         // Surfaces which existing users had their bcrypt hash refreshed
         // back to the canonical demo password during this call. Empty
         // when nothing drifted.
-        passwordReset,
+        passwordReset: result.passwordReset,
       });
     } catch (error) {
       logger.error({ err: error }, "Seed error");

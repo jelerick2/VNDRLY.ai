@@ -2,10 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { attachTestErrorMiddleware, expectStatus } from "../test-utils/route-app";
+import {
+  attachTestErrorMiddleware,
+  expectStatus,
+} from "../test-utils/route-app";
 import pg from "pg";
 import bcrypt from "bcryptjs";
 import { sql } from "drizzle-orm";
+import { assertIsolatedTestDatabaseEnvironment } from "../../../../scripts/e2e-isolation.mjs";
 
 // ---------------------------------------------------------------------------
 // Regression coverage for the demo-login recovery branch in
@@ -27,18 +31,23 @@ import { sql } from "drizzle-orm";
 //        - `POST /api/auth/login` with the canonical credentials
 //          returns 200 (the recovery path actually restored login).
 //
-// Requires a real Postgres with the schema pushed; the suite is skipped
-// when only the placeholder localhost DSN from `test/setup.ts` is
-// available so unit-only CI keeps passing.
+// Requires the isolated wrapper's marker plus identical sanitized `_test`
+// DATABASE_URL/TEST_DATABASE_URL values. The guard returns before opening a
+// client for every other environment, including a shared development URL.
 // ---------------------------------------------------------------------------
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const haveRealDb = await checkRealDb();
 
 async function checkRealDb(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  if (DATABASE_URL.includes("test:test@localhost")) return false;
-  const client = new pg.Client({ connectionString: DATABASE_URL });
+  let databaseUrl: string;
+  try {
+    databaseUrl = assertIsolatedTestDatabaseEnvironment(
+      process.env,
+    ).databaseUrl;
+  } catch {
+    return false;
+  }
+  const client = new pg.Client({ connectionString: databaseUrl });
   try {
     await client.connect();
     await client.query("SELECT 1");
@@ -54,19 +63,14 @@ async function checkRealDb(): Promise<boolean> {
   }
 }
 
-// TODO(Task #774 follow-up): /api/auth/seed throws an FK violation against
-// `user_org_memberships_partner_id_partners_id_fk` because DEMO_USERS
-// references partner ids 1, 2, 3, 4, 6, 19 that don't exist in a fresh
-// test DB (the test gate spins up an empty schema and never runs the
-// `seed-permian-basin` partner seed). The right fix is either to make
-// /auth/seed upsert any missing referenced partners, or to have this
-// suite call `seedPartners()` in beforeAll. Skipping for now so the
-// validation gate added in Task #774 can be green.
-describe.skip("POST /api/auth/seed demo password recovery", () => {
-  void haveRealDb;
+describe.runIf(haveRealDb)("POST /api/auth/seed demo password recovery", () => {
   let app: express.Express;
   let db: typeof import("@workspace/db").db;
   let usersTable: typeof import("@workspace/db").usersTable;
+  let partnersTable: typeof import("@workspace/db").partnersTable;
+  let vendorsTable: typeof import("@workspace/db").vendorsTable;
+  let userOrgMembershipsTable: typeof import("@workspace/db").userOrgMembershipsTable;
+  let firstSeedStatus = 0;
   // Stash the original NODE_ENV so afterAll can restore it. The dev-only
   // /auth/seed endpoint requires NODE_ENV === "development" at
   // module-load time, but other test files may rely on the prior value
@@ -81,6 +85,9 @@ describe.skip("POST /api/auth/seed demo password recovery", () => {
     const dbModule = await import("@workspace/db");
     db = dbModule.db;
     usersTable = dbModule.usersTable;
+    partnersTable = dbModule.partnersTable;
+    vendorsTable = dbModule.vendorsTable;
+    userOrgMembershipsTable = dbModule.userOrgMembershipsTable;
     const authRouter = (await import("./auth")).default;
     app = express();
     app.use(cookieParser());
@@ -90,7 +97,77 @@ describe.skip("POST /api/auth/seed demo password recovery", () => {
 
     // Make sure the demo users exist before we start mutating them.
     const seedRes = await request(app).post("/api/auth/seed");
+    firstSeedStatus = seedRes.status;
     expectStatus(seedRes, 200);
+  });
+
+  it("returns 200 on the clean isolated schema and creates required natural-key organizations", async () => {
+    expect(firstSeedStatus).toBe(200);
+
+    const partners = await db
+      .select({ name: partnersTable.name })
+      .from(partnersTable);
+    const vendors = await db
+      .select({ name: vendorsTable.name })
+      .from(vendorsTable);
+    expect(partners.map((row) => row.name)).toEqual(
+      expect.arrayContaining([
+        "ExxonMobil",
+        "Chevron",
+        "Shell USA",
+        "Marathon Oil",
+        "BP America (BPX Energy)",
+        "Mach Natural Resources",
+      ]),
+    );
+    expect(vendors.map((row) => row.name)).toEqual(
+      expect.arrayContaining([
+        "Precision Drilling",
+        "Baker Hughes",
+        "Winchester",
+      ]),
+    );
+  });
+
+  it("is idempotent and does not duplicate users, memberships, or organizations", async () => {
+    const before = {
+      users: (await db.select({ id: usersTable.id }).from(usersTable)).length,
+      memberships: (
+        await db
+          .select({ id: userOrgMembershipsTable.id })
+          .from(userOrgMembershipsTable)
+      ).length,
+      partners: (await db.select({ id: partnersTable.id }).from(partnersTable))
+        .length,
+      vendors: (await db.select({ id: vendorsTable.id }).from(vendorsTable))
+        .length,
+    };
+
+    const rerun = await request(app).post("/api/auth/seed");
+    expectStatus(rerun, 200);
+    expect(rerun.body.added).toEqual([]);
+
+    const after = {
+      users: (await db.select({ id: usersTable.id }).from(usersTable)).length,
+      memberships: (
+        await db
+          .select({ id: userOrgMembershipsTable.id })
+          .from(userOrgMembershipsTable)
+      ).length,
+      partners: (await db.select({ id: partnersTable.id }).from(partnersTable))
+        .length,
+      vendors: (await db.select({ id: vendorsTable.id }).from(vendorsTable))
+        .length,
+    };
+    expect(after).toEqual(before);
+
+    const bakerRows = await db
+      .select({ name: vendorsTable.name })
+      .from(vendorsTable)
+      .where(
+        sql`lower(btrim(${vendorsTable.name})) in ('baker hughes', 'baker hughes field svcs', 'baker hughes field services')`,
+      );
+    expect(bakerRows).toHaveLength(1);
   });
 
   afterAll(async () => {
@@ -168,5 +245,64 @@ describe.skip("POST /api/auth/seed demo password recovery", () => {
     expectStatus(noop, 200);
     expect(Array.isArray(noop.body.passwordReset)).toBe(true);
     expect(noop.body.passwordReset).not.toContain("admin");
+  });
+
+  it("restores an email-identified canonical alias and preserves its session version and row fields", async () => {
+    const username = "auth-seed-email-alias-regression";
+    const bogusHash = bcrypt.hashSync("not-the-demo-password", 10);
+    const [existing] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(sql`lower(${usersTable.username}) = lower(${username})`);
+
+    let userId: number;
+    if (existing) {
+      userId = existing.id;
+      await db
+        .update(usersTable)
+        .set({
+          email: "ADMIN@VNDRLY.COM",
+          passwordHash: bogusHash,
+          sessionVersion: 73,
+          displayName: "Preserved Alias Display",
+        })
+        .where(sql`${usersTable.id} = ${userId}`);
+    } else {
+      const [created] = await db
+        .insert(usersTable)
+        .values({
+          username,
+          email: "ADMIN@VNDRLY.COM",
+          passwordHash: bogusHash,
+          role: "admin",
+          displayName: "Preserved Alias Display",
+          sessionVersion: 73,
+        })
+        .returning({ id: usersTable.id });
+      userId = created.id;
+    }
+
+    const recovered = await request(app).post("/api/auth/seed");
+    expectStatus(recovered, 200);
+    expect(recovered.body.passwordReset).toContain("admin");
+
+    const [row] = await db
+      .select({
+        username: usersTable.username,
+        email: usersTable.email,
+        displayName: usersTable.displayName,
+        passwordHash: usersTable.passwordHash,
+        sessionVersion: usersTable.sessionVersion,
+      })
+      .from(usersTable)
+      .where(
+        sql`lower(coalesce(${usersTable.email}, ${usersTable.username})) = 'admin@vndrly.com' AND ${usersTable.id} = ${userId}`,
+      );
+    expect(row).toBeDefined();
+    expect(row.username).toBe(username);
+    expect(row.email).toBe("ADMIN@VNDRLY.COM");
+    expect(row.displayName).toBe("Preserved Alias Display");
+    expect(row.sessionVersion).toBe(73);
+    expect(bcrypt.compareSync("vndrly123", row.passwordHash)).toBe(true);
   });
 });

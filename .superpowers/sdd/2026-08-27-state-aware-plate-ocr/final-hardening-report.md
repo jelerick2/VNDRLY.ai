@@ -198,6 +198,41 @@ Files:
 - Task reports 3, 5, 6, and 7 were removed from the Git index/tree while their
   ignored local copies remain intact. No unrelated tracked artifact was removed.
 
+## P0 follow-up — clean-schema demo recovery
+
+- The isolated E2E server reached its dedicated local API port, then exposed a
+  pre-existing `/api/auth/seed` defect: `DEMO_USERS` memberships assumed legacy
+  partner/vendor IDs that do not exist on a clean schema.
+- The dev recovery route now resolves only the organization dependencies used
+  by `DEMO_USERS` through stable, case-insensitive natural names and canonical
+  contact-email aliases. Missing rows are inserted additively with generated
+  IDs; existing organization IDs and fields are never changed.
+- User recovery matches the documented contract exactly through
+  `LOWER(COALESCE(email, username))`. Canonical admin, Baker, Winchester, Mach,
+  and Exxon aliases retain the exact passwords in
+  `docs/canonical-credentials.md`, hashed at bcrypt cost 10.
+- Repeated recovery is idempotent. Existing memberships and active choices are
+  preserved, missing memberships are filled with the resolved organization ID,
+  and password repair does not increment `session_version` or touch session
+  data.
+- The formerly skipped password-recovery/startup-check integration suites are
+  enabled only when the centralized isolation assertion accepts the wrapper
+  marker and exact matching `_test` targets. They cannot probe a shared dev URL.
+- DB-free in-memory regressions cover a fresh schema, rerun idempotence,
+  non-legacy generated IDs, canonical email aliases, drifted hashes, preserved
+  sessions/unrelated rows, and reuse of existing organization name/email
+  aliases without duplicates.
+
+Files:
+
+- `artifacts/api-server/src/lib/demo-user-seed.ts`
+- `artifacts/api-server/src/lib/demo-user-seed-db.ts`
+- `artifacts/api-server/src/lib/demo-user-seed.test.ts`
+- `artifacts/api-server/src/lib/verify-demo-passwords.ts`
+- `artifacts/api-server/src/lib/verify-demo-passwords.test.ts`
+- `artifacts/api-server/src/routes/auth.ts`
+- `artifacts/api-server/src/routes/auth-seed-recovery.test.ts`
+
 ## Verification
 
 Green:
@@ -219,6 +254,11 @@ Green:
 - `pnpm run test:web` — 101 files passed; 772 passed, 1 skipped.
 - `pnpm run test:mobile` — 78 files passed; 536 passed.
 - `git diff --check` — passed (only expected Windows LF/CRLF notices).
+- Demo seed DB-free focus — 1 file/5 tests passed; the 2 isolated-only files
+  were discovered safely and skipped (7 tests) because no isolation marker was
+  present, with no database connection attempted.
+- `pnpm --dir artifacts/api-server run typecheck` — passed after the
+  clean-schema recovery follow-up.
 
 The first typecheck/web/mobile invocation was unable to read installed package
 junctions under the filesystem sandbox. The same DB-free commands were rerun
@@ -232,6 +272,9 @@ Not run by design:
   hardening-pass attempt was stopped before connection/schema work, and this
   follow-up made no API-wrapper or database attempt. The gate remains for a
   reviewer with explicit isolated-database authority.
+- The newly enabled `/auth/seed` integration assertions were not executed in
+  this DB-free follow-up. The next authorized isolated API/E2E rerun must verify
+  the real clean-schema route before release.
 
 ## Remaining concerns / reviewer follow-up
 

@@ -5,6 +5,7 @@ import request from "supertest";
 import pg from "pg";
 import bcrypt from "bcryptjs";
 import { sql } from "drizzle-orm";
+import { assertIsolatedTestDatabaseEnvironment } from "../../../../scripts/e2e-isolation.mjs";
 
 // ---------------------------------------------------------------------------
 // Regression coverage for the dev-only startup self-check added in Task #739
@@ -31,19 +32,24 @@ import { sql } from "drizzle-orm";
 // and Vitest runs test files in parallel by default — using a different
 // demo user keeps the two suites independent.
 //
-// Requires a real Postgres with the schema pushed; the suite is skipped
-// when only the placeholder localhost DSN from `test/setup.ts` is
-// available so unit-only CI keeps passing. Mirrors the gating used by
+// Requires the isolated wrapper's marker plus identical sanitized `_test`
+// DATABASE_URL/TEST_DATABASE_URL values. The guard returns before opening a
+// client in every other environment. Mirrors the gating used by
 // `auth-seed-recovery.test.ts`.
 // ---------------------------------------------------------------------------
 
-const DATABASE_URL = process.env.DATABASE_URL;
 const haveRealDb = await checkRealDb();
 
 async function checkRealDb(): Promise<boolean> {
-  if (!DATABASE_URL) return false;
-  if (DATABASE_URL.includes("test:test@localhost")) return false;
-  const client = new pg.Client({ connectionString: DATABASE_URL });
+  let databaseUrl: string;
+  try {
+    databaseUrl = assertIsolatedTestDatabaseEnvironment(
+      process.env,
+    ).databaseUrl;
+  } catch {
+    return false;
+  }
+  const client = new pg.Client({ connectionString: databaseUrl });
   try {
     await client.connect();
     await client.query("SELECT 1");
@@ -59,15 +65,7 @@ async function checkRealDb(): Promise<boolean> {
   }
 }
 
-// TODO(Task #774 follow-up): Same root cause as auth-seed-recovery.test.ts —
-// /api/auth/seed throws an FK violation against
-// `user_org_memberships_partner_id_partners_id_fk` on a fresh test DB
-// because DEMO_USERS references partner ids that the test gate never
-// seeds. Skipping for now so the validation gate added in Task #774 can
-// be green; real fix is to make /auth/seed upsert missing partners or
-// have this suite call `seedPartners()` first.
-describe.skip("verifyDemoPasswords startup self-check", () => {
-  void haveRealDb;
+describe.runIf(haveRealDb)("verifyDemoPasswords startup self-check", () => {
   let app: express.Express;
   let db: typeof import("@workspace/db").db;
   let usersTable: typeof import("@workspace/db").usersTable;

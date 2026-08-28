@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
 import { DEMO_USERS } from "./demo-users";
+import { demoIdentityAliases, demoUserNaturalIdentity } from "./demo-user-seed";
 import { logger } from "./logger";
 
 /**
@@ -19,28 +20,40 @@ import { logger } from "./logger";
  */
 export async function verifyDemoPasswords(): Promise<void> {
   try {
-    const usernames = DEMO_USERS.map((u) => u.username.toLowerCase());
-    if (usernames.length === 0) return;
+    const identities = [
+      ...new Set(DEMO_USERS.flatMap((demo) => demoIdentityAliases(demo))),
+    ];
+    if (identities.length === 0) return;
 
     const rows = await db
       .select({
         id: usersTable.id,
         username: usersTable.username,
+        email: usersTable.email,
         passwordHash: usersTable.passwordHash,
       })
       .from(usersTable)
-      .where(inArray(sql`lower(${usersTable.username})`, usernames));
-
-    const byName = new Map(
-      rows.map((r) => [r.username.toLowerCase(), r] as const),
-    );
+      .where(
+        inArray(
+          sql`lower(coalesce(${usersTable.email}, ${usersTable.username}))`,
+          identities,
+        ),
+      );
 
     const drifted: string[] = [];
     for (const demo of DEMO_USERS) {
-      const row = byName.get(demo.username.toLowerCase());
-      if (!row) continue; // not seeded yet — /auth/seed will create it
-      const ok = bcrypt.compareSync(demo.password, row.passwordHash);
-      if (!ok) drifted.push(demo.username);
+      const aliases = new Set(demoIdentityAliases(demo));
+      const matches = rows.filter((row) =>
+        aliases.has(demoUserNaturalIdentity(row)),
+      );
+      if (matches.length === 0) continue; // not seeded yet
+      if (
+        matches.some(
+          (row) => !bcrypt.compareSync(demo.password, row.passwordHash),
+        )
+      ) {
+        drifted.push(demo.username);
+      }
     }
 
     if (drifted.length === 0) return;
