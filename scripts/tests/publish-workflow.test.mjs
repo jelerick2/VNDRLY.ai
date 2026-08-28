@@ -35,3 +35,10 @@ test("Publish web deployment cannot rewrite production data or server configurat
   assert.doesNotMatch(workflow, /\b(?:DROP|TRUNCATE)\b/i);
   assert.doesNotMatch(workflow, /systemctl|nginx|certbot/);
 });
+
+test("Publish records the 2026-08-28 full-ship release-path verification", () => {
+  assert.match(
+    workflow,
+    /Full-ship release-path verification: 2026-08-28T15:50Z/,
+  );
+});
