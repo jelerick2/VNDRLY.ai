@@ -270,7 +270,7 @@ describe("GatekeeperPage plate state", () => {
     const trigger = screen.getByRole("button", { name: "Select plate state" });
     const plateInput = screen.getByTestId("input-gate-plate");
     expect(
-      trigger.compareDocumentPosition(plateInput) &
+      plateInput.compareDocumentPosition(trigger) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
