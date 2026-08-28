@@ -6,6 +6,7 @@ import { requireIsolatedFixtureContext } from "./isolated-fixture-guard";
 
 const originalEnvironment = {
   DATABASE_URL: process.env.DATABASE_URL,
+  LISTEN_NOTIFY_DATABASE_URL: process.env.LISTEN_NOTIFY_DATABASE_URL,
   PGPORT: process.env.PGPORT,
   TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
   VNDRLY_ISOLATED_TEST_DB: process.env.VNDRLY_ISOLATED_TEST_DB,
@@ -22,6 +23,7 @@ function restoreEnvironment(key: keyof typeof originalEnvironment): void {
 
 afterEach(() => {
   restoreEnvironment("DATABASE_URL");
+  restoreEnvironment("LISTEN_NOTIFY_DATABASE_URL");
   restoreEnvironment("PGPORT");
   restoreEnvironment("TEST_DATABASE_URL");
   restoreEnvironment("VNDRLY_ISOLATED_TEST_DB");
@@ -39,6 +41,7 @@ function fixtureApp(databaseAction: () => void) {
 describe("requireIsolatedFixtureContext", () => {
   it("refuses before any database action when the isolated marker is absent", async () => {
     delete process.env.DATABASE_URL;
+    delete process.env.LISTEN_NOTIFY_DATABASE_URL;
     delete process.env.TEST_DATABASE_URL;
     delete process.env.VNDRLY_ISOLATED_TEST_DB;
     const databaseAction = vi.fn();
@@ -51,6 +54,9 @@ describe("requireIsolatedFixtureContext", () => {
   });
 
   it("refuses before any database action when only the marker is present", async () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.LISTEN_NOTIFY_DATABASE_URL;
+    delete process.env.TEST_DATABASE_URL;
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
     const databaseAction = vi.fn();
 
@@ -114,7 +120,7 @@ describe("requireIsolatedFixtureContext", () => {
     expect(databaseAction).not.toHaveBeenCalled();
   });
 
-  it("permits the database action only for the exact isolated _test target", async () => {
+  it("permits the database action when the marker and exact safe URLs are present", async () => {
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
     process.env.DATABASE_URL =
       "postgres://runner:first@ISOLATED.EXAMPLE.TEST:5432/vndrly_test";
