@@ -6,8 +6,10 @@ the shared development or production database.
 
 ## Prerequisites
 
-- No API or web workflow may already own ports 8080 or 23539. Playwright
-  deliberately refuses to reuse servers whose database provenance is unknown.
+- No API or web workflow may already own the dedicated E2E ports 18080 or
+  23539. Playwright deliberately refuses to reuse servers whose database
+  provenance is unknown; the normal development API on port 8080 may continue
+  running independently.
 - Set `TEST_DATABASE_URL` to a database dedicated to tests whose database name
   ends in `_test` and whose normalized host/port/database differs from
   `DATABASE_URL`, or omit it so the wrapper derives a separate `_test` database
@@ -47,7 +49,8 @@ opening a connection or creating/resetting a schema, and the API fixture guard
 applies the same strict parser before entering a route action. Running the
 Playwright package directly is expected to refuse.
 
-The browser base URL is fixed at `http://localhost:23539`. `E2E_BASE_URL` may be
+The isolated API is fixed at `http://localhost:18080`, and the browser base URL
+is fixed at `http://localhost:23539`. `E2E_BASE_URL` may be
 unset or spell that exact local origin; external hosts, alternate loopback
 addresses, ports, paths, credentials, query strings, and fragments are
 rejected. Playwright also refuses to reuse either server, so global setup's

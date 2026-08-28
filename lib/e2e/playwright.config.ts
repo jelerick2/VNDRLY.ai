@@ -74,16 +74,16 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  // E2E is allowed to run only under the isolated DB wrapper. Never reuse
-  // a pre-existing API on port 8080: its database provenance is unknown.
+  // E2E is allowed to run only under the isolated DB wrapper. Never reuse a
+  // pre-existing API on the dedicated port: its database provenance is unknown.
   webServer: [
     {
       command: "pnpm --filter @workspace/api-server run dev:local",
-      url: "http://localhost:8080/api/healthz",
+      url: "http://localhost:18080/api/healthz",
       reuseExistingServer: false,
       timeout: 120_000,
       env: {
-        PORT: "8080",
+        PORT: "18080",
         DATABASE_URL: isolation.databaseUrl,
         TEST_DATABASE_URL: isolation.testDatabaseUrl,
         VNDRLY_ISOLATED_TEST_DB: "1",
@@ -100,7 +100,7 @@ export default defineConfig({
       env: {
         PORT: "23539",
         BASE_PATH: "/",
-        VITE_API_PROXY_TARGET: "http://localhost:8080",
+        VITE_API_PROXY_TARGET: "http://localhost:18080",
       },
       stdout: "ignore",
       stderr: "pipe",

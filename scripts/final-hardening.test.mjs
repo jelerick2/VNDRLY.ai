@@ -286,6 +286,34 @@ test("Playwright config and global setup validate the local origin before use", 
   );
 });
 
+test("Playwright pins its isolated API server and web proxy to a dedicated local port", async () => {
+  const config = await readFile(
+    new URL("lib/e2e/playwright.config.ts", repoRoot),
+    "utf8",
+  );
+
+  assert.match(
+    config,
+    /url:\s*"http:\/\/localhost:18080\/api\/healthz"/,
+  );
+  assert.match(config, /PORT:\s*"18080"/);
+  assert.match(
+    config,
+    /VITE_API_PROXY_TARGET:\s*"http:\/\/localhost:18080"/,
+  );
+  assert.equal(
+    [...config.matchAll(/localhost:18080/g)].length,
+    2,
+    "the API health check and Vite proxy must share the dedicated origin",
+  );
+  assert.doesNotMatch(config, /localhost:8080|PORT:\s*"8080"/);
+  assert.doesNotMatch(
+    config,
+    /process\.env\.(?:PORT|API_PORT|E2E_API_PORT|VITE_API_PROXY_TARGET)/,
+    "the dedicated E2E API port must not accept an external override",
+  );
+});
+
 test("strict sanitizer canonicalizes the documented Supabase direct and pooler URL shapes", () => {
   const sanitize = e2eIsolation.sanitizePostgresConnectionUrl;
   const direct = sanitize?.(

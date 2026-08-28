@@ -33,10 +33,10 @@ import {
 //     a manual click), so the filtered list is what AP staff actually
 //     land on.
 //
-// Servers: this spec re-uses the dev workflows (api-server on :8080,
+// Servers: this spec uses the isolated workflows (api-server on :18080,
 // vndrly web on :23539) auto-started by the playwright config, with the
-// same DATABASE_URL the api-server is using. Per-run fixtures use a
-// timestamp-prefixed stamp so re-runs on a shared dev DB don't collide.
+// same wrapper-owned isolated DATABASE_URL. Per-run fixtures use a
+// timestamp-prefixed stamp so re-runs cannot collide.
 
 const PARTNER_PASSWORD = "e2e-partner-866-pwd";
 

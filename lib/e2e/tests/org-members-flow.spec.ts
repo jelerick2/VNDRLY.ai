@@ -23,12 +23,11 @@ import {
 //     "You can't remove yourself" title.
 //
 // The Playwright config (`lib/e2e/playwright.config.ts`) auto-starts
-// the api-server (:8080) and the vndrly web app (:23539) for this spec
-// via `webServer`, with `reuseExistingServer: true` so local dev
-// re-uses the running workflows. Both services must point at the same
-// DB (`DATABASE_URL`). Per-run fixtures use a timestamp prefix so
-// re-runs on a shared dev / CI database don't collide, and afterAll
-// cleans up every row this spec inserted (with a stamp-scoped
+// the api-server (:18080) and the vndrly web app (:23539) for this spec
+// via `webServer`, with `reuseExistingServer: false`. Both services point
+// at the wrapper-owned isolated DB (`DATABASE_URL`). Per-run fixtures use a
+// timestamp prefix for unique fixture identifiers, and afterAll cleans up
+// every row this spec inserted (with a stamp-scoped
 // fallback delete for any orphan rows left by mid-test failures).
 
 // We deliberately do NOT log in as the demo `admin` account — touching

@@ -50,6 +50,10 @@ deployment paths were tested statically only and were not executed.
 - E2E web requests are pinned to `http://localhost:23539`; every external,
   alternate loopback, port, path, credential, query, or fragment override is
   rejected before Playwright/global setup can issue a request.
+- The wrapper-owned API is pinned independently to `http://localhost:18080` in
+  the Playwright health check, API `PORT`, and Vite proxy. It accepts no external
+  override and never reuses an existing server, while the normal development
+  API may continue occupying port 8080.
 - The two destructive fixture routes are wired through
   `requireIsolatedFixtureContext` before any route body/database action. The
   guard returns 503 unless the marker, exact normalized URL equality, and
@@ -198,11 +202,11 @@ Files:
 
 Green:
 
-- `node --test scripts/final-hardening.test.mjs` — 21 passed, including strict
+- `node --test scripts/final-hardening.test.mjs` — 22 passed, including strict
   direct/pooler canonicalization, explicit/derived target validation, physical-
   target normalization, encoded-control/query/fragment/path rejection, libpq
-  environment stripping, external E2E origin rejection, wrapper ordering, and
-  static Playwright wiring.
+  environment stripping, external E2E origin rejection, dedicated API-port
+  consistency, wrapper ordering, and static Playwright wiring.
 - Isolated fixture guard focused Vitest — 1 file, 7 passed; marker-only,
   suffixless, mismatched, query-bearing, and omitted-port-plus-`PGPORT` targets
   all return 503 before the route action.
