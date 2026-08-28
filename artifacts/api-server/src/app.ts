@@ -1,4 +1,9 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, {
+  type Express,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
@@ -20,8 +25,12 @@ import { requireTenant } from "./lib/requireTenant";
 import { isAllowedCorsOrigin } from "./lib/corsOrigins";
 import helmet from "helmet";
 
-
 const app: Express = express();
+
+// Production terminates through a loopback Nginx proxy. Trust only that hop
+// when Express resolves `req.ip`; direct clients cannot spoof a new identity
+// by supplying their own leftmost X-Forwarded-For value.
+app.set("trust proxy", "loopback");
 
 // Paths that must bypass the session-version guard. Only include routes
 // that run before a valid session exists (login, anonymous health check).
@@ -31,7 +40,8 @@ const app: Express = express();
 // equivalent to a successful logout from the client's perspective, and
 // also prevents stolen tokens from being used to repeatedly increment
 // sessionVersion (DoS via forced global logout).
-const SESSION_VERSION_SKIP: { method: string; pattern: RegExp }[] = [  { method: "POST", pattern: /^\/api\/auth\/login\/?$/ },
+const SESSION_VERSION_SKIP: { method: string; pattern: RegExp }[] = [
+  { method: "POST", pattern: /^\/api\/auth\/login\/?$/ },
   { method: "GET", pattern: /^\/api\/health\/?$/ },
   { method: "GET", pattern: /^\/api\/healthz\/?$/ },
 ];
@@ -62,7 +72,7 @@ const corsMiddleware = cors({
       return callback(null, true);
     }
     return callback(null, false);
-  }
+  },
 });
 
 app.use(corsMiddleware);
@@ -123,7 +133,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   const cookies = (req as any).cookies ?? {};
   if (decodeRole(cookies["vndrly_guest"])) return next();
 
-  if (isAllowlistedApiRoute(req, PUBLIC_UNAUTHENTICATED_ALLOWLIST)) return next();
+  if (isAllowlistedApiRoute(req, PUBLIC_UNAUTHENTICATED_ALLOWLIST))
+    return next();
   return res.status(401).json({
     error: "Authentication required",
     code: "auth.unauthenticated",
@@ -207,66 +218,67 @@ const { enforceTenant } = require("./lib/tenantGuard");
 
 // Per-route handlers enforce auth; this layer only applies tenant response
 // filtering when a session is present.
-app.use("/api", (req, res, next) => {
-  const session = getSessionFromRequest(req);
-
-  const originalJson = res.json;
-
-  res.json = function (data) {
-    try {
-      // If no session, don't touch response
-      if (!session) return originalJson.call(this, data);
-
-      // Handle arrays
-      if (Array.isArray(data)) {
-        data = data.filter((item) => {
-          if (!item || typeof item !== "object") return true;
-
-          if (session.partnerId && item.partnerId) {
-            return item.partnerId === session.partnerId;
-          }
-
-          if (session.vendorId && item.vendorId) {
-            return item.vendorId === session.vendorId;
-          }
-
-          return true; // allow non-tenant objects through (metadata, etc)
-        });
-      }
-
-      // Handle single object
-      else if (data && typeof data === "object") {
-        if (
-          (session.partnerId && data.partnerId && data.partnerId !== session.partnerId) ||
-          (session.vendorId && data.vendorId && data.vendorId !== session.vendorId)
-        ) {
-          return originalJson.call(this, null); // block it
-        }
-      }
-
-      return originalJson.call(this, data);
-    } catch (err) {
-      console.error("Tenant guard error:", err);
-      return originalJson.call(this, data);
-    }
-  };
-
-  next();
-}, router);
-
 app.use(
-  (
-    err: unknown,
-    _req: Request,
-    res: Response,
-    _next: NextFunction,
-  ) => {
-    console.error(err);
+  "/api",
+  (req, res, next) => {
+    const session = getSessionFromRequest(req);
 
-    res.status(500).json({
-      message: "Internal server error",
-    });
+    const originalJson = res.json;
+
+    res.json = function (data) {
+      try {
+        // If no session, don't touch response
+        if (!session) return originalJson.call(this, data);
+
+        // Handle arrays
+        if (Array.isArray(data)) {
+          data = data.filter((item) => {
+            if (!item || typeof item !== "object") return true;
+
+            if (session.partnerId && item.partnerId) {
+              return item.partnerId === session.partnerId;
+            }
+
+            if (session.vendorId && item.vendorId) {
+              return item.vendorId === session.vendorId;
+            }
+
+            return true; // allow non-tenant objects through (metadata, etc)
+          });
+        }
+
+        // Handle single object
+        else if (data && typeof data === "object") {
+          if (
+            (session.partnerId &&
+              data.partnerId &&
+              data.partnerId !== session.partnerId) ||
+            (session.vendorId &&
+              data.vendorId &&
+              data.vendorId !== session.vendorId)
+          ) {
+            return originalJson.call(this, null); // block it
+          }
+        }
+
+        return originalJson.call(this, data);
+      } catch (err) {
+        console.error("Tenant guard error:", err);
+        return originalJson.call(this, data);
+      }
+    };
+
+    next();
   },
+  router,
 );
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error(err);
+
+  res.status(500).json({
+    message: "Internal server error",
+  });
+});
 
 export default app;

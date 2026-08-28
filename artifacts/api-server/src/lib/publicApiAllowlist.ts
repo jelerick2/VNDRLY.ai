@@ -17,6 +17,10 @@ export const GUEST_ALLOWLIST: ApiAllowRule[] = [
   { method: "GET", pattern: /^\/api\/auth\/reset-password\/validate\/?$/ },
   { method: "POST", pattern: /^\/api\/auth\/reset-password\/?$/ },
   { method: "GET", pattern: /^\/api\/visits\/site-context\/[^/]+\/?$/ },
+  {
+    method: "GET",
+    pattern: /^\/api\/visits\/sites\/\d+\/preferred-plate-states\/?$/,
+  },
   { method: "GET", pattern: /^\/api\/visits\/public-sites\/?$/ },
   { method: "POST", pattern: /^\/api\/visits\/check-in\/?$/ },
   { method: "POST", pattern: /^\/api\/visits\/\d+\/check-out\/?$/ },
@@ -32,7 +36,10 @@ const DEV_UNAUTHENTICATED_ALLOWLIST: ApiAllowRule[] =
     ? [
         { method: "POST", pattern: /^\/api\/auth\/seed\/?$/ },
         { method: "POST", pattern: /^\/api\/auth\/seed-1099-fixture\/?$/ },
-        { method: "POST", pattern: /^\/api\/auth\/seed-audit-pagination-fixture\/?$/ },
+        {
+          method: "POST",
+          pattern: /^\/api\/auth\/seed-audit-pagination-fixture\/?$/,
+        },
       ]
     : [];
 
@@ -45,7 +52,10 @@ export const PUBLIC_UNAUTHENTICATED_ALLOWLIST: ApiAllowRule[] = [
   { method: "POST", pattern: /^\/api\/onboarding\/vendor\/?$/ },
   { method: "GET", pattern: /^\/api\/onboarding\/verify-email\/[^/]+\/?$/ },
   { method: "POST", pattern: /^\/api\/onboarding\/resend-verification\/?$/ },
-  { method: "GET", pattern: /^\/api\/onboarding\/partner-contact\/by-token\/[^/]+\/?$/ },
+  {
+    method: "GET",
+    pattern: /^\/api\/onboarding\/partner-contact\/by-token\/[^/]+\/?$/,
+  },
   {
     method: "POST",
     pattern: /^\/api\/onboarding\/partner-contact\/by-token\/[^/]+\/accept\/?$/,

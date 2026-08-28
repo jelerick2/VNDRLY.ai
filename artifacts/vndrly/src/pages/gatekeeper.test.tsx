@@ -13,7 +13,9 @@ const api = vi.hoisted(() => ({
   listPreferredPlateStates: vi.fn(),
   readPlate: vi.fn(),
 }));
-const liveMonitor = vi.hoisted(() => ({ flash: null as Record<string, unknown> | null }));
+const liveMonitor = vi.hoisted(() => ({
+  flash: null as Record<string, unknown> | null,
+}));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -21,7 +23,8 @@ vi.mock("react-i18next", () => ({
       const strings: Record<string, string> = {
         "plateStatePicker.label": "Plate state",
         "plateStatePicker.select": "Select plate state",
-        "plateStatePicker.selected": "Selected plate state: {{state}} ({{code}})",
+        "plateStatePicker.selected":
+          "Selected plate state: {{state}} ({{code}})",
         "plateStatePicker.search": "Search states",
         "plateStatePicker.noResults": "No states found.",
         "plateStatePicker.preferred": "Preferred states",
@@ -38,7 +41,9 @@ vi.mock("react-i18next", () => ({
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ user: { role: "vendor", vendorRole: "gatekeeper", vendorId: 1054 } }),
+  useAuth: () => ({
+    user: { role: "vendor", vendorRole: "gatekeeper", vendorId: 1054 },
+  }),
 }));
 
 vi.mock("@/hooks/use-brand", () => ({
@@ -50,11 +55,13 @@ vi.mock("@/hooks/use-gate-live-monitor", () => ({
 }));
 
 vi.mock("@/components/live-connection-pill", () => ({
-  LiveConnectionPill: () => React.createElement("span", { "data-testid": "live-pill" }),
+  LiveConnectionPill: () =>
+    React.createElement("span", { "data-testid": "live-pill" }),
 }));
 
 vi.mock("@/lib/gatekeeper-log-export", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/gatekeeper-log-export")>();
+  const actual =
+    await importOriginal<typeof import("@/lib/gatekeeper-log-export")>();
   return {
     ...actual,
     exportExcel: vi.fn(),
@@ -169,12 +176,25 @@ beforeEach(() => {
     defaultSite: ASSIGNED_SITE,
   });
   api.getSiteContext.mockResolvedValue(SITE_CONTEXT);
-  api.listPreferredPlateStates.mockResolvedValue({ preferred: ["CA", "TX", "NY", "FL", "OH"] });
-  api.readPlate.mockResolvedValue({ plate: null, state: null, plateConfidence: null, stateConfidence: null });
-  api.gateCheckIn.mockResolvedValue({ id: 88 });
-  geolocationMock = vi.fn((success: (position: { coords: { latitude: number; longitude: number } }) => void) => {
-    success({ coords: { latitude: 35.4, longitude: -97.5 } });
+  api.listPreferredPlateStates.mockResolvedValue({
+    preferred: ["CA", "TX", "NY", "FL", "OH"],
   });
+  api.readPlate.mockResolvedValue({
+    plate: null,
+    state: null,
+    plateConfidence: null,
+    stateConfidence: null,
+  });
+  api.gateCheckIn.mockResolvedValue({ id: 88 });
+  geolocationMock = vi.fn(
+    (
+      success: (position: {
+        coords: { latitude: number; longitude: number };
+      }) => void,
+    ) => {
+      success({ coords: { latitude: 35.4, longitude: -97.5 } });
+    },
+  );
   Object.defineProperty(navigator, "geolocation", {
     configurable: true,
     value: { getCurrentPosition: geolocationMock },
@@ -206,98 +226,175 @@ describe("GatekeeperPage plate state", () => {
 
     const view = renderPage();
 
-    expect((await screen.findByTestId("gate-live-flash")).textContent).toContain("TX • ABC123");
-    await waitFor(() => expect(view.container.textContent).toContain("OK • 4412"));
+    expect(
+      (await screen.findByTestId("gate-live-flash")).textContent,
+    ).toContain("TX • ABC123");
+    await waitFor(() =>
+      expect(view.container.textContent).toContain("OK • 4412"),
+    );
   });
 
   it("waits for the authorized site id and renders its preferred states immediately before the plate input", async () => {
     let resolveSite!: (value: typeof SITE_CONTEXT) => void;
-    api.getSiteContext.mockReturnValue(new Promise((resolve) => { resolveSite = resolve; }));
+    api.getSiteContext.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSite = resolve;
+      }),
+    );
     api.listPreferredPlateStates.mockResolvedValue({ preferred: ["OK", "TX"] });
 
     renderPage();
-    await waitFor(() => expect(api.getSiteContext).toHaveBeenCalledWith("ACME-HQ"));
+    await waitFor(() =>
+      expect(api.getSiteContext).toHaveBeenCalledWith("ACME-HQ"),
+    );
     expect(api.listPreferredPlateStates).not.toHaveBeenCalled();
 
     resolveSite(SITE_CONTEXT);
-    await waitFor(() => expect(api.listPreferredPlateStates).toHaveBeenCalledWith(42));
+    await waitFor(() =>
+      expect(api.listPreferredPlateStates).toHaveBeenCalledWith(42, "ACME-HQ"),
+    );
     const trigger = screen.getByRole("button", { name: "Select plate state" });
     const plateInput = screen.getByTestId("input-gate-plate");
-    expect(trigger.compareDocumentPosition(plateInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      trigger.compareDocumentPosition(plateInput) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     await userEvent.setup().click(trigger);
-    expect(screen.getAllByRole("option").slice(0, 3).map((option) => option.textContent)).toEqual([
-      "Oklahoma (OK)",
-      "Texas (TX)",
-      "Alabama (AL)",
-    ]);
+    expect(
+      screen
+        .getAllByRole("option")
+        .slice(0, 3)
+        .map((option) => option.textContent),
+    ).toEqual(["Oklahoma (OK)", "Texas (TX)", "Alabama (AL)"]);
   });
 
   it("uses the national state fallback when site preferences fail", async () => {
     api.listPreferredPlateStates.mockRejectedValue(new Error("unavailable"));
     renderPage();
 
-    await waitFor(() => expect(api.listPreferredPlateStates).toHaveBeenCalledWith(42));
-    await userEvent.setup().click(screen.getByRole("button", { name: "Select plate state" }));
-    expect(screen.getAllByRole("option").slice(0, 3).map((option) => option.textContent)).toEqual([
-      "California (CA)",
-      "Texas (TX)",
-      "New York (NY)",
-    ]);
+    await waitFor(() =>
+      expect(api.listPreferredPlateStates).toHaveBeenCalledWith(42, "ACME-HQ"),
+    );
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "Select plate state" }));
+    expect(
+      screen
+        .getAllByRole("option")
+        .slice(0, 3)
+        .map((option) => option.textContent),
+    ).toEqual(["California (CA)", "Texas (TX)", "New York (NY)"]);
   });
 
   it("blocks a missing state before geolocation or check-in and exposes an accessible error", async () => {
     renderPage();
     await screen.findByTestId("input-gate-plate");
-    fireEvent.change(screen.getByTestId("input-gate-first-name"), { target: { value: "Jordan" } });
-    fireEvent.change(screen.getByTestId("input-gate-last-name"), { target: { value: "Hale" } });
-    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    fireEvent.change(screen.getByTestId("input-gate-first-name"), {
+      target: { value: "Jordan" },
+    });
+    fireEvent.change(screen.getByTestId("input-gate-last-name"), {
+      target: { value: "Hale" },
+    });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
     await waitFor(() => {
-      expect((screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }) as HTMLButtonElement).disabled).toBe(false);
+      expect(
+        (
+          screen.getByRole("button", {
+            name: "gatekeeper.checkInVisitor",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false);
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }),
+    );
 
     expect(geolocationMock).not.toHaveBeenCalled();
     expect(api.gateCheckIn).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe("gatekeeper.plateStateRequired");
+    expect(screen.getByRole("alert").textContent).toBe(
+      "gatekeeper.plateStateRequired",
+    );
   });
 
   it("uses the OCR confidence threshold, preserves manual correction, sends state, and resets it", async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes("request-url")) {
-        return { ok: true, json: async () => ({ uploadURL: "/upload", objectPath: "/objects/plate.jpg" }) };
-      }
-      if (url.includes("finalize") || init?.method === "PUT") return { ok: true };
-      return { ok: true };
-    });
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("request-url")) {
+          return {
+            ok: true,
+            json: async () => ({
+              uploadURL: "/upload",
+              objectPath: "/objects/plate.jpg",
+            }),
+          };
+        }
+        if (url.includes("finalize") || init?.method === "PUT")
+          return { ok: true };
+        return { ok: true };
+      },
+    );
     vi.stubGlobal("fetch", fetchMock);
     api.readPlate
-      .mockResolvedValueOnce({ plate: "4412", state: "TX", plateConfidence: 0.97, stateConfidence: 0.79 })
-      .mockResolvedValueOnce({ plate: "4412", state: "tx", plateConfidence: 0.97, stateConfidence: 0.8 });
+      .mockResolvedValueOnce({
+        plate: "4412",
+        state: "TX",
+        plateConfidence: 0.97,
+        stateConfidence: 0.79,
+      })
+      .mockResolvedValueOnce({
+        plate: "4412",
+        state: "tx",
+        plateConfidence: 0.97,
+        stateConfidence: 0.8,
+      });
     const { container } = renderPage();
     await screen.findByTestId("input-gate-plate");
 
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
     await selectState("Oklahoma (OK)");
-    const plateInput = container.querySelector<HTMLInputElement>('input[type="file"][capture="environment"]')!;
+    const plateInput = container.querySelector<HTMLInputElement>(
+      'input[type="file"][capture="environment"]',
+    )!;
     const file = new File(["plate"], "plate.jpg", { type: "image/jpeg" });
     fireEvent.change(plateInput, { target: { files: [file] } });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Selected plate state: Oklahoma (OK)" })).toBeTruthy();
-      expect((screen.getByTestId("input-gate-plate") as HTMLInputElement).value).toBe("4412");
+      expect(
+        screen.getByRole("button", {
+          name: "Selected plate state: Oklahoma (OK)",
+        }),
+      ).toBeTruthy();
+      expect(
+        (screen.getByTestId("input-gate-plate") as HTMLInputElement).value,
+      ).toBe("4412");
     });
 
     fireEvent.change(plateInput, { target: { files: [file] } });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" })).toBeTruthy();
+      expect(
+        screen.getByRole("button", {
+          name: "Selected plate state: Texas (TX)",
+        }),
+      ).toBeTruthy();
       expect(screen.getByText("Suggested state: TX")).toBeTruthy();
     });
     await selectState("Oklahoma (OK)");
     expect(screen.getByText("State corrected: OK")).toBeTruthy();
-    fireEvent.change(screen.getByTestId("input-gate-first-name"), { target: { value: "Jordan" } });
-    fireEvent.change(screen.getByTestId("input-gate-last-name"), { target: { value: "Hale" } });
-    fireEvent.click(screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }));
+    fireEvent.change(screen.getByTestId("input-gate-first-name"), {
+      target: { value: "Jordan" },
+    });
+    fireEvent.change(screen.getByTestId("input-gate-last-name"), {
+      target: { value: "Hale" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }),
+    );
 
     await waitFor(() => expect(api.gateCheckIn).toHaveBeenCalledTimes(1));
     expect(api.gateCheckIn.mock.calls[0][0]).toMatchObject({
@@ -305,9 +402,94 @@ describe("GatekeeperPage plate state", () => {
       vehiclePlate: "4412",
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Select plate state" })).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Select plate state" }),
+      ).toBeTruthy();
       expect(screen.queryByText("State corrected: OK")).toBeNull();
     });
+  });
+
+  it("clears stale state across sequential voice plates and replaces both when voice supplies state", async () => {
+    const recognitions: Array<{
+      onresult: ((event: any) => void) | null;
+      onend: (() => void) | null;
+    }> = [];
+    class FakeRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = "";
+      onresult: ((event: any) => void) | null = null;
+      onerror: (() => void) | null = null;
+      onend: (() => void) | null = null;
+      start = vi.fn();
+      stop = vi.fn();
+
+      constructor() {
+        recognitions.push(this);
+      }
+    }
+    Object.defineProperty(window, "SpeechRecognition", {
+      configurable: true,
+      value: FakeRecognition,
+    });
+    const speak = async (transcript: string) => {
+      window.dispatchEvent(new Event("vndrly:gate-voice"));
+      await waitFor(() => expect(recognitions.length).toBeGreaterThan(0));
+      const recognition = recognitions.at(-1)!;
+      recognition.onresult?.({
+        results: { 0: { 0: { transcript } }, length: 1 },
+      });
+      recognition.onend?.();
+    };
+
+    try {
+      renderPage();
+      await screen.findByTestId("input-gate-plate");
+
+      await speak("state OK plate OLD 123 driver Jane Doe");
+      await waitFor(() => {
+        expect(
+          (screen.getByTestId("input-gate-plate") as HTMLInputElement).value,
+        ).toBe("OLD123");
+        expect(
+          screen.getByRole("button", {
+            name: "Selected plate state: Oklahoma (OK)",
+          }),
+        ).toBeTruthy();
+      });
+
+      await speak("plate NEW 456 driver Jane Doe");
+      await waitFor(() => {
+        expect(
+          (screen.getByTestId("input-gate-plate") as HTMLInputElement).value,
+        ).toBe("NEW456");
+        expect(
+          screen.getByRole("button", { name: "Select plate state" }),
+        ).toBeTruthy();
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }),
+      );
+      expect(api.gateCheckIn).not.toHaveBeenCalled();
+      expect(screen.getByRole("alert").textContent).toBe(
+        "gatekeeper.plateStateRequired",
+      );
+
+      await speak("state TX plate FINAL 9 driver Jane Doe");
+      await waitFor(() => {
+        expect(
+          (screen.getByTestId("input-gate-plate") as HTMLInputElement).value,
+        ).toBe("FINAL9");
+        expect(
+          screen.getByRole("button", {
+            name: "Selected plate state: Texas (TX)",
+          }),
+        ).toBeTruthy();
+      });
+    } finally {
+      delete (window as typeof window & { SpeechRecognition?: unknown })
+        .SpeechRecognition;
+    }
   });
 
   it("replaces prior composite auto-fill after switching to a state with a different exact match and preserves manual edits", async () => {
@@ -328,23 +510,41 @@ describe("GatekeeperPage plate state", () => {
     await screen.findByTestId("input-gate-plate");
 
     await selectState("Oklahoma (OK)");
-    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
     await waitFor(() => {
-      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Oklahoma");
-      expect((screen.getByTestId("input-gate-company") as HTMLInputElement).value).toBe("Sooner Services");
+      expect(
+        (screen.getByTestId("input-gate-first-name") as HTMLInputElement).value,
+      ).toBe("Oklahoma");
+      expect(
+        (screen.getByTestId("input-gate-company") as HTMLInputElement).value,
+      ).toBe("Sooner Services");
     });
 
-    fireEvent.change(screen.getByTestId("input-gate-company"), { target: { value: "Manual Company" } });
-    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    fireEvent.change(screen.getByTestId("input-gate-company"), {
+      target: { value: "Manual Company" },
+    });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
     await selectState("Texas (TX)");
 
     await waitFor(() => {
-      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Texas");
-      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("Driver");
-      expect((screen.getByTestId("input-gate-company") as HTMLInputElement).value).toBe("Manual Company");
+      expect(
+        (screen.getByTestId("input-gate-first-name") as HTMLInputElement).value,
+      ).toBe("Texas");
+      expect(
+        (screen.getByTestId("input-gate-last-name") as HTMLInputElement).value,
+      ).toBe("Driver");
+      expect(
+        (screen.getByTestId("input-gate-company") as HTMLInputElement).value,
+      ).toBe("Manual Company");
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }),
+    );
     await waitFor(() => expect(api.gateCheckIn).toHaveBeenCalledTimes(1));
     expect(api.gateCheckIn.mock.calls[0][0]).toMatchObject({
       firstName: "Texas",
@@ -361,19 +561,33 @@ describe("GatekeeperPage plate state", () => {
     await screen.findByTestId("input-gate-plate");
 
     await selectState("Oklahoma (OK)");
-    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
     await waitFor(() => {
-      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("Visitor");
+      expect(
+        (screen.getByTestId("input-gate-last-name") as HTMLInputElement).value,
+      ).toBe("Visitor");
     });
 
-    fireEvent.change(screen.getByTestId("input-gate-first-name"), { target: { value: "Manual" } });
-    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    fireEvent.change(screen.getByTestId("input-gate-first-name"), {
+      target: { value: "Manual" },
+    });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
     await selectState("Texas (TX)");
 
     await waitFor(() => {
-      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Manual");
-      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("");
-      expect((screen.getByTestId("input-gate-company") as HTMLInputElement).value).toBe("");
+      expect(
+        (screen.getByTestId("input-gate-first-name") as HTMLInputElement).value,
+      ).toBe("Manual");
+      expect(
+        (screen.getByTestId("input-gate-last-name") as HTMLInputElement).value,
+      ).toBe("");
+      expect(
+        (screen.getByTestId("input-gate-company") as HTMLInputElement).value,
+      ).toBe("");
     });
   });
 
@@ -382,10 +596,14 @@ describe("GatekeeperPage plate state", () => {
     renderPage();
     await screen.findByTestId("input-gate-plate");
 
-    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
 
     await waitFor(() => {
-      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("");
+      expect(
+        (screen.getByTestId("input-gate-first-name") as HTMLInputElement).value,
+      ).toBe("");
       expect(screen.queryByText("gatekeeper.previousVisit")).toBeNull();
       expect(screen.queryByTestId("gate-last-driver-hint")).toBeNull();
     });
@@ -407,11 +625,17 @@ describe("GatekeeperPage plate state", () => {
     await screen.findByTestId("input-gate-plate");
 
     await selectState("Texas (TX)");
-    fireEvent.change(screen.getByTestId("input-gate-plate"), { target: { value: "4412" } });
+    fireEvent.change(screen.getByTestId("input-gate-plate"), {
+      target: { value: "4412" },
+    });
 
     await waitFor(() => {
-      expect((screen.getByTestId("input-gate-first-name") as HTMLInputElement).value).toBe("Texas");
-      expect((screen.getByTestId("input-gate-last-name") as HTMLInputElement).value).toBe("Driver");
+      expect(
+        (screen.getByTestId("input-gate-first-name") as HTMLInputElement).value,
+      ).toBe("Texas");
+      expect(
+        (screen.getByTestId("input-gate-last-name") as HTMLInputElement).value,
+      ).toBe("Driver");
       expect(screen.getByTestId("gate-last-driver-hint")).toBeTruthy();
     });
   });

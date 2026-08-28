@@ -81,14 +81,32 @@ export type SiteContext = {
   vendors: { id: number; name: string }[];
 };
 
-async function jf<T>(path: string, init?: RequestInit, opts?: { auth?: "staff" | "guest" | "none" }): Promise<T> {
-  const headers: Record<string, string> = { "Content-Type": "application/json", ...((init?.headers as Record<string, string>) ?? {}) };
-  const res = await fetch(`${BASE}${path}`, { credentials: "include", headers, ...init });
+async function jf<T>(
+  path: string,
+  init?: RequestInit,
+  opts?: { auth?: "staff" | "guest" | "none" },
+): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+  const res = await fetch(`${BASE}${path}`, {
+    credentials: "include",
+    headers,
+    ...init,
+  });
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     let data: any = null;
-    try { data = await res.json(); if (data?.message) msg = data.message; } catch {}
-    const err = new Error(msg) as Error & { data?: any; status?: number; headers?: Headers };
+    try {
+      data = await res.json();
+      if (data?.message) msg = data.message;
+    } catch {}
+    const err = new Error(msg) as Error & {
+      data?: any;
+      status?: number;
+      headers?: Headers;
+    };
     err.data = data;
     err.status = res.status;
     err.headers = res.headers;
@@ -137,21 +155,37 @@ export type PreferredPlateStatesResponse = {
 };
 
 export const visitsApi = {
-  list: (params?: { siteLocationId?: number; from?: string; to?: string; activeOnly?: boolean; limit?: number; offset?: number }) => {
+  list: (params?: {
+    siteLocationId?: number;
+    from?: string;
+    to?: string;
+    activeOnly?: boolean;
+    limit?: number;
+    offset?: number;
+  }) => {
     const qs: string[] = [];
-    if (params?.siteLocationId) qs.push(`siteLocationId=${params.siteLocationId}`);
+    if (params?.siteLocationId)
+      qs.push(`siteLocationId=${params.siteLocationId}`);
     if (params?.from) qs.push(`from=${encodeURIComponent(params.from)}`);
     if (params?.to) qs.push(`to=${encodeURIComponent(params.to)}`);
     if (params?.activeOnly) qs.push("activeOnly=true");
     if (params?.limit) qs.push(`limit=${params.limit}`);
     if (params?.offset) qs.push(`offset=${params.offset}`);
-    return jf<VisitorRow[]>(`/api/visits${qs.length ? `?${qs.join("&")}` : ""}`);
+    return jf<VisitorRow[]>(
+      `/api/visits${qs.length ? `?${qs.join("&")}` : ""}`,
+    );
   },
   get: (id: number) => jf<VisitorDetail>(`/api/visits/${id}`),
-  getSiteContext: (siteCode: string) => jf<SiteContext>(`/api/visits/site-context/${encodeURIComponent(siteCode)}`),
-  listAssignedGateSites: () => jf<AssignedGateSitesResponse>(`/api/visits/gate/assigned-sites`),
-  listPreferredPlateStates: (siteId: number) =>
-    jf<PreferredPlateStatesResponse>(`/api/visits/sites/${siteId}/preferred-plate-states`),
+  getSiteContext: (siteCode: string) =>
+    jf<SiteContext>(`/api/visits/site-context/${encodeURIComponent(siteCode)}`),
+  listAssignedGateSites: () =>
+    jf<AssignedGateSitesResponse>(`/api/visits/gate/assigned-sites`),
+  listPreferredPlateStates: (siteId: number, siteCode?: string) => {
+    const proof = siteCode ? `?siteCode=${encodeURIComponent(siteCode)}` : "";
+    return jf<PreferredPlateStatesResponse>(
+      `/api/visits/sites/${siteId}/preferred-plate-states${proof}`,
+    );
+  },
   listPublicSites: () => jf<PublicSite[]>(`/api/visits/public-sites`),
   startGuestSession: (input: {
     firstName: string;
@@ -163,7 +197,11 @@ export const visitsApi = {
     plateState?: string;
     purpose?: string;
     safetyAcknowledged: boolean;
-  }) => jf<GuestSessionResponse>(`/api/auth/guest`, { method: "POST", body: JSON.stringify(input) }),
+  }) =>
+    jf<GuestSessionResponse>(`/api/auth/guest`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   guestMe: () => jf<GuestSessionRead>(`/api/auth/guest/me`),
   guestLogout: () => jf<void>(`/api/auth/guest/logout`, { method: "POST" }),
   checkIn: (input: {
@@ -179,10 +217,17 @@ export const visitsApi = {
     vehiclePhotoUrl?: string;
     latitude: number;
     longitude: number;
-  }) => jf<VisitorRow>(`/api/visits/check-in`, { method: "POST", body: JSON.stringify(input) }),
+  }) =>
+    jf<VisitorRow>(`/api/visits/check-in`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   myActive: () => jf<VisitorRow | null>(`/api/visits/me/active`),
   checkOut: (id: number, latitude?: number, longitude?: number) =>
-    jf<VisitorRow>(`/api/visits/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
+    jf<VisitorRow>(`/api/visits/${id}/check-out`, {
+      method: "POST",
+      body: JSON.stringify({ latitude, longitude }),
+    }),
   gateCheckIn: (input: {
     firstName: string;
     lastName: string;
@@ -201,11 +246,21 @@ export const visitsApi = {
     vehiclePhotoUrl?: string;
     latitude: number;
     longitude: number;
-  }) => jf<VisitorRow>(`/api/visits/gate/check-in`, { method: "POST", body: JSON.stringify(input) }),
+  }) =>
+    jf<VisitorRow>(`/api/visits/gate/check-in`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   gateCheckOut: (id: number, latitude?: number, longitude?: number) =>
-    jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, { method: "POST", body: JSON.stringify({ latitude, longitude }) }),
+    jf<VisitorRow>(`/api/visits/gate/${id}/check-out`, {
+      method: "POST",
+      body: JSON.stringify({ latitude, longitude }),
+    }),
   readPlate: (input: { objectPath: string }) =>
-    jf<PlateOcrCandidate>(`/api/visits/gate/read-plate`, { method: "POST", body: JSON.stringify(input) }),
+    jf<PlateOcrCandidate>(`/api/visits/gate/read-plate`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
   gateEnabled: () => jf<{ enabled: boolean }>(`/api/visits/gate/enabled`),
   gateOps: () =>
     jf<{
@@ -231,7 +286,12 @@ export const visitsApi = {
     }>(`/api/visits/gate/ops`),
 };
 
-export async function listAllVisits(params?: { siteLocationId?: number; from?: string; to?: string; activeOnly?: boolean }): Promise<VisitorRow[]> {
+export async function listAllVisits(params?: {
+  siteLocationId?: number;
+  from?: string;
+  to?: string;
+  activeOnly?: boolean;
+}): Promise<VisitorRow[]> {
   const rows: VisitorRow[] = [];
   const pageSize = 1000;
   for (let offset = 0; ; offset += pageSize) {

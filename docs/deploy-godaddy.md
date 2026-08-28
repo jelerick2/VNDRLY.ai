@@ -64,6 +64,35 @@ pnpm run deploy:production
 
 Bootstraps the server (Node, nginx, clone repo), builds web + API, enables HTTPS.
 
+### Plate-state deployment preflight
+
+Normal GoDaddy deployment now runs the API's `migrate:plate-state` step after
+the build and before the service restart. That step reads only
+`lib/db/drizzle/chunk_391_site_visit_plate_state.sql`, permits exactly these
+two idempotent additive changes, and rejects any additional SQL:
+
+- nullable text `guest_sessions.plate_state`
+- nullable text `site_visits.plate_state`
+
+It then verifies both columns through `information_schema`. A missing/wrong
+column or migration error stops the deployment before `vndrly-api` restarts.
+This path does not run Drizzle push, backfill data, change defaults, or execute
+a migration directory/glob.
+
+### Staged state requirement
+
+The server accepts legacy installed clients that send a plate without state
+while `VNDRLY_REQUIRE_PLATE_STATE` is absent or not `1`; the stored state is
+`null`. Invalid supplied values are still rejected. After installed mobile
+adoption is confirmed, add this server environment entry and deploy normally:
+
+```text
+VNDRLY_REQUIRE_PLATE_STATE=1
+```
+
+Web and current mobile clients already require state locally. Remove or set
+the variable to any value other than `1` to return to compatibility mode.
+
 ## DNS cutover
 
 When the VPS serves the app over HTTPS on its IP, point `vndrly.ai` A records to that IP (GoDaddy DNS), or:

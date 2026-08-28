@@ -22,25 +22,41 @@ export type GatekeeperVisitInput = {
 
 export type GatekeeperSubmitResult =
   | { ok: true; visitId: number }
-  | { ok: false; reason: "missing-name" | "missing-plate" | "missing-state" | "no-host" | "location-denied" };
+  | {
+      ok: false;
+      reason:
+        | "missing-name"
+        | "missing-plate"
+        | "missing-state"
+        | "no-host"
+        | "location-denied";
+    };
 
 export type PreferredPlateStatesResponse = {
   preferred: PlateStateCode[];
 };
 
 export async function fetchGatekeeperVisits(): Promise<ActiveVisit[]> {
-  return apiFetch<Array<ActiveVisit & { checkOutTime?: string | null }>>("/api/visits?activeOnly=true&limit=1000");
+  return apiFetch<Array<ActiveVisit & { checkOutTime?: string | null }>>(
+    "/api/visits?activeOnly=true&limit=1000",
+  );
 }
 
 export async function fetchAssignedGateSites(): Promise<AssignedGateSitesResponse> {
   return apiFetch("/api/visits/gate/assigned-sites");
 }
 
-export async function fetchPreferredPlateStates(siteId: number): Promise<PreferredPlateStatesResponse> {
-  return apiFetch(`/api/visits/sites/${siteId}/preferred-plate-states`);
+export async function fetchPreferredPlateStates(
+  siteId: number,
+  siteCode?: string,
+): Promise<PreferredPlateStatesResponse> {
+  const proof = siteCode ? `?siteCode=${encodeURIComponent(siteCode)}` : "";
+  return apiFetch(`/api/visits/sites/${siteId}/preferred-plate-states${proof}`);
 }
 
-export async function fetchGatekeeperHistory(fromIso: string): Promise<ActiveVisit[]> {
+export async function fetchGatekeeperHistory(
+  fromIso: string,
+): Promise<ActiveVisit[]> {
   return fetchVisitPages(`from=${encodeURIComponent(fromIso)}`);
 }
 
@@ -52,7 +68,9 @@ async function fetchVisitPages(prefix: string): Promise<ActiveVisit[]> {
   const rows: ActiveVisit[] = [];
   const pageSize = 1000;
   for (let offset = 0; ; offset += pageSize) {
-    const query = [prefix, `limit=${pageSize}`, `offset=${offset}`].filter(Boolean).join("&");
+    const query = [prefix, `limit=${pageSize}`, `offset=${offset}`]
+      .filter(Boolean)
+      .join("&");
     const page = await apiFetch<ActiveVisit[]>(`/api/visits?${query}`);
     rows.push(...page);
     if (page.length < pageSize) return rows;
@@ -66,14 +84,18 @@ export type PlateOcrCandidate = {
   stateConfidence: number | null;
 };
 
-export async function readGatePlate(objectPath: string): Promise<PlateOcrCandidate> {
+export async function readGatePlate(
+  objectPath: string,
+): Promise<PlateOcrCandidate> {
   return apiFetch<PlateOcrCandidate>("/api/visits/gate/read-plate", {
     method: "POST",
     body: JSON.stringify({ objectPath }),
   });
 }
 
-export async function deleteGateEvidence(objectPath: string | null): Promise<void> {
+export async function deleteGateEvidence(
+  objectPath: string | null,
+): Promise<void> {
   if (!objectPath) return;
   await apiFetch("/api/storage/uploads", {
     method: "DELETE",
@@ -87,7 +109,9 @@ export async function gatekeeperCheckOut(visitId: number): Promise<void> {
   try {
     const perm = await Location.requestForegroundPermissionsAsync();
     if (perm.status === "granted") {
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
       latitude = pos.coords.latitude;
       longitude = pos.coords.longitude;
     }
@@ -112,8 +136,11 @@ export async function submitGatekeeperVisit(
   if (!host) return { ok: false, reason: "no-host" };
 
   const perm = await Location.requestForegroundPermissionsAsync();
-  if (perm.status !== "granted") return { ok: false, reason: "location-denied" };
-  const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+  if (perm.status !== "granted")
+    return { ok: false, reason: "location-denied" };
+  const pos = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.High,
+  });
 
   const res = await apiFetch<{ id: number }>("/api/visits/gate/check-in", {
     method: "POST",
@@ -130,7 +157,9 @@ export async function submitGatekeeperVisit(
       purpose: input.purpose.trim() || undefined,
       expectedDurationMinutes: parseDurationMinutes(input.durationStr),
       ...(input.platePhotoUrl ? { platePhotoUrl: input.platePhotoUrl } : {}),
-      ...(input.vehiclePhotoUrl ? { vehiclePhotoUrl: input.vehiclePhotoUrl } : {}),
+      ...(input.vehiclePhotoUrl
+        ? { vehiclePhotoUrl: input.vehiclePhotoUrl }
+        : {}),
       latitude: pos.coords.latitude,
       longitude: pos.coords.longitude,
     }),

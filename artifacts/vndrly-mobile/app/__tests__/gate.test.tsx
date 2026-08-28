@@ -31,7 +31,8 @@ vi.mock("react-i18next", () => ({
       const strings: Record<string, string> = {
         "plateStatePicker.label": "Plate state",
         "plateStatePicker.select": "Select plate state",
-        "plateStatePicker.selected": "Selected plate state: {{state}} ({{code}})",
+        "plateStatePicker.selected":
+          "Selected plate state: {{state}} ({{code}})",
         "plateStatePicker.search": "Search states",
         "plateStatePicker.noResults": "No states found.",
         "plateStatePicker.preferred": "Preferred states",
@@ -53,18 +54,17 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-const {
-  requestForegroundPermissionsAsyncMock,
-  getCurrentPositionAsyncMock,
-} = vi.hoisted(() => ({
-  requestForegroundPermissionsAsyncMock: vi.fn(),
-  getCurrentPositionAsyncMock: vi.fn(),
-}));
+const { requestForegroundPermissionsAsyncMock, getCurrentPositionAsyncMock } =
+  vi.hoisted(() => ({
+    requestForegroundPermissionsAsyncMock: vi.fn(),
+    getCurrentPositionAsyncMock: vi.fn(),
+  }));
 vi.mock("expo-location", () => ({
   Accuracy: { High: 4, Balanced: 3 },
   requestForegroundPermissionsAsync: (...a: unknown[]) =>
     requestForegroundPermissionsAsyncMock(...a),
-  getCurrentPositionAsync: (...a: unknown[]) => getCurrentPositionAsyncMock(...a),
+  getCurrentPositionAsync: (...a: unknown[]) =>
+    getCurrentPositionAsyncMock(...a),
 }));
 
 vi.mock("expo-secure-store", () => ({
@@ -109,9 +109,11 @@ vi.mock("@/lib/guest", () => ({
 vi.mock("@/lib/gatekeeper", () => ({
   deleteGateEvidence: vi.fn(async () => undefined),
   fetchGatekeeperVisits: (...a: unknown[]) => fetchGatekeeperVisitsMock(...a),
-  fetchGatekeeperRecentVisits: (...a: unknown[]) => fetchGatekeeperRecentVisitsMock(...a),
+  fetchGatekeeperRecentVisits: (...a: unknown[]) =>
+    fetchGatekeeperRecentVisitsMock(...a),
   fetchAssignedGateSites: (...a: unknown[]) => fetchAssignedGateSitesMock(...a),
-  fetchPreferredPlateStates: (...a: unknown[]) => fetchPreferredPlateStatesMock(...a),
+  fetchPreferredPlateStates: (...a: unknown[]) =>
+    fetchPreferredPlateStatesMock(...a),
   submitGatekeeperVisit: (...a: unknown[]) => submitGatekeeperVisitMock(...a),
   gatekeeperCheckOut: (...a: unknown[]) => gatekeeperCheckOutMock(...a),
   readGatePlate: (...a: unknown[]) => readGatePlateMock(...a),
@@ -134,7 +136,10 @@ vi.mock("@/hooks/use-brand", () => ({
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
     user: { role: "vendor", vendorRole: "gatekeeper", vendorId: 1054 },
-    activeMembership: { orgLogoUrl: "https://cdn.example.com/vendor.png", orgName: "Acme Vendor" },
+    activeMembership: {
+      orgLogoUrl: "https://cdn.example.com/vendor.png",
+      orgName: "Acme Vendor",
+    },
   }),
 }));
 
@@ -181,7 +186,13 @@ vi.mock("@/components/AmberButton", async () => {
 });
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { Alert } from "react-native";
 
 import GatekeeperScreen from "../(tabs)/gate";
@@ -203,6 +214,8 @@ const FLYWHEEL_SITE = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  captureAndUploadImageMock.mockReset();
+  readGatePlateMock.mockReset();
   fetchGatekeeperVisitsMock.mockResolvedValue([]);
   fetchGatekeeperRecentVisitsMock.mockResolvedValue([]);
   readGatePlateMock.mockResolvedValue(null);
@@ -210,7 +223,9 @@ beforeEach(() => {
     sites: [FLYWHEEL_SITE],
     defaultSite: FLYWHEEL_SITE,
   });
-  fetchPreferredPlateStatesMock.mockResolvedValue({ preferred: ["CA", "TX", "NY", "FL", "OH"] });
+  fetchPreferredPlateStatesMock.mockResolvedValue({
+    preferred: ["CA", "TX", "NY", "FL", "OH"],
+  });
   vi.spyOn(Alert, "alert").mockImplementation(() => {});
 });
 
@@ -288,7 +303,9 @@ describe("GatekeeperScreen", () => {
 
     const view = renderScreen();
 
-    await waitFor(() => expect(view.container.textContent).toContain("TX • ABC123"));
+    await waitFor(() =>
+      expect(view.container.textContent).toContain("TX • ABC123"),
+    );
   });
 
   it("shows the branded vendor logo in front of Gate Portal", async () => {
@@ -320,11 +337,19 @@ describe("GatekeeperScreen", () => {
   it("defaults the current location to Flywheel Energy Spur like the web booth", async () => {
     fetchSiteContextMock.mockResolvedValue({
       ...SITE_CTX,
-      site: { ...SITE_CTX.site, name: "Flywheel Energy Spur", siteCode: "SITE-B40D77D2" },
+      site: {
+        ...SITE_CTX.site,
+        name: "Flywheel Energy Spur",
+        siteCode: "SITE-B40D77D2",
+      },
     });
     renderScreen();
-    expect(await screen.findByTestId("gate-site-option-SITE-B40D77D2")).toBeTruthy();
-    expect(screen.getAllByText("Flywheel Energy Spur").length).toBeGreaterThan(0);
+    expect(
+      await screen.findByTestId("gate-site-option-SITE-B40D77D2"),
+    ).toBeTruthy();
+    expect(screen.getAllByText("Flywheel Energy Spur").length).toBeGreaterThan(
+      0,
+    );
     expect((firstByTestId("gate-site-code") as HTMLInputElement).value).toBe(
       "SITE-B40D77D2",
     );
@@ -335,20 +360,34 @@ describe("GatekeeperScreen", () => {
 
   it("renders site-preferred plate states immediately before the plate input", async () => {
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
-    fetchPreferredPlateStatesMock.mockResolvedValue({ preferred: ["OK", "TX"] });
+    fetchPreferredPlateStatesMock.mockResolvedValue({
+      preferred: ["OK", "TX"],
+    });
 
     renderScreen();
 
     await waitFor(() => {
-      expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42);
+      expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(
+        42,
+        "SITE-B40D77D2",
+      );
     });
     const trigger = screen.getByRole("button", { name: "Select plate state" });
     const plateInput = firstByTestId("gate-vehicle-plate");
-    expect(trigger.compareDocumentPosition(plateInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      trigger.compareDocumentPosition(plateInput) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     tap(trigger);
-    const stateOptions = screen.getAllByRole("button", { name: /state option$/ });
-    expect(stateOptions.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
+    const stateOptions = screen.getAllByRole("button", {
+      name: /state option$/,
+    });
+    expect(
+      stateOptions
+        .slice(0, 3)
+        .map((option) => option.getAttribute("aria-label")),
+    ).toEqual([
       "Oklahoma (OK), state option",
       "Texas (TX), state option",
       "Alabama (AL), state option",
@@ -360,10 +399,21 @@ describe("GatekeeperScreen", () => {
     fetchPreferredPlateStatesMock.mockRejectedValue(new Error("unavailable"));
     renderScreen();
 
-    await waitFor(() => expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42));
+    await waitFor(() =>
+      expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(
+        42,
+        "SITE-B40D77D2",
+      ),
+    );
     tap(screen.getByRole("button", { name: "Select plate state" }));
-    const stateOptions = screen.getAllByRole("button", { name: /state option$/ });
-    expect(stateOptions.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
+    const stateOptions = screen.getAllByRole("button", {
+      name: /state option$/,
+    });
+    expect(
+      stateOptions
+        .slice(0, 3)
+        .map((option) => option.getAttribute("aria-label")),
+    ).toEqual([
       "California (CA), state option",
       "Texas (TX), state option",
       "New York (NY), state option",
@@ -398,13 +448,19 @@ describe("GatekeeperScreen", () => {
     ]);
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), { target: { value: "4412" } });
+    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), {
+      target: { value: "4412" },
+    });
     tap(screen.getByRole("button", { name: "Select plate state" }));
     tap(screen.getByRole("button", { name: "Texas (TX), state option" }));
 
     await waitFor(() => {
-      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Exact");
-      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Texas");
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe(
+        "Exact",
+      );
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe(
+        "Texas",
+      );
     });
   });
 
@@ -436,21 +492,37 @@ describe("GatekeeperScreen", () => {
     ]);
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), { target: { value: "4412" } });
+    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), {
+      target: { value: "4412" },
+    });
     tap(screen.getByRole("button", { name: "Select plate state" }));
     tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
     await waitFor(() => {
-      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Oklahoma");
-      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Visitor");
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe(
+        "Oklahoma",
+      );
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe(
+        "Visitor",
+      );
     });
 
-    fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Manual" } });
-    tap(screen.getByRole("button", { name: "Selected plate state: Oklahoma (OK)" }));
+    fireEvent.change(firstByTestId("gate-first-name"), {
+      target: { value: "Manual" },
+    });
+    tap(
+      screen.getByRole("button", {
+        name: "Selected plate state: Oklahoma (OK)",
+      }),
+    );
     tap(screen.getByRole("button", { name: "Texas (TX), state option" }));
 
     await waitFor(() => {
-      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Manual");
-      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Driver");
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe(
+        "Manual",
+      );
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe(
+        "Driver",
+      );
     });
   });
 
@@ -469,7 +541,9 @@ describe("GatekeeperScreen", () => {
         checkInTime: "2026-08-23T10:00:00Z",
       },
     ]);
-    captureAndUploadImageMock.mockResolvedValue({ objectPath: "/uploads/tx.jpg" });
+    captureAndUploadImageMock.mockResolvedValue({
+      objectPath: "/uploads/tx.jpg",
+    });
     readGatePlateMock.mockResolvedValue({
       plate: "4412",
       state: "TX",
@@ -478,20 +552,34 @@ describe("GatekeeperScreen", () => {
     });
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), { target: { value: "4412" } });
+    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), {
+      target: { value: "4412" },
+    });
     tap(screen.getByRole("button", { name: "Select plate state" }));
     tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
     await waitFor(() => {
-      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Visitor");
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe(
+        "Visitor",
+      );
     });
 
-    fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Manual" } });
+    fireEvent.change(firstByTestId("gate-first-name"), {
+      target: { value: "Manual" },
+    });
     tap(firstByTestId("gate-capture-tag-photo"));
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" })).toBeTruthy();
-      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Manual");
-      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("");
+      expect(
+        screen.getByRole("button", {
+          name: "Selected plate state: Texas (TX)",
+        }),
+      ).toBeTruthy();
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe(
+        "Manual",
+      );
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe(
+        "",
+      );
     });
   });
 
@@ -500,16 +588,26 @@ describe("GatekeeperScreen", () => {
     submitGatekeeperVisitMock.mockResolvedValue({ ok: true, visitId: 88 });
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("gate-first-name"), { target: { value: "Jordan" } });
-    fireEvent.change(firstByTestId("gate-last-name"), { target: { value: "Hale" } });
-    fireEvent.change(firstByTestId("gate-vehicle-plate"), { target: { value: "4412" } });
-    fireEvent.change(firstByTestId("gate-site-code"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(await findFirstByTestId("gate-first-name"), {
+      target: { value: "Jordan" },
+    });
+    fireEvent.change(firstByTestId("gate-last-name"), {
+      target: { value: "Hale" },
+    });
+    fireEvent.change(firstByTestId("gate-vehicle-plate"), {
+      target: { value: "4412" },
+    });
+    fireEvent.change(firstByTestId("gate-site-code"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("gate-site-lookup"));
     tap(await findFirstByTestId("host-option-partner:7"));
     tap(firstByTestId("check-in-btn"));
 
     expect(submitGatekeeperVisitMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe("gatekeeper.plateStateRequired");
+    expect(screen.getByRole("alert").textContent).toBe(
+      "gatekeeper.plateStateRequired",
+    );
   });
 
   it("applies the OCR threshold, keeps manual correction, sends state, and clears it after success", async () => {
@@ -518,43 +616,154 @@ describe("GatekeeperScreen", () => {
       .mockResolvedValueOnce({ objectPath: "/uploads/low.jpg" })
       .mockResolvedValueOnce({ objectPath: "/uploads/high.jpg" });
     readGatePlateMock
-      .mockResolvedValueOnce({ plate: "4412", state: "TX", plateConfidence: 0.97, stateConfidence: 0.79 })
-      .mockResolvedValueOnce({ plate: "4412", state: "TX", plateConfidence: 0.97, stateConfidence: 0.8 });
+      .mockResolvedValueOnce({
+        plate: "4412",
+        state: "TX",
+        plateConfidence: 0.97,
+        stateConfidence: 0.79,
+      })
+      .mockResolvedValueOnce({
+        plate: "4412",
+        state: "TX",
+        plateConfidence: 0.97,
+        stateConfidence: 0.8,
+      });
     submitGatekeeperVisitMock.mockResolvedValue({ ok: true, visitId: 88 });
     renderScreen();
 
+    fireEvent.change(await findFirstByTestId("gate-vehicle-plate"), {
+      target: { value: "4412" },
+    });
     tap(await screen.findByRole("button", { name: "Select plate state" }));
     tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
     tap(firstByTestId("gate-capture-tag-photo"));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Selected plate state: Oklahoma (OK)" })).toBeTruthy();
-      expect((firstByTestId("gate-vehicle-plate") as HTMLInputElement).value).toBe("4412");
+      expect(
+        screen.getByRole("button", {
+          name: "Selected plate state: Oklahoma (OK)",
+        }),
+      ).toBeTruthy();
+      expect(
+        (firstByTestId("gate-vehicle-plate") as HTMLInputElement).value,
+      ).toBe("4412");
+      expect(isDisabled(firstByTestId("gate-capture-tag-photo"))).toBe(false);
     });
 
     tap(firstByTestId("gate-capture-tag-photo"));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" })).toBeTruthy();
+      expect(
+        screen.getByRole("button", {
+          name: "Selected plate state: Texas (TX)",
+        }),
+      ).toBeTruthy();
       expect(screen.getByText("Suggested state: TX")).toBeTruthy();
     });
-    tap(screen.getByRole("button", { name: "Selected plate state: Texas (TX)" }));
+    tap(
+      screen.getByRole("button", { name: "Selected plate state: Texas (TX)" }),
+    );
     tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
     expect(screen.getByText("State corrected: OK")).toBeTruthy();
 
-    fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Jordan" } });
-    fireEvent.change(firstByTestId("gate-last-name"), { target: { value: "Hale" } });
-    fireEvent.change(firstByTestId("gate-site-code"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(firstByTestId("gate-first-name"), {
+      target: { value: "Jordan" },
+    });
+    fireEvent.change(firstByTestId("gate-last-name"), {
+      target: { value: "Hale" },
+    });
+    fireEvent.change(firstByTestId("gate-site-code"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("gate-site-lookup"));
     tap(await findFirstByTestId("host-option-partner:7"));
     tap(firstByTestId("check-in-btn"));
 
-    await waitFor(() => expect(submitGatekeeperVisitMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(submitGatekeeperVisitMock).toHaveBeenCalledTimes(1),
+    );
     expect(submitGatekeeperVisitMock.mock.calls[0][0]).toMatchObject({
       plateState: "OK",
       vehiclePlate: "4412",
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Select plate state" })).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Select plate state" }),
+      ).toBeTruthy();
       expect(screen.queryByText("State corrected: OK")).toBeNull();
+    });
+  });
+
+  it("clears stale state across sequential OCR plates and replaces both when OCR supplies state", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    captureAndUploadImageMock
+      .mockResolvedValueOnce({ objectPath: "/uploads/old.jpg" })
+      .mockResolvedValueOnce({ objectPath: "/uploads/new.jpg" })
+      .mockResolvedValueOnce({ objectPath: "/uploads/final.jpg" });
+    readGatePlateMock
+      .mockResolvedValueOnce({
+        plate: "OLD-123",
+        state: "OK",
+        plateConfidence: 0.98,
+        stateConfidence: 0.9,
+      })
+      .mockResolvedValueOnce({
+        plate: "NEW-456",
+        state: "TX",
+        plateConfidence: 0.98,
+        stateConfidence: 0.79,
+      })
+      .mockResolvedValueOnce({
+        plate: "FINAL-9",
+        state: "TX",
+        plateConfidence: 0.98,
+        stateConfidence: 0.9,
+      });
+    renderScreen();
+
+    tap(await findFirstByTestId("gate-capture-tag-photo"));
+    await waitFor(() => {
+      expect(
+        (firstByTestId("gate-vehicle-plate") as HTMLInputElement).value,
+      ).toBe("OLD-123");
+      expect(
+        screen.getByRole("button", {
+          name: "Selected plate state: Oklahoma (OK)",
+        }),
+      ).toBeTruthy();
+      expect(isDisabled(firstByTestId("gate-capture-tag-photo"))).toBe(false);
+    });
+
+    tap(firstByTestId("gate-capture-tag-photo"));
+    await waitFor(() => {
+      expect(
+        (firstByTestId("gate-vehicle-plate") as HTMLInputElement).value,
+      ).toBe("NEW-456");
+      expect(
+        screen.getByRole("button", { name: "Select plate state" }),
+      ).toBeTruthy();
+      expect(isDisabled(firstByTestId("gate-capture-tag-photo"))).toBe(false);
+    });
+    fireEvent.change(firstByTestId("gate-first-name"), {
+      target: { value: "Jane" },
+    });
+    fireEvent.change(firstByTestId("gate-last-name"), {
+      target: { value: "Doe" },
+    });
+    tap(firstByTestId("check-in-btn"));
+    expect(submitGatekeeperVisitMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toBe(
+      "gatekeeper.plateStateRequired",
+    );
+
+    tap(firstByTestId("gate-capture-tag-photo"));
+    await waitFor(() => {
+      expect(
+        (firstByTestId("gate-vehicle-plate") as HTMLInputElement).value,
+      ).toBe("FINAL-9");
+      expect(
+        screen.getByRole("button", {
+          name: "Selected plate state: Texas (TX)",
+        }),
+      ).toBeTruthy();
     });
   });
 
@@ -568,15 +777,21 @@ describe("GatekeeperScreen", () => {
     renderScreen();
     await findFirstByTestId("gate-first-name");
 
-    fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Jordan" } });
-    fireEvent.change(firstByTestId("gate-last-name"), { target: { value: "Hale" } });
+    fireEvent.change(firstByTestId("gate-first-name"), {
+      target: { value: "Jordan" },
+    });
+    fireEvent.change(firstByTestId("gate-last-name"), {
+      target: { value: "Hale" },
+    });
     tap(screen.getByRole("button", { name: "Select plate state" }));
     tap(screen.getByRole("button", { name: "Oklahoma (OK), state option" }));
 
     tap(firstByTestId("gate-capture-tag-photo"));
     await waitFor(() => {
       expect(captureAndUploadImageMock).toHaveBeenCalledTimes(1);
-      expect(isDisabled(firstByTestId("gate-capture-vehicle-photo"))).toBe(false);
+      expect(isDisabled(firstByTestId("gate-capture-vehicle-photo"))).toBe(
+        false,
+      );
     });
     tap(firstByTestId("gate-capture-vehicle-photo"));
     await waitFor(() => {
@@ -584,7 +799,9 @@ describe("GatekeeperScreen", () => {
       expect(isDisabled(firstByTestId("gate-capture-tag-photo"))).toBe(false);
     });
 
-    fireEvent.change(firstByTestId("gate-site-code"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(firstByTestId("gate-site-code"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("gate-site-lookup"));
     tap(await findFirstByTestId("host-option-partner:7"));
     tap(firstByTestId("check-in-btn"));
@@ -592,7 +809,10 @@ describe("GatekeeperScreen", () => {
     await waitFor(() => {
       expect(submitGatekeeperVisitMock).toHaveBeenCalledTimes(1);
     });
-    const payload = submitGatekeeperVisitMock.mock.calls[0][0] as Record<string, unknown>;
+    const payload = submitGatekeeperVisitMock.mock.calls[0][0] as Record<
+      string,
+      unknown
+    >;
     expect(payload).not.toHaveProperty("phone");
     expect(payload).not.toHaveProperty("email");
     expect(payload.platePhotoUrl).toBe("/uploads/tag.jpg");

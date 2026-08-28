@@ -14,6 +14,7 @@ import {
   supabaseEnvPath,
   twilioEnvPath,
 } from "./secrets-path.mjs";
+import { buildApiMigrationAndRestartCommands } from "./plate-state-migration.mjs";
 const LOCAL_CFG = path.join(ROOT, ".local", "godaddy-vps.json");
 const BOOTSTRAP = path.join(ROOT, "scripts/server/bootstrap-vps.sh");
 const NGINX_SITE = path.join(ROOT, "scripts/server/vndrly.ai.nginx.conf");
@@ -81,7 +82,9 @@ function loadDeployConfig() {
     );
   }
   if (!dbPassword) {
-    throw new Error("Missing Supabase password in API Keys and Secrets/Supabase.env");
+    throw new Error(
+      "Missing Supabase password in API Keys and Secrets/Supabase.env",
+    );
   }
 
   return { host, user, password, port, dbPassword };
@@ -156,7 +159,8 @@ async function main() {
   if (!openaiKey && oaiMatch) openaiKey = oaiMatch[1].trim();
   if (!openaiKey) openaiKey = envValue(openAiEnv, "OPENAI_API_KEY").trim();
 
-  const finnhubKey = localEnv.match(/^FINNHUB_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
+  const finnhubKey =
+    localEnv.match(/^FINNHUB_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
   const alphaVantageKey =
     localEnv.match(/^ALPHA_VANTAGE_API_KEY=(.+)$/m)?.[1]?.trim() ?? "";
   const mapboxEnv = parseEnvFile(mapboxEnvPath());
@@ -197,7 +201,9 @@ async function main() {
     envValue(twilioEnv, "TWILIO_A2P_STATUS") ??
     "";
   const twilioTollFreeVerificationStatus =
-    localEnv.match(/^TWILIO_TOLL_FREE_VERIFICATION_STATUS=(.+)$/m)?.[1]?.trim() ??
+    localEnv
+      .match(/^TWILIO_TOLL_FREE_VERIFICATION_STATUS=(.+)$/m)?.[1]
+      ?.trim() ??
     envValue(twilioEnv, "TWILIO_TOLL_FREE_VERIFICATION_STATUS") ??
     "";
   const sendGridEnv = parseEnvFile(sendGridEnvPath());
@@ -270,27 +276,38 @@ async function main() {
     twilioApiKey ? `TWILIO_API_KEY=${twilioApiKey}` : "",
     twilioApiSecret ? `TWILIO_API_SECRET=${twilioApiSecret}` : "",
     twilioPhoneNumber ? `TWILIO_PHONE_NUMBER=${twilioPhoneNumber}` : "",
-    twilioMessagingServiceSid ? `TWILIO_MESSAGING_SERVICE_SID=${twilioMessagingServiceSid}` : "",
-    twilioSenderRegistrationStatus ? `TWILIO_SENDER_REGISTRATION_STATUS=${twilioSenderRegistrationStatus}` : "",
+    twilioMessagingServiceSid
+      ? `TWILIO_MESSAGING_SERVICE_SID=${twilioMessagingServiceSid}`
+      : "",
+    twilioSenderRegistrationStatus
+      ? `TWILIO_SENDER_REGISTRATION_STATUS=${twilioSenderRegistrationStatus}`
+      : "",
     twilioA2pStatus ? `TWILIO_A2P_STATUS=${twilioA2pStatus}` : "",
-    twilioTollFreeVerificationStatus ? `TWILIO_TOLL_FREE_VERIFICATION_STATUS=${twilioTollFreeVerificationStatus}` : "",
+    twilioTollFreeVerificationStatus
+      ? `TWILIO_TOLL_FREE_VERIFICATION_STATUS=${twilioTollFreeVerificationStatus}`
+      : "",
     sendGridApiKey ? `SENDGRID_API_KEY=${sendGridApiKey}` : "",
     sendGridFromEmail ? `SENDGRID_FROM_EMAIL=${sendGridFromEmail}` : "",
     sendGridFromName ? `SENDGRID_FROM_NAME=${sendGridFromName}` : "",
     sendGridReplyTo ? `SENDGRID_REPLY_TO=${sendGridReplyTo}` : "",
     sendGridSandboxMode ? `SENDGRID_SANDBOX_MODE=${sendGridSandboxMode}` : "",
-    sendGridDomainAuthenticated ? `SENDGRID_DOMAIN_AUTHENTICATED=${sendGridDomainAuthenticated}` : "",
+    sendGridDomainAuthenticated
+      ? `SENDGRID_DOMAIN_AUTHENTICATED=${sendGridDomainAuthenticated}`
+      : "",
     "OPS_ALERT_EMAIL=admin@vndrly.ai",
     "PUBLIC_APP_URL=https://vndrly.ai",
     "APP_BASE_URL=https://vndrly.ai",
   ].filter(Boolean);
 
-  const bootstrapB64 = b64(readFileSync(BOOTSTRAP, "utf8").replace(/\r\n/g, "\n"));
+  const bootstrapB64 = b64(
+    readFileSync(BOOTSTRAP, "utf8").replace(/\r\n/g, "\n"),
+  );
   const nginxB64 = b64(readFileSync(NGINX_SITE, "utf8").replace(/\r\n/g, "\n"));
   const prodEnvB64 = b64(prodEnvLines.join("\n") + "\n");
 
   console.log(`Deploying to ${cfg.user}@${cfg.host}:${cfg.port} ...`);
   const conn = await sshConnect(cfg);
+  const apiMigrationAndRestart = buildApiMigrationAndRestartCommands();
 
   try {
     const script = `
@@ -335,9 +352,7 @@ ${mapboxAccessToken ? `export VITE_MAPBOX_ACCESS_TOKEN=${shQuote(mapboxAccessTok
 sudo -u vndrly env HOME=/home/vndrly pnpm install --frozen-lockfile || sudo -u vndrly env HOME=/home/vndrly pnpm install
 sudo -u vndrly env HOME=/home/vndrly BASE_PATH=/ NODE_ENV=production VITE_MAPBOX_ACCESS_TOKEN="$VITE_MAPBOX_ACCESS_TOKEN" pnpm --filter @workspace/vndrly run build
 sudo -u vndrly env HOME=/home/vndrly pnpm --filter @workspace/api-server run build
-sudo systemctl daemon-reload
-sudo systemctl enable vndrly-api 2>/dev/null || true
-sudo systemctl restart vndrly-api
+${apiMigrationAndRestart}
 echo ${JSON.stringify(nginxB64)} | base64 -d | sudo tee /etc/nginx/sites-available/vndrly.ai >/dev/null
 sudo ln -sf /etc/nginx/sites-available/vndrly.ai /etc/nginx/sites-enabled/vndrly.ai
 sudo nginx -t

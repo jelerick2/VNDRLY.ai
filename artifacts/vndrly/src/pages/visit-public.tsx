@@ -50,8 +50,8 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
     const d = raw.replace(/\D/g, "").slice(0, 10);
     if (d.length === 0) return "";
     if (d.length < 4) return `(${d}`;
-    if (d.length < 7) return `(${d.slice(0,3)}) ${d.slice(3)}`;
-    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`;
+    if (d.length < 7) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
   }
   const [safety, setSafety] = useState(false);
 
@@ -68,24 +68,48 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
     enabled: !!siteCode,
   });
   const preferredPlateStates = useQuery({
-    queryKey: ["preferred-plate-states-public", ctxQuery.data?.site.id],
-    queryFn: () => visitsApi.listPreferredPlateStates(ctxQuery.data!.site.id),
-    enabled: Boolean(ctxQuery.data?.site.id),
+    queryKey: [
+      "preferred-plate-states-public",
+      ctxQuery.data?.site.id,
+      siteCode,
+    ],
+    queryFn: () =>
+      visitsApi.listPreferredPlateStates(ctxQuery.data!.site.id, siteCode),
+    enabled: Boolean(ctxQuery.data?.site.id && siteCode),
     retry: false,
   });
-  const orderedStatePreferences = preferredPlateStates.data?.preferred
-    ?? NATIONAL_PLATE_STATE_FALLBACK;
+  const orderedStatePreferences =
+    preferredPlateStates.data?.preferred ?? NATIONAL_PLATE_STATE_FALLBACK;
 
   const guestQuery = useQuery({
     queryKey: ["guest-session-public"],
     queryFn: visitsApi.guestMe,
     retry: false,
   });
+  const guestSessionId = guestQuery.data?.guestSessionId ?? null;
+  const activeQuery = useQuery({
+    queryKey: ["visit-active-public", guestSessionId],
+    queryFn: visitsApi.myActive,
+    enabled: guestSessionId !== null,
+    retry: false,
+  });
 
   useEffect(() => {
-    if (!guestQuery.data || restoredGuestSessionId.current === guestQuery.data.guestSessionId) return;
+    if (guestSessionId === null || !activeQuery.data) return;
+    setActive(activeQuery.data);
+    setStep("active");
+  }, [activeQuery.data, guestSessionId]);
+
+  useEffect(() => {
+    if (
+      !guestQuery.data ||
+      restoredGuestSessionId.current === guestQuery.data.guestSessionId
+    )
+      return;
     restoredGuestSessionId.current = guestQuery.data.guestSessionId;
-    setVehiclePlate(normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "");
+    setVehiclePlate(
+      normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "",
+    );
     setPlateState(normalizePlateState(guestQuery.data.profile.plateState));
   }, [guestQuery.data]);
 
@@ -113,7 +137,11 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
           logoUrl,
           logoSquareUrl,
           name: partnerCtx.name,
-          isOrgBranded: !!(partnerCtx.brandPrimaryColor || logoUrl || logoSquareUrl),
+          isOrgBranded: !!(
+            partnerCtx.brandPrimaryColor ||
+            logoUrl ||
+            logoSquareUrl
+          ),
         };
       })()
     : {
@@ -126,40 +154,54 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
       };
   const partnerBrandStyle = brandStyleVars(partnerBrand);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const v = await visitsApi.myActive();
-        if (cancelled) return;
-        if (v) { setActive(v); setStep("active"); }
-      } catch { /* ignore */ }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
   const hostOptions = useMemo(() => {
     const ctx = ctxQuery.data;
     if (!ctx) return [];
-    const opts: { key: string; label: string; type: "partner" | "vendor"; id: number }[] = [];
-    if (ctx.partner) opts.push({ key: `partner:${ctx.partner.id}`, label: `${ctx.partner.name} (${t("nav.partner")})`, type: "partner", id: ctx.partner.id });
-    for (const v of ctx.vendors) opts.push({ key: `vendor:${v.id}`, label: `${v.name} (${t("nav.vendor")})`, type: "vendor", id: v.id });
+    const opts: {
+      key: string;
+      label: string;
+      type: "partner" | "vendor";
+      id: number;
+    }[] = [];
+    if (ctx.partner)
+      opts.push({
+        key: `partner:${ctx.partner.id}`,
+        label: `${ctx.partner.name} (${t("nav.partner")})`,
+        type: "partner",
+        id: ctx.partner.id,
+      });
+    for (const v of ctx.vendors)
+      opts.push({
+        key: `vendor:${v.id}`,
+        label: `${v.name} (${t("nav.vendor")})`,
+        type: "vendor",
+        id: v.id,
+      });
     return opts;
   }, [ctxQuery.data, t]);
 
   const onSignIn = async () => {
     setError(null);
-    if (!firstName.trim() || !lastName.trim()) { setError(t("visitor.public.requireName")); return; }
-    if (!safety) { setError(t("visitor.public.requireSafety")); return; }
+    if (!firstName.trim() || !lastName.trim()) {
+      setError(t("visitor.public.requireName"));
+      return;
+    }
+    if (!safety) {
+      setError(t("visitor.public.requireSafety"));
+      return;
+    }
     const normalizedPlate = normalizePlateNumber(vehiclePlate);
     if (normalizedPlate && !plateState) return;
     setBusy(true);
     try {
       // The guest cookie is replaced by this call, so evict the previous
-      // kiosk visitor before rotating it. This key is deliberately not
-      // shared with staff auth queries.
+      // kiosk visitor and its active-visit request before rotating it. These
+      // keys are deliberately not shared with staff auth queries.
+      await queryClient.cancelQueries({ queryKey: ["visit-active-public"] });
+      queryClient.removeQueries({ queryKey: ["visit-active-public"] });
       await queryClient.cancelQueries({ queryKey: ["guest-session-public"] });
       queryClient.removeQueries({ queryKey: ["guest-session-public"] });
+      setActive(null);
       const session = await visitsApi.startGuestSession({
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -167,13 +209,20 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
         email: email.trim() || undefined,
         company: company.trim() || undefined,
         vehiclePlate: normalizedPlate ?? undefined,
-        plateState: normalizedPlate ? plateState ?? undefined : undefined,
+        plateState: normalizedPlate ? (plateState ?? undefined) : undefined,
         purpose: purpose.trim() || undefined,
         safetyAcknowledged: safety,
       });
       restoredGuestSessionId.current = session.guestSessionId;
-      setVehiclePlate(normalizePlateNumber(session.profile.vehiclePlate) ?? normalizedPlate ?? "");
-      setPlateState(normalizePlateState(session.profile.plateState) ?? (normalizedPlate ? plateState : null));
+      setVehiclePlate(
+        normalizePlateNumber(session.profile.vehiclePlate) ??
+          normalizedPlate ??
+          "",
+      );
+      setPlateState(
+        normalizePlateState(session.profile.plateState) ??
+          (normalizedPlate ? plateState : null),
+      );
       queryClient.setQueryData(["guest-session-public"], {
         guestSessionId: session.guestSessionId,
         role: session.role,
@@ -190,8 +239,14 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
 
   const getPosition = (): Promise<GeolocationPosition> =>
     new Promise((resolve, reject) => {
-      if (!navigator.geolocation) { reject(new Error(t("visitor.public.locationDenied"))); return; }
-      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
+      if (!navigator.geolocation) {
+        reject(new Error(t("visitor.public.locationDenied")));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+      });
     });
 
   const onCheckIn = async () => {
@@ -199,7 +254,10 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
     const normalizedPlate = normalizePlateNumber(vehiclePlate);
     if (normalizedPlate && !plateState) return;
     const ctx = ctxQuery.data;
-    if (!ctx || !hostKey) { setError(t("visitor.public.pickHost")); return; }
+    if (!ctx || !hostKey) {
+      setError(t("visitor.public.pickHost"));
+      return;
+    }
     const host = hostOptions.find((o) => o.key === hostKey);
     if (!host) return;
     setBusy(true);
@@ -212,15 +270,29 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
         hostPartnerId: host.type === "partner" ? host.id : undefined,
         hostVendorId: host.type === "vendor" ? host.id : undefined,
         purpose: purpose.trim() || undefined,
-        expectedDurationMinutes: Number.isFinite(dur) && dur > 0 ? dur : undefined,
-        ...(normalizedPlate ? { vehiclePlate: normalizedPlate, plateState: plateState ?? undefined } : {}),
+        expectedDurationMinutes:
+          Number.isFinite(dur) && dur > 0 ? dur : undefined,
+        ...(normalizedPlate
+          ? {
+              vehiclePlate: normalizedPlate,
+              plateState: plateState ?? undefined,
+            }
+          : {}),
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
       });
       setActive(v);
       setStep("active");
     } catch (e) {
-      const data = (e as { data?: { code?: string; distanceMeters?: number; radiusMeters?: number } })?.data;
+      const data = (
+        e as {
+          data?: {
+            code?: string;
+            distanceMeters?: number;
+            radiusMeters?: number;
+          };
+        }
+      )?.data;
       if (
         data?.code === OFF_GEOFENCE &&
         typeof data.distanceMeters === "number" &&
@@ -230,10 +302,12 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
           t("visitor.public.offGeofence", {
             distance: data.distanceMeters,
             radius: data.radiusMeters,
-          })
+          }),
         );
       } else {
-        setError(e instanceof Error ? e.message : t("visitor.public.errorTitle"));
+        setError(
+          e instanceof Error ? e.message : t("visitor.public.errorTitle"),
+        );
       }
     } finally {
       setBusy(false);
@@ -245,10 +319,19 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
     setBusy(true);
     setError(null);
     try {
-      let lat: number | undefined; let lng: number | undefined;
-      try { const pos = await getPosition(); lat = pos.coords.latitude; lng = pos.coords.longitude; } catch {}
+      let lat: number | undefined;
+      let lng: number | undefined;
+      try {
+        const pos = await getPosition();
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+      } catch {}
       await visitsApi.checkOut(active.id, lat, lng);
-      try { await visitsApi.guestLogout(); } catch {}
+      await queryClient.cancelQueries({ queryKey: ["visit-active-public"] });
+      queryClient.removeQueries({ queryKey: ["visit-active-public"] });
+      try {
+        await visitsApi.guestLogout();
+      } catch {}
       await queryClient.cancelQueries({ queryKey: ["guest-session-public"] });
       queryClient.removeQueries({ queryKey: ["guest-session-public"] });
       restoredGuestSessionId.current = null;
@@ -272,8 +355,18 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
     }
   };
 
-  if (ctxQuery.isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (ctxQuery.error) return <div className="p-6 text-sm text-destructive">{t("visitor.public.siteNotFound")} {(ctxQuery.error as Error).message}</div>;
+  if (ctxQuery.isLoading)
+    return (
+      <div className="p-6 text-sm text-muted-foreground">
+        {t("common.loading")}
+      </div>
+    );
+  if (ctxQuery.error)
+    return (
+      <div className="p-6 text-sm text-destructive">
+        {t("visitor.public.siteNotFound")} {(ctxQuery.error as Error).message}
+      </div>
+    );
 
   const ctx = ctxQuery.data!;
   const partnerLogoUrl = ctx.partner?.logoUrl ?? null;
@@ -299,7 +392,8 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
           opacity: 0.85,
           height: "240px",
           maskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
-          WebkitMaskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, black 0%, transparent 100%)",
         }}
       />
       {/* Brand-color accent strip across the very top of the visitor
@@ -338,39 +432,75 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
               <button
                 type="button"
                 onClick={() => {
-                  if (step === "checkin") { setStep("signin"); setError(null); }
-                  else { window.history.back(); }
+                  if (step === "checkin") {
+                    setStep("signin");
+                    setError(null);
+                  } else {
+                    window.history.back();
+                  }
                 }}
                 aria-label={t("common.back") as string}
                 className="shrink-0 transition-transform hover:scale-105 active:scale-95"
                 data-testid="button-back"
               >
-                <img src={backButtonImg} alt="" className="h-10 w-10 block" draggable={false} />
+                <img
+                  src={backButtonImg}
+                  alt=""
+                  className="h-10 w-10 block"
+                  draggable={false}
+                />
               </button>
               <div className="min-w-0">
-                <CardTitle className="text-lg">{t("visitor.public.headerTitle")}</CardTitle>
-                <div className="text-xs text-muted-foreground">{t("visitor.public.siteAt")}</div>
-                <div className="text-sm text-muted-foreground">{ctx.site.name}</div>
-                <div className="text-xs text-muted-foreground">{ctx.site.address}</div>
+                <CardTitle className="text-lg">
+                  {t("visitor.public.headerTitle")}
+                </CardTitle>
+                <div className="text-xs text-muted-foreground">
+                  {t("visitor.public.siteAt")}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {ctx.site.name}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {ctx.site.address}
+                </div>
               </div>
             </div>
           </CardHeader>
         </Card>
 
-        {error && <div className="rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm p-3" data-testid="visitor-error">{error}</div>}
+        {error && (
+          <div
+            className="rounded-md border border-destructive/50 bg-destructive/10 text-destructive text-sm p-3"
+            data-testid="visitor-error"
+          >
+            {error}
+          </div>
+        )}
 
         {step === "signin" && (
           <Card>
             <CardContent className="pt-6 space-y-3">
-              <div className="text-sm font-medium">{t("visitor.public.step1Title")}</div>
-              <div className="text-xs text-muted-foreground">{t("visitor.public.step1Note")}</div>
+              <div className="text-sm font-medium">
+                {t("visitor.public.step1Title")}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {t("visitor.public.step1Note")}
+              </div>
               <div>
                 <Label>{t("visitor.public.firstName")} *</Label>
-                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} data-testid="input-first-name" />
+                <Input
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  data-testid="input-first-name"
+                />
               </div>
               <div>
                 <Label>{t("visitor.public.lastName")} *</Label>
-                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} data-testid="input-last-name" />
+                <Input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  data-testid="input-last-name"
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -385,9 +515,24 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                     data-testid="input-phone"
                   />
                 </div>
-                <div><Label>{t("visitor.public.email")} *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="input-email" /></div>
+                <div>
+                  <Label>{t("visitor.public.email")} *</Label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    data-testid="input-email"
+                  />
+                </div>
               </div>
-              <div><Label>{t("visitor.public.company")} *</Label><Input value={company} onChange={(e) => setCompany(e.target.value)} data-testid="input-company" /></div>
+              <div>
+                <Label>{t("visitor.public.company")} *</Label>
+                <Input
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  data-testid="input-company"
+                />
+              </div>
               <div className="space-y-3">
                 <div>
                   <Label>{t("visitor.public.vehicleState")}</Label>
@@ -395,22 +540,37 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                     value={plateState}
                     onChange={setPlateState}
                     preferredStates={orderedStatePreferences}
-                    error={vehiclePlate.trim() && !plateState ? t("gatekeeper.plateStateRequired") : undefined}
+                    error={
+                      vehiclePlate.trim() && !plateState
+                        ? t("gatekeeper.plateStateRequired")
+                        : undefined
+                    }
                   />
                 </div>
                 <div>
                   <Label>{t("visitor.public.vehiclePlate")}</Label>
-                  <Input value={vehiclePlate} onChange={(e) => setVehiclePlate(e.target.value.toUpperCase())} maxLength={10} data-testid="input-vehicle-plate" />
+                  <Input
+                    value={vehiclePlate}
+                    onChange={(e) =>
+                      setVehiclePlate(e.target.value.toUpperCase())
+                    }
+                    maxLength={10}
+                    data-testid="input-vehicle-plate"
+                  />
                 </div>
               </div>
               <div>
                 <div className="flex items-baseline justify-between">
                   <Label>{t("visitor.public.purpose")} *</Label>
-                  <span className="text-xs text-muted-foreground">{purpose.length}/{PURPOSE_MAX}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {purpose.length}/{PURPOSE_MAX}
+                  </span>
                 </div>
                 <Textarea
                   value={purpose}
-                  onChange={(e) => setPurpose(e.target.value.slice(0, PURPOSE_MAX))}
+                  onChange={(e) =>
+                    setPurpose(e.target.value.slice(0, PURPOSE_MAX))
+                  }
                   placeholder={t("visitor.public.purposePlaceholder") as string}
                   maxLength={PURPOSE_MAX}
                   rows={6}
@@ -452,11 +612,22 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
                   purpose.trim().length > 0 &&
                   safety;
                 return formReady ? (
-                  <PortalButton onClick={onSignIn} disabled={busy} testId="button-guest-signin">
-                    {busy ? t("common.submitting") : t("visitor.public.continue")}
+                  <PortalButton
+                    onClick={onSignIn}
+                    disabled={busy}
+                    testId="button-guest-signin"
+                  >
+                    {busy
+                      ? t("common.submitting")
+                      : t("visitor.public.continue")}
                   </PortalButton>
                 ) : (
-                  <PngPillButton color="blue" disabled className="w-full h-11" data-testid="button-guest-signin">
+                  <PngPillButton
+                    color="blue"
+                    disabled
+                    className="w-full h-11"
+                    data-testid="button-guest-signin"
+                  >
                     {t("visitor.public.continue")}
                   </PngPillButton>
                 );
@@ -468,9 +639,13 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
         {step === "checkin" && (
           <Card>
             <CardContent className="pt-6 space-y-3">
-              <div className="text-sm font-medium">{t("visitor.public.whoVisiting")}</div>
+              <div className="text-sm font-medium">
+                {t("visitor.public.whoVisiting")}
+              </div>
               {hostOptions.length === 0 ? (
-                <div className="text-sm text-muted-foreground">{t("visitor.public.noHosts")}</div>
+                <div className="text-sm text-muted-foreground">
+                  {t("visitor.public.noHosts")}
+                </div>
               ) : (
                 <div className="space-y-1">
                   {hostOptions.map((opt) => (
@@ -496,17 +671,31 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
               )}
               <div>
                 <Label>{t("visitor.public.purpose")}</Label>
-                <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder={t("visitor.public.purposePlaceholder")} />
+                <Input
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                  placeholder={t("visitor.public.purposePlaceholder")}
+                />
               </div>
               <div>
                 <Label>{t("visitor.public.expectedMinutes")}</Label>
-                <Input type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} />
+                <Input
+                  type="number"
+                  min={1}
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
               </div>
-              <PortalButton onClick={onCheckIn} disabled={busy || !hostKey} testId="button-check-in">
+              <PortalButton
+                onClick={onCheckIn}
+                disabled={busy || !hostKey}
+                testId="button-check-in"
+              >
                 {busy ? t("common.submitting") : t("visitor.public.checkIn")}
               </PortalButton>
               <div className="text-xs text-muted-foreground text-center">
-                {t("visitor.public.geofenceNote")} ({ctx.site.siteRadiusMeters}{t("visitor.public.metersSuffix")})
+                {t("visitor.public.geofenceNote")} ({ctx.site.siteRadiusMeters}
+                {t("visitor.public.metersSuffix")})
               </div>
             </CardContent>
           </Card>
@@ -516,14 +705,42 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
           <Card>
             <CardContent className="pt-6 space-y-3">
               <div>
-                <div className="text-base font-semibold">{t("visitor.public.activeAt")} {active.siteName ?? ctx.site.name}</div>
+                <div className="text-base font-semibold">
+                  {t("visitor.public.activeAt")}{" "}
+                  {active.siteName ?? ctx.site.name}
+                </div>
               </div>
               <div className="text-sm">
-                <div><span className="text-muted-foreground">{t("visitor.public.host")}:</span> {active.hostType === "partner" ? active.hostPartnerName : active.hostVendorName}</div>
-                {active.purpose && <div><span className="text-muted-foreground">{t("visitor.public.purpose")}:</span> {active.purpose}</div>}
-                <div><span className="text-muted-foreground">{t("visitor.public.checkedInAt")}:</span> {new Date(active.checkInTime).toLocaleString()}</div>
+                <div>
+                  <span className="text-muted-foreground">
+                    {t("visitor.public.host")}:
+                  </span>{" "}
+                  {active.hostType === "partner"
+                    ? active.hostPartnerName
+                    : active.hostVendorName}
+                </div>
+                {active.purpose && (
+                  <div>
+                    <span className="text-muted-foreground">
+                      {t("visitor.public.purpose")}:
+                    </span>{" "}
+                    {active.purpose}
+                  </div>
+                )}
+                <div>
+                  <span className="text-muted-foreground">
+                    {t("visitor.public.checkedInAt")}:
+                  </span>{" "}
+                  {new Date(active.checkInTime).toLocaleString()}
+                </div>
               </div>
-              <PillButton color="blue" className="w-full" onClick={onCheckOut} disabled={busy} data-testid="button-check-out">
+              <PillButton
+                color="blue"
+                className="w-full"
+                onClick={onCheckOut}
+                disabled={busy}
+                data-testid="button-check-out"
+              >
                 {busy ? t("common.submitting") : t("visitor.public.checkOut")}
               </PillButton>
             </CardContent>

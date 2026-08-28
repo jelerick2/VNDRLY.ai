@@ -1,11 +1,12 @@
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
-import "../../scripts/load-env-local.mjs";
 import "../../scripts/dev-local-defaults.mjs";
+import { assertIsolatedTestDatabaseEnvironment } from "../../scripts/e2e-isolation.mjs";
 
-const baseURL =
-  process.env.E2E_BASE_URL ?? "http://localhost:23539";
+const isolation = assertIsolatedTestDatabaseEnvironment(process.env);
+
+const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:23539";
 
 // Resolve a chromium binary so the spec is runnable from the root
 // `pnpm test` chain without the caller having to set PLAYWRIGHT_CHROMIUM
@@ -16,7 +17,10 @@ const baseURL =
 function resolveChromiumPath(): string | undefined {
   if (process.env.PLAYWRIGHT_CHROMIUM) return process.env.PLAYWRIGHT_CHROMIUM;
   try {
-    const command = process.platform === "win32" ? "where.exe chromium" : "command -v chromium";
+    const command =
+      process.platform === "win32"
+        ? "where.exe chromium"
+        : "command -v chromium";
     const chromium = execSync(command, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
@@ -43,7 +47,9 @@ function resolveChromiumPath(): string | undefined {
       process.env["PROGRAMFILES(X86)"] &&
         `${process.env["PROGRAMFILES(X86)"]}\\Microsoft\\Edge\\Application\\msedge.exe`,
     ].filter((candidate): candidate is string => Boolean(candidate));
-    const installedBrowser = candidates.find((candidate) => existsSync(candidate));
+    const installedBrowser = candidates.find((candidate) =>
+      existsSync(candidate),
+    );
     if (installedBrowser) return installedBrowser;
   }
   return undefined;
@@ -65,18 +71,20 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  // Boot the api-server and the vndrly web app automatically so the
-  // spec is self-contained and works from `pnpm test` even when the
-  // dev workflows aren't already running. `reuseExistingServer: true`
-  // keeps local dev fast: if the workflows are already up on these
-  // ports, Playwright reuses them instead of spawning duplicates.
+  // E2E is allowed to run only under the isolated DB wrapper. Never reuse
+  // a pre-existing API on port 8080: its database provenance is unknown.
   webServer: [
     {
       command: "pnpm --filter @workspace/api-server run dev:local",
       url: "http://localhost:8080/api/healthz",
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 120_000,
-      env: { PORT: "8080" },
+      env: {
+        PORT: "8080",
+        DATABASE_URL: isolation.databaseUrl,
+        TEST_DATABASE_URL: isolation.testDatabaseUrl,
+        VNDRLY_ISOLATED_TEST_DB: "1",
+      },
       stdout: "ignore",
       stderr: "pipe",
     },
@@ -84,7 +92,7 @@ export default defineConfig({
       command:
         "pnpm --dir ../../artifacts/vndrly exec vite --config vite.config.ts --host 0.0.0.0 --strictPort",
       url: "http://localhost:23539/",
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 120_000,
       env: {
         PORT: "23539",

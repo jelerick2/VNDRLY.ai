@@ -18,6 +18,7 @@ import { DEMO_USERS } from "../lib/demo-users";
 import { logger } from "../lib/logger";
 import { SESSION_SECRET } from "../lib/session";
 import { loginBrandQueryFromContext } from "../lib/loginBrandQuery";
+import { requireIsolatedFixtureContext } from "../lib/isolated-fixture-guard";
 
 const router = Router();
 
@@ -31,7 +32,10 @@ const COOKIE_OPTIONS = {
 };
 
 function signPayload(payload: string): string {
-  const sig = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
+  const sig = crypto
+    .createHmac("sha256", SESSION_SECRET)
+    .update(payload)
+    .digest("hex");
   return `${payload}.${sig}`;
 }
 
@@ -88,8 +92,17 @@ function verifyPayload(signed: string): string | null {
   if (lastDot === -1) return null;
   const payload = signed.slice(0, lastDot);
   const sig = signed.slice(lastDot + 1);
-  const expected = crypto.createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
-  if (!crypto.timingSafeEqual(Buffer.from(sig, "hex"), Buffer.from(expected, "hex"))) return null;
+  const expected = crypto
+    .createHmac("sha256", SESSION_SECRET)
+    .update(payload)
+    .digest("hex");
+  if (
+    !crypto.timingSafeEqual(
+      Buffer.from(sig, "hex"),
+      Buffer.from(expected, "hex"),
+    )
+  )
+    return null;
   return payload;
 }
 
@@ -113,7 +126,10 @@ interface MembershipSummary {
  * NOT by orgType, so a vendor membership with role="field_employee"
  * resolves to session role "field_employee".
  */
-function deriveSessionRole(orgType: "partner" | "vendor", membershipRole: MembershipRole): "partner" | "vendor" | "field_employee" {
+function deriveSessionRole(
+  orgType: "partner" | "vendor",
+  membershipRole: MembershipRole,
+): "partner" | "vendor" | "field_employee" {
   if (membershipRole === "field_employee") return "field_employee";
   return orgType;
 }
@@ -139,7 +155,9 @@ interface ResolvedContext {
  * derivation from `users.role` + their vendor_people row so existing
  * behavior is preserved.
  */
-async function resolveContext(user: typeof usersTable.$inferSelect): Promise<ResolvedContext> {
+async function resolveContext(
+  user: typeof usersTable.$inferSelect,
+): Promise<ResolvedContext> {
   const rows = await db
     .select({
       id: userOrgMembershipsTable.id,
@@ -154,19 +172,30 @@ async function resolveContext(user: typeof usersTable.$inferSelect): Promise<Res
       vendorLogoUrl: vendorsTable.logoUrl,
     })
     .from(userOrgMembershipsTable)
-    .leftJoin(partnersTable, eq(partnersTable.id, userOrgMembershipsTable.partnerId))
-    .leftJoin(vendorsTable, eq(vendorsTable.id, userOrgMembershipsTable.vendorId))
+    .leftJoin(
+      partnersTable,
+      eq(partnersTable.id, userOrgMembershipsTable.partnerId),
+    )
+    .leftJoin(
+      vendorsTable,
+      eq(vendorsTable.id, userOrgMembershipsTable.vendorId),
+    )
     .where(eq(userOrgMembershipsTable.userId, user.id))
     .orderBy(asc(userOrgMembershipsTable.id));
 
   const memberships: MembershipSummary[] = rows
     .map((r): MembershipSummary | null => {
       const orgType: "partner" | "vendor" | null =
-        r.orgType === "partner" ? "partner" : r.orgType === "vendor" ? "vendor" : null;
+        r.orgType === "partner"
+          ? "partner"
+          : r.orgType === "vendor"
+            ? "vendor"
+            : null;
       if (!orgType) return null;
       const orgId = orgType === "partner" ? r.partnerId : r.vendorId;
       const orgName = orgType === "partner" ? r.partnerName : r.vendorName;
-      const orgLogoUrl = orgType === "partner" ? r.partnerLogoUrl : r.vendorLogoUrl;
+      const orgLogoUrl =
+        orgType === "partner" ? r.partnerLogoUrl : r.vendorLogoUrl;
       if (!orgId) return null;
       const role: MembershipRole =
         r.role === "admin" || r.role === "field_employee" ? r.role : "member";
@@ -174,7 +203,9 @@ async function resolveContext(user: typeof usersTable.$inferSelect): Promise<Res
         id: r.id,
         orgType,
         orgId,
-        orgName: orgName ?? `${orgType === "partner" ? "Partner" : "Vendor"} #${orgId}`,
+        orgName:
+          orgName ??
+          `${orgType === "partner" ? "Partner" : "Vendor"} #${orgId}`,
         orgLogoUrl: orgLogoUrl ?? null,
         role,
         vendorPeopleId: r.vendorPeopleId ?? null,
@@ -198,7 +229,12 @@ async function resolveContext(user: typeof usersTable.$inferSelect): Promise<Res
           vendorRole: vendorPeopleTable.vendorRole,
         })
         .from(vendorPeopleTable)
-        .where(and(eq(vendorPeopleTable.userId, user.id), isNull(vendorPeopleTable.deletedAt)));
+        .where(
+          and(
+            eq(vendorPeopleTable.userId, user.id),
+            isNull(vendorPeopleTable.deletedAt),
+          ),
+        );
       if (vp) {
         vendorRole = vp.vendorRole ?? null;
         vendorPeopleId = vp.id;
@@ -271,7 +307,10 @@ async function resolveContext(user: typeof usersTable.$inferSelect): Promise<Res
   };
 }
 
-function buildSessionCookie(user: typeof usersTable.$inferSelect, ctx: ResolvedContext): string {
+function buildSessionCookie(
+  user: typeof usersTable.$inferSelect,
+  ctx: ResolvedContext,
+): string {
   const nowSecs = Math.floor(Date.now() / 1000);
   const payload = Buffer.from(
     JSON.stringify({
@@ -330,7 +369,8 @@ router.post("/auth/login", async (req, res) => {
     // Distinct error code so the frontend can show a tailored message.
     if (user.suspendedAt) {
       return res.status(403).json({
-        message: "This account has been suspended. Please contact your administrator.",
+        message:
+          "This account has been suspended. Please contact your administrator.",
         code: "auth.suspended",
       });
     }
@@ -369,7 +409,9 @@ router.post("/auth/login", async (req, res) => {
     // already in the column) always win — this branch is one-shot.
     if (preferredLanguage === null) {
       const clientLocale =
-        typeof req.body?.clientLocale === "string" ? req.body.clientLocale : null;
+        typeof req.body?.clientLocale === "string"
+          ? req.body.clientLocale
+          : null;
       const acceptLanguage =
         typeof req.headers["accept-language"] === "string"
           ? (req.headers["accept-language"] as string)
@@ -502,7 +544,9 @@ router.post("/auth/logout", async (req, res) => {
   return res.json({ message: "Logged out", loginBrandQuery });
 });
 
-function readSession(req: import("express").Request): { userId: number; [k: string]: unknown } | null {
+function readSession(
+  req: import("express").Request,
+): { userId: number; [k: string]: unknown } | null {
   const headerToken = (() => {
     const h = req.headers.authorization;
     if (!h) return null;
@@ -529,7 +573,8 @@ router.get("/auth/me", async (req, res) => {
   try {
     const session = readSession(req);
     if (!session?.userId) {
-      if (req.cookies?.[COOKIE_NAME]) res.clearCookie(COOKIE_NAME, { path: "/" });
+      if (req.cookies?.[COOKIE_NAME])
+        res.clearCookie(COOKIE_NAME, { path: "/" });
       return res.status(401).json({
         message: "Not authenticated",
         code: "auth.not_authenticated",
@@ -591,7 +636,9 @@ router.get("/auth/memberships", async (req, res) => {
       .where(eq(usersTable.id, session.userId as number))
       .limit(1);
     if (!user) {
-      return res.status(401).json({ message: "Not authenticated", code: "auth.not_authenticated" });
+      return res
+        .status(401)
+        .json({ message: "Not authenticated", code: "auth.not_authenticated" });
     }
     const ctx = await resolveContext(user);
     return res.json({
@@ -600,7 +647,12 @@ router.get("/auth/memberships", async (req, res) => {
     });
   } catch (error) {
     logger.error({ err: error }, "List memberships error");
-    return res.status(500).json({ message: "Internal server error", code: "server.internal_error" });
+    return res
+      .status(500)
+      .json({
+        message: "Internal server error",
+        code: "server.internal_error",
+      });
   }
 });
 
@@ -626,7 +678,9 @@ router.post("/auth/switch-context", async (req, res) => {
       .where(eq(usersTable.id, session.userId as number))
       .limit(1);
     if (!user) {
-      return res.status(401).json({ message: "Not authenticated", code: "auth.not_authenticated" });
+      return res
+        .status(401)
+        .json({ message: "Not authenticated", code: "auth.not_authenticated" });
     }
     const [membership] = await db
       .select()
@@ -680,7 +734,12 @@ router.post("/auth/switch-context", async (req, res) => {
     });
   } catch (error) {
     logger.error({ err: error }, "Switch context error");
-    return res.status(500).json({ message: "Internal server error", code: "server.internal_error" });
+    return res
+      .status(500)
+      .json({
+        message: "Internal server error",
+        code: "server.internal_error",
+      });
   }
 });
 
@@ -730,7 +789,7 @@ if (process.env.NODE_ENV === "development") {
         existing.map((u) => [u.username.toLowerCase(), u.id] as const),
       );
 
-      const inserted: { id: number; demo: typeof DEMO_USERS[number] }[] = [];
+      const inserted: { id: number; demo: (typeof DEMO_USERS)[number] }[] = [];
       const passwordReset: string[] = [];
 
       // Sync each demo user (and its memberships) atomically. New users
@@ -755,9 +814,21 @@ if (process.env.NODE_ENV === "development") {
           demo.memberships && demo.memberships.length > 0
             ? demo.memberships
             : demo.partnerId
-              ? [{ orgType: "partner" as const, orgId: demo.partnerId, role: derivedRole }]
+              ? [
+                  {
+                    orgType: "partner" as const,
+                    orgId: demo.partnerId,
+                    role: derivedRole,
+                  },
+                ]
               : demo.vendorId
-                ? [{ orgType: "vendor" as const, orgId: demo.vendorId, role: derivedRole }]
+                ? [
+                    {
+                      orgType: "vendor" as const,
+                      orgId: demo.vendorId,
+                      role: derivedRole,
+                    },
+                  ]
                 : [];
 
         await db.transaction(async (tx) => {
@@ -772,7 +843,9 @@ if (process.env.NODE_ENV === "development") {
                 passwordHash: hash(demo.password),
                 role: demo.role,
                 displayName: demo.displayName,
-                preferredLanguage: normalizeLanguage(demo.preferredLanguage ?? null),
+                preferredLanguage: normalizeLanguage(
+                  demo.preferredLanguage ?? null,
+                ),
               })
               .returning({ id: usersTable.id });
             userId = newRow.id;
@@ -838,7 +911,9 @@ if (process.env.NODE_ENV === "development") {
 
           for (const m of desired) {
             const already = existingMemberships.find((row) =>
-              m.orgType === "partner" ? row.partnerId === m.orgId : row.vendorId === m.orgId,
+              m.orgType === "partner"
+                ? row.partnerId === m.orgId
+                : row.vendorId === m.orgId,
             );
             if (already) continue;
             await tx.insert(userOrgMembershipsTable).values({
@@ -871,7 +946,10 @@ if (process.env.NODE_ENV === "development") {
       }
 
       return res.json({
-        message: existing.length === 0 ? "Seed users created" : "Synced demo users + memberships",
+        message:
+          existing.length === 0
+            ? "Seed users created"
+            : "Synced demo users + memberships",
         added: inserted.map((i) => i.demo.username),
         // Surfaces which existing users had their bcrypt hash refreshed
         // back to the canonical demo password during this call. Empty
@@ -880,12 +958,15 @@ if (process.env.NODE_ENV === "development") {
       });
     } catch (error) {
       logger.error({ err: error }, "Seed error");
-      return res.status(500).json({ message: "Failed to seed users", code: "auth.seed_failed" });
+      return res
+        .status(500)
+        .json({ message: "Failed to seed users", code: "auth.seed_failed" });
     }
   });
 
-  // Dev-only: deterministic fixture for the bulk 1099-recategorize end-to-
-  // end tests. Idempotent — repeated calls return the same IDs without
+  // Isolated-test-only: deterministic fixture for the bulk
+  // 1099-recategorize end-to-end tests. Idempotent — repeated calls return
+  // the same IDs without
   // duplicating rows. Provides:
   //   - A vendor ("1099 Fixture Vendor") with a federal_tax_id so it can
   //     surface on the admin 1099 dashboard.
@@ -898,243 +979,251 @@ if (process.env.NODE_ENV === "development") {
   // Uses partner id 1 (ExxonMobil) which is created by the standard demo
   // seed. Returns the IDs the test plan needs to deep-link into the
   // invoice detail page and assert against the dashboard row.
-  router.post("/auth/seed-1099-fixture", async (_req, res) => {
-    try {
-      // 0. Make sure the demo accounts exist (admin login is required by
-      // both tests). Mirror the inline upsert from /auth/seed for the
-      // admin user only, so calling this endpoint on a fresh database
-      // works without needing /auth/seed first.
-      const ADMIN = DEMO_USERS.find((u) => u.username === "admin");
-      if (ADMIN) {
-        const [existingAdmin] = await db
-          .select({ id: usersTable.id })
-          .from(usersTable)
-          .where(sql`lower(${usersTable.username}) = lower(${ADMIN.username})`);
-        if (!existingAdmin) {
-          await db.insert(usersTable).values({
-            username: ADMIN.username,
-            passwordHash: bcrypt.hashSync(ADMIN.password, 10),
-            role: ADMIN.role,
-            displayName: ADMIN.displayName,
-          });
+  router.post(
+    "/auth/seed-1099-fixture",
+    requireIsolatedFixtureContext,
+    async (_req, res) => {
+      try {
+        // 0. Make sure the demo accounts exist (admin login is required by
+        // both tests). Mirror the inline upsert from /auth/seed for the
+        // admin user only, so calling this endpoint on a fresh database
+        // works without needing /auth/seed first.
+        const ADMIN = DEMO_USERS.find((u) => u.username === "admin");
+        if (ADMIN) {
+          const [existingAdmin] = await db
+            .select({ id: usersTable.id })
+            .from(usersTable)
+            .where(
+              sql`lower(${usersTable.username}) = lower(${ADMIN.username})`,
+            );
+          if (!existingAdmin) {
+            await db.insert(usersTable).values({
+              username: ADMIN.username,
+              passwordHash: bcrypt.hashSync(ADMIN.password, 10),
+              role: ADMIN.role,
+              displayName: ADMIN.displayName,
+            });
+          }
         }
-      }
 
-      // 1. Partner — reuse seeded partner id 1 (ExxonMobil) if present,
-      // otherwise create a fixture partner. Stored federal_tax_id so the
-      // 1099 dashboard has a payer name to render.
-      let partnerId: number;
-      const [seededPartner] = await db
-        .select({ id: partnersTable.id })
-        .from(partnersTable)
-        .where(eq(partnersTable.id, 1));
-      if (seededPartner) {
-        partnerId = seededPartner.id;
-      } else {
-        const [p] = await db
-          .insert(partnersTable)
-          .values({
-            name: "Fixture Partner",
-            contactName: "Fixture Partner Contact",
-            contactEmail: "fixture-partner@example.com",
-            federalTaxId: "12-3456789",
-            billingAddress: "123 Fixture Way, Houston, TX 77001",
-          })
-          .returning({ id: partnersTable.id });
-        partnerId = p.id;
-      }
+        // 1. Partner — reuse seeded partner id 1 (ExxonMobil) if present,
+        // otherwise create a fixture partner. Stored federal_tax_id so the
+        // 1099 dashboard has a payer name to render.
+        let partnerId: number;
+        const [seededPartner] = await db
+          .select({ id: partnersTable.id })
+          .from(partnersTable)
+          .where(eq(partnersTable.id, 1));
+        if (seededPartner) {
+          partnerId = seededPartner.id;
+        } else {
+          const [p] = await db
+            .insert(partnersTable)
+            .values({
+              name: "Fixture Partner",
+              contactName: "Fixture Partner Contact",
+              contactEmail: "fixture-partner@example.com",
+              federalTaxId: "12-3456789",
+              billingAddress: "123 Fixture Way, Houston, TX 77001",
+            })
+            .returning({ id: partnersTable.id });
+          partnerId = p.id;
+        }
 
-      // 2. Vendor — deterministic name. Idempotent insert by name.
-      const VENDOR_NAME = "1099 Fixture Vendor";
-      let vendorRow = (
+        // 2. Vendor — deterministic name. Idempotent insert by name.
+        const VENDOR_NAME = "1099 Fixture Vendor";
+        let vendorRow = (
+          await db
+            .select({ id: vendorsTable.id })
+            .from(vendorsTable)
+            .where(eq(vendorsTable.name, VENDOR_NAME))
+        )[0];
+        if (!vendorRow) {
+          const [v] = await db
+            .insert(vendorsTable)
+            .values({
+              name: VENDOR_NAME,
+              contactName: "Fixture Vendor Contact",
+              contactEmail: "fixture-vendor@example.com",
+              federalTaxId: "98-7654321",
+              billingAddress: "999 Fixture Rd, Midland, TX 79701",
+            })
+            .returning({ id: vendorsTable.id });
+          vendorRow = v;
+        }
+        const vendorId = vendorRow.id;
+
+        // 3. Draft invoice + 3 lines (current month, fixture-1099-draft
+        // invoice number is unique so re-runs are idempotent).
+        const now = new Date();
+        const year = now.getUTCFullYear();
+        const monthStart = new Date(Date.UTC(year, now.getUTCMonth(), 1));
+        const monthEnd = new Date(
+          Date.UTC(year, now.getUTCMonth() + 1, 0, 23, 59, 59),
+        );
+        const DRAFT_INVOICE_NUMBER = `FIXTURE-1099-DRAFT-${vendorId}`;
+        let draftInvoiceRow = (
+          await db
+            .select({ id: invoicesTable.id })
+            .from(invoicesTable)
+            .where(eq(invoicesTable.invoiceNumber, DRAFT_INVOICE_NUMBER))
+        )[0];
+        if (!draftInvoiceRow) {
+          const [i] = await db
+            .insert(invoicesTable)
+            .values({
+              invoiceNumber: DRAFT_INVOICE_NUMBER,
+              vendorId,
+              partnerId,
+              cadence: "monthly",
+              status: "draft",
+              periodStart: monthStart,
+              periodEnd: monthEnd,
+              subtotal: "1500.00",
+              taxTotal: "0.00",
+              total: "1500.00",
+            })
+            .returning({ id: invoicesTable.id });
+          draftInvoiceRow = i;
+        }
+        const draftInvoiceId = draftInvoiceRow.id;
+
+        // Idempotency: if a prior run (or an unrelated lifecycle event)
+        // promoted the fixture invoice past `draft`, force it back so the
+        // inline-edit / bulk-recategorize flows under test stay enabled
+        // (canEditInvoice gates on status === 'draft').
         await db
-          .select({ id: vendorsTable.id })
-          .from(vendorsTable)
-          .where(eq(vendorsTable.name, VENDOR_NAME))
-      )[0];
-      if (!vendorRow) {
-        const [v] = await db
-          .insert(vendorsTable)
-          .values({
-            name: VENDOR_NAME,
-            contactName: "Fixture Vendor Contact",
-            contactEmail: "fixture-vendor@example.com",
-            federalTaxId: "98-7654321",
-            billingAddress: "999 Fixture Rd, Midland, TX 79701",
-          })
-          .returning({ id: vendorsTable.id });
-        vendorRow = v;
-      }
-      const vendorId = vendorRow.id;
+          .update(invoicesTable)
+          .set({ status: "draft" })
+          .where(eq(invoicesTable.id, draftInvoiceId));
 
-      // 3. Draft invoice + 3 lines (current month, fixture-1099-draft
-      // invoice number is unique so re-runs are idempotent).
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const monthStart = new Date(Date.UTC(year, now.getUTCMonth(), 1));
-      const monthEnd = new Date(
-        Date.UTC(year, now.getUTCMonth() + 1, 0, 23, 59, 59),
-      );
-      const DRAFT_INVOICE_NUMBER = `FIXTURE-1099-DRAFT-${vendorId}`;
-      let draftInvoiceRow = (
+        // Reset the draft invoice lines to a known baseline on every call.
+        // The bulk-recategorize tests mutate incomeCategory and the manual
+        // override flag, so unconditionally deleting + re-inserting keeps
+        // the fixture deterministic across re-runs even if a prior run left
+        // partial state behind.
         await db
-          .select({ id: invoicesTable.id })
-          .from(invoicesTable)
-          .where(eq(invoicesTable.invoiceNumber, DRAFT_INVOICE_NUMBER))
-      )[0];
-      if (!draftInvoiceRow) {
-        const [i] = await db
-          .insert(invoicesTable)
-          .values({
-            invoiceNumber: DRAFT_INVOICE_NUMBER,
-            vendorId,
-            partnerId,
-            cadence: "monthly",
-            status: "draft",
-            periodStart: monthStart,
-            periodEnd: monthEnd,
-            subtotal: "1500.00",
-            taxTotal: "0.00",
-            total: "1500.00",
-          })
-          .returning({ id: invoicesTable.id });
-        draftInvoiceRow = i;
-      }
-      const draftInvoiceId = draftInvoiceRow.id;
+          .delete(invoiceLinesTable)
+          .where(eq(invoiceLinesTable.invoiceId, draftInvoiceId));
+        const insertedDraftLines = await db
+          .insert(invoiceLinesTable)
+          .values([
+            {
+              invoiceId: draftInvoiceId,
+              sourceType: "manual",
+              lineType: "labor_regular",
+              description: "Fixture labor — site supervisor",
+              quantity: "10",
+              unitPrice: "75.00",
+              amount: "750.00",
+              taxAmount: "0.00",
+              incomeCategory: "nec",
+            },
+            {
+              invoiceId: draftInvoiceId,
+              sourceType: "manual",
+              lineType: "equipment",
+              description: "Fixture equipment — pump rental",
+              quantity: "1",
+              unitPrice: "500.00",
+              amount: "500.00",
+              taxAmount: "0.00",
+              incomeCategory: "nec",
+            },
+            {
+              invoiceId: draftInvoiceId,
+              sourceType: "manual",
+              lineType: "mileage",
+              description: "Fixture mileage — round trip",
+              quantity: "100",
+              unitPrice: "2.50",
+              amount: "250.00",
+              taxAmount: "0.00",
+              incomeCategory: "nec",
+            },
+          ])
+          .returning({ id: invoiceLinesTable.id });
+        const draftLineIds: number[] = insertedDraftLines.map((l) => l.id);
 
-      // Idempotency: if a prior run (or an unrelated lifecycle event)
-      // promoted the fixture invoice past `draft`, force it back so the
-      // inline-edit / bulk-recategorize flows under test stay enabled
-      // (canEditInvoice gates on status === 'draft').
-      await db
-        .update(invoicesTable)
-        .set({ status: "draft" })
-        .where(eq(invoicesTable.id, draftInvoiceId));
-
-      // Reset the draft invoice lines to a known baseline on every call.
-      // The bulk-recategorize tests mutate incomeCategory and the manual
-      // override flag, so unconditionally deleting + re-inserting keeps
-      // the fixture deterministic across re-runs even if a prior run left
-      // partial state behind.
-      await db
-        .delete(invoiceLinesTable)
-        .where(eq(invoiceLinesTable.invoiceId, draftInvoiceId));
-      const insertedDraftLines = await db
-        .insert(invoiceLinesTable)
-        .values([
-          {
-            invoiceId: draftInvoiceId,
+        // 4. Paid invoice + payment in the current calendar year so the
+        // vendor surfaces on the 1099 dashboard for `year`. NEC line is well
+        // above the $600 threshold (totalPaid filter in nec1099Rows).
+        const PAID_INVOICE_NUMBER = `FIXTURE-1099-PAID-${vendorId}-${year}`;
+        let paidInvoiceRow = (
+          await db
+            .select({ id: invoicesTable.id, total: invoicesTable.total })
+            .from(invoicesTable)
+            .where(eq(invoicesTable.invoiceNumber, PAID_INVOICE_NUMBER))
+        )[0];
+        if (!paidInvoiceRow) {
+          // Use Feb of the current year so we never collide with the draft
+          // invoice's (vendor, partner, cadence, periodStart) uniqueness
+          // guard regardless of when the fixture is invoked.
+          const paidPeriodStart = new Date(Date.UTC(year, 1, 1));
+          const paidPeriodEnd = new Date(Date.UTC(year, 1, 28, 23, 59, 59));
+          const [pi] = await db
+            .insert(invoicesTable)
+            .values({
+              invoiceNumber: PAID_INVOICE_NUMBER,
+              vendorId,
+              partnerId,
+              cadence: "monthly",
+              status: "paid",
+              periodStart: paidPeriodStart,
+              periodEnd: paidPeriodEnd,
+              subtotal: "1200.00",
+              taxTotal: "0.00",
+              total: "1200.00",
+              paidAmount: "1200.00",
+              paidAt: new Date(Date.UTC(year, 1, 15)),
+              sentAt: new Date(Date.UTC(year, 1, 5)),
+            })
+            .returning({ id: invoicesTable.id, total: invoicesTable.total });
+          paidInvoiceRow = pi;
+          await db.insert(invoiceLinesTable).values({
+            invoiceId: pi.id,
             sourceType: "manual",
             lineType: "labor_regular",
-            description: "Fixture labor — site supervisor",
-            quantity: "10",
+            description: "Fixture paid labor — January work",
+            quantity: "16",
             unitPrice: "75.00",
-            amount: "750.00",
+            amount: "1200.00",
             taxAmount: "0.00",
             incomeCategory: "nec",
-          },
-          {
-            invoiceId: draftInvoiceId,
-            sourceType: "manual",
-            lineType: "equipment",
-            description: "Fixture equipment — pump rental",
-            quantity: "1",
-            unitPrice: "500.00",
-            amount: "500.00",
-            taxAmount: "0.00",
-            incomeCategory: "nec",
-          },
-          {
-            invoiceId: draftInvoiceId,
-            sourceType: "manual",
-            lineType: "mileage",
-            description: "Fixture mileage — round trip",
-            quantity: "100",
-            unitPrice: "2.50",
-            amount: "250.00",
-            taxAmount: "0.00",
-            incomeCategory: "nec",
-          },
-        ])
-        .returning({ id: invoiceLinesTable.id });
-      const draftLineIds: number[] = insertedDraftLines.map((l) => l.id);
-
-      // 4. Paid invoice + payment in the current calendar year so the
-      // vendor surfaces on the 1099 dashboard for `year`. NEC line is well
-      // above the $600 threshold (totalPaid filter in nec1099Rows).
-      const PAID_INVOICE_NUMBER = `FIXTURE-1099-PAID-${vendorId}-${year}`;
-      let paidInvoiceRow = (
-        await db
-          .select({ id: invoicesTable.id, total: invoicesTable.total })
-          .from(invoicesTable)
-          .where(eq(invoicesTable.invoiceNumber, PAID_INVOICE_NUMBER))
-      )[0];
-      if (!paidInvoiceRow) {
-        // Use Feb of the current year so we never collide with the draft
-        // invoice's (vendor, partner, cadence, periodStart) uniqueness
-        // guard regardless of when the fixture is invoked.
-        const paidPeriodStart = new Date(Date.UTC(year, 1, 1));
-        const paidPeriodEnd = new Date(Date.UTC(year, 1, 28, 23, 59, 59));
-        const [pi] = await db
-          .insert(invoicesTable)
-          .values({
-            invoiceNumber: PAID_INVOICE_NUMBER,
-            vendorId,
-            partnerId,
-            cadence: "monthly",
-            status: "paid",
-            periodStart: paidPeriodStart,
-            periodEnd: paidPeriodEnd,
-            subtotal: "1200.00",
-            taxTotal: "0.00",
-            total: "1200.00",
-            paidAmount: "1200.00",
+          });
+          await db.insert(invoicePaymentsTable).values({
+            invoiceId: pi.id,
+            method: "ach",
+            amount: "1200.00",
             paidAt: new Date(Date.UTC(year, 1, 15)),
-            sentAt: new Date(Date.UTC(year, 1, 5)),
-          })
-          .returning({ id: invoicesTable.id, total: invoicesTable.total });
-        paidInvoiceRow = pi;
-        await db.insert(invoiceLinesTable).values({
-          invoiceId: pi.id,
-          sourceType: "manual",
-          lineType: "labor_regular",
-          description: "Fixture paid labor — January work",
-          quantity: "16",
-          unitPrice: "75.00",
-          amount: "1200.00",
-          taxAmount: "0.00",
-          incomeCategory: "nec",
+          });
+        }
+        const paidInvoiceId = paidInvoiceRow.id;
+
+        return res.json({
+          ok: true,
+          vendorId,
+          vendorName: VENDOR_NAME,
+          partnerId,
+          draftInvoiceId,
+          draftInvoiceNumber: DRAFT_INVOICE_NUMBER,
+          draftLineIds,
+          paidInvoiceId,
+          year,
         });
-        await db.insert(invoicePaymentsTable).values({
-          invoiceId: pi.id,
-          method: "ach",
-          amount: "1200.00",
-          paidAt: new Date(Date.UTC(year, 1, 15)),
+      } catch (error) {
+        logger.error({ err: error }, "1099 fixture seed error");
+        return res.status(500).json({
+          message: "Failed to seed 1099 fixture",
+          code: "auth.fixture_seed_failed",
+          error: String(error),
         });
       }
-      const paidInvoiceId = paidInvoiceRow.id;
+    },
+  );
 
-      return res.json({
-        ok: true,
-        vendorId,
-        vendorName: VENDOR_NAME,
-        partnerId,
-        draftInvoiceId,
-        draftInvoiceNumber: DRAFT_INVOICE_NUMBER,
-        draftLineIds,
-        paidInvoiceId,
-        year,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "1099 fixture seed error");
-      return res
-        .status(500)
-        .json({ message: "Failed to seed 1099 fixture", code: "auth.fixture_seed_failed", error: String(error) });
-    }
-  });
-
-  // Dev-only: deterministic fixture for the audit-log pagination end-to-end
-  // test (lib/e2e/tests/audit-log-pagination.spec.ts). Truncates the
+  // Isolated-test-only: deterministic fixture for the audit-log pagination
+  // end-to-end test (lib/e2e/tests/audit-log-pagination.spec.ts). Truncates the
   // report_export_audit_log table and re-inserts a known mix of rows so
   // the spec can:
   //   - Page from page 1 → page 2 → back, against a known row count.
@@ -1154,134 +1243,141 @@ if (process.env.NODE_ENV === "development") {
   //   - 1 chain ROOT at the very oldest timestamp at the bottom of
   //     page 2.
   // Total: 150 rows, exactly 2 pages.
-  router.post("/auth/seed-audit-pagination-fixture", async (_req, res) => {
-    try {
-      // Wipe any prior audit rows so the spec runs against an exact row
-      // count regardless of what the dev DB looked like before. This
-      // table is purely an after-the-fact log — no other table holds a
-      // foreign key into it — so a TRUNCATE is safe in dev.
-      await db.execute(sql`TRUNCATE TABLE report_export_audit_log RESTART IDENTITY`);
+  router.post(
+    "/auth/seed-audit-pagination-fixture",
+    requireIsolatedFixtureContext,
+    async (_req, res) => {
+      try {
+        // Reset prior fixture rows so the spec runs against an exact count.
+        // The isolation guard permits this only inside the wrapper-owned test
+        // database; it can never reach the shared development database.
+        await db.execute(
+          sql`TRUNCATE TABLE report_export_audit_log RESTART IDENTITY`,
+        );
 
-      // Build createdAt timestamps from oldest → newest so the desc(
-      // createdAt) sort the route uses places the newest entries on
-      // page 1. Spread one second between each so ties don't form.
-      const TOTAL = 150;
-      const PAGE_SIZE = 100;
-      const baseEpoch = Date.UTC(2026, 0, 1, 0, 0, 0);
-      const ts = (i: number): Date => new Date(baseEpoch + i * 1000);
+        // Build createdAt timestamps from oldest → newest so the desc(
+        // createdAt) sort the route uses places the newest entries on
+        // page 1. Spread one second between each so ties don't form.
+        const TOTAL = 150;
+        const PAGE_SIZE = 100;
+        const baseEpoch = Date.UTC(2026, 0, 1, 0, 0, 0);
+        const ts = (i: number): Date => new Date(baseEpoch + i * 1000);
 
-      // 1. Insert the chain ROOT at the OLDEST timestamp (i = 0). It
-      //    will land at the very bottom of page 2.
-      const [rootRow] = await db
-        .insert(reportExportAuditLogTable)
-        .values({
-          reportKind: "qb_invoice_push",
-          format: "qbo_api_push",
-          scope: { period: "audit-fixture-root" },
-          detailJson: null,
-          rowCount: 1,
-          fileBytes: 0,
-          downloadedByUserId: null,
-          userRole: "admin",
-          userIp: null,
-          userAgent: null,
-          createdAt: ts(0),
-        })
-        .returning({ id: reportExportAuditLogTable.id });
-      const rootId = rootRow.id;
+        // 1. Insert the chain ROOT at the OLDEST timestamp (i = 0). It
+        //    will land at the very bottom of page 2.
+        const [rootRow] = await db
+          .insert(reportExportAuditLogTable)
+          .values({
+            reportKind: "qb_invoice_push",
+            format: "qbo_api_push",
+            scope: { period: "audit-fixture-root" },
+            detailJson: null,
+            rowCount: 1,
+            fileBytes: 0,
+            downloadedByUserId: null,
+            userRole: "admin",
+            userIp: null,
+            userAgent: null,
+            createdAt: ts(0),
+          })
+          .returning({ id: reportExportAuditLogTable.id });
+        const rootId = rootRow.id;
 
-      // 2. Insert 148 plain filler rows in between (i = 1 .. 148). 49 of
-      //    these will be on page 2 (with the root) and the other 99 on
-      //    page 1 (with the chain tip and the warning rows).
-      const fillerCount = TOTAL - 2;
-      const fillerValues = [] as Array<typeof reportExportAuditLogTable.$inferInsert>;
-      for (let i = 1; i <= fillerCount; i++) {
-        fillerValues.push({
-          reportKind: "qb_invoice_push",
-          format: "qbo_api_push",
-          scope: { period: "audit-fixture-filler", n: i },
-          detailJson: null,
-          rowCount: 1,
-          fileBytes: 0,
-          downloadedByUserId: null,
-          userRole: "admin",
-          userIp: null,
-          userAgent: null,
-          createdAt: ts(i),
+        // 2. Insert 148 plain filler rows in between (i = 1 .. 148). 49 of
+        //    these will be on page 2 (with the root) and the other 99 on
+        //    page 1 (with the chain tip and the warning rows).
+        const fillerCount = TOTAL - 2;
+        const fillerValues = [] as Array<
+          typeof reportExportAuditLogTable.$inferInsert
+        >;
+        for (let i = 1; i <= fillerCount; i++) {
+          fillerValues.push({
+            reportKind: "qb_invoice_push",
+            format: "qbo_api_push",
+            scope: { period: "audit-fixture-filler", n: i },
+            detailJson: null,
+            rowCount: 1,
+            fileBytes: 0,
+            downloadedByUserId: null,
+            userRole: "admin",
+            userIp: null,
+            userAgent: null,
+            createdAt: ts(i),
+          });
+        }
+        const insertedFillers = await db
+          .insert(reportExportAuditLogTable)
+          .values(fillerValues)
+          .returning({ id: reportExportAuditLogTable.id });
+
+        // 3. Pick three of the most recent fillers (those that landed at
+        //    the highest i values) and stamp them with detailJson.warnings
+        //    so the warnings filter narrows the visible page from 100 → 3.
+        //    These rows live on page 1 with the chain tip.
+        const warningTargets = insertedFillers.slice(-3);
+        const warningIds: number[] = [];
+        for (const row of warningTargets) {
+          await db
+            .update(reportExportAuditLogTable)
+            .set({
+              detailJson: {
+                warnings: [
+                  {
+                    kind: "audit_fixture",
+                    identifier: "FIXTURE-WARN",
+                    message: "seeded warning",
+                  },
+                ],
+              },
+            })
+            .where(eq(reportExportAuditLogTable.id, row.id));
+          warningIds.push(row.id);
+        }
+
+        // 4. Insert the chain TIP at the NEWEST timestamp so it lands at
+        //    the very top of page 1. Its "Retry of #<rootId>" badge points
+        //    at the root row on page 2.
+        const [tipRow] = await db
+          .insert(reportExportAuditLogTable)
+          .values({
+            reportKind: "qb_invoice_push",
+            format: "qbo_api_push",
+            scope: {
+              period: "audit-fixture-tip",
+              retriedFromAuditId: rootId,
+            },
+            detailJson: null,
+            rowCount: 1,
+            fileBytes: 0,
+            downloadedByUserId: null,
+            userRole: "admin",
+            userIp: null,
+            userAgent: null,
+            createdAt: ts(TOTAL - 1),
+          })
+          .returning({ id: reportExportAuditLogTable.id });
+        const tipId = tipRow.id;
+
+        return res.json({
+          ok: true,
+          totalRows: TOTAL,
+          pageSize: PAGE_SIZE,
+          totalPages: Math.ceil(TOTAL / PAGE_SIZE),
+          rootId,
+          tipId,
+          warningIds,
+          warningCount: warningIds.length,
+        });
+      } catch (error) {
+        logger.error({ err: error }, "audit pagination fixture seed error");
+        return res.status(500).json({
+          message: "Failed to seed audit-pagination fixture",
+          code: "auth.fixture_seed_failed",
+          error: String(error),
         });
       }
-      const insertedFillers = await db
-        .insert(reportExportAuditLogTable)
-        .values(fillerValues)
-        .returning({ id: reportExportAuditLogTable.id });
-
-      // 3. Pick three of the most recent fillers (those that landed at
-      //    the highest i values) and stamp them with detailJson.warnings
-      //    so the warnings filter narrows the visible page from 100 → 3.
-      //    These rows live on page 1 with the chain tip.
-      const warningTargets = insertedFillers.slice(-3);
-      const warningIds: number[] = [];
-      for (const row of warningTargets) {
-        await db
-          .update(reportExportAuditLogTable)
-          .set({
-            detailJson: {
-              warnings: [
-                {
-                  kind: "audit_fixture",
-                  identifier: "FIXTURE-WARN",
-                  message: "seeded warning",
-                },
-              ],
-            },
-          })
-          .where(eq(reportExportAuditLogTable.id, row.id));
-        warningIds.push(row.id);
-      }
-
-      // 4. Insert the chain TIP at the NEWEST timestamp so it lands at
-      //    the very top of page 1. Its "Retry of #<rootId>" badge points
-      //    at the root row on page 2.
-      const [tipRow] = await db
-        .insert(reportExportAuditLogTable)
-        .values({
-          reportKind: "qb_invoice_push",
-          format: "qbo_api_push",
-          scope: {
-            period: "audit-fixture-tip",
-            retriedFromAuditId: rootId,
-          },
-          detailJson: null,
-          rowCount: 1,
-          fileBytes: 0,
-          downloadedByUserId: null,
-          userRole: "admin",
-          userIp: null,
-          userAgent: null,
-          createdAt: ts(TOTAL - 1),
-        })
-        .returning({ id: reportExportAuditLogTable.id });
-      const tipId = tipRow.id;
-
-      return res.json({
-        ok: true,
-        totalRows: TOTAL,
-        pageSize: PAGE_SIZE,
-        totalPages: Math.ceil(TOTAL / PAGE_SIZE),
-        rootId,
-        tipId,
-        warningIds,
-        warningCount: warningIds.length,
-      });
-    } catch (error) {
-      logger.error({ err: error }, "audit pagination fixture seed error");
-      return res.status(500).json({
-        message: "Failed to seed audit-pagination fixture",
-        code: "auth.fixture_seed_failed",
-        error: String(error),
-      });
-    }
-  });
+    },
+  );
 }
 
 export default router;

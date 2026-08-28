@@ -18,7 +18,9 @@ vi.mock("@/hooks/useColors", () => ({
 
 vi.mock("@expo/vector-icons", () => ({ Feather: () => null }));
 
-const { routerReplaceMock } = vi.hoisted(() => ({ routerReplaceMock: vi.fn() }));
+const { routerReplaceMock } = vi.hoisted(() => ({
+  routerReplaceMock: vi.fn(),
+}));
 vi.mock("expo-router", () => ({
   router: { replace: routerReplaceMock, push: vi.fn(), back: vi.fn() },
 }));
@@ -64,7 +66,8 @@ const ES_STRINGS: Record<string, string> = {
   "visitor.plateStateRequired": "Estado obligatorio",
   "plateStatePicker.label": "Estado de la placa",
   "plateStatePicker.select": "Seleccionar estado de la placa",
-  "plateStatePicker.selected": "Estado de la placa seleccionado: {{state}} ({{code}})",
+  "plateStatePicker.selected":
+    "Estado de la placa seleccionado: {{state}} ({{code}})",
   "plateStatePicker.search": "Buscar estados",
   "plateStatePicker.noResults": "No se encontraron estados.",
   "plateStatePicker.preferred": "Estados preferidos",
@@ -77,10 +80,7 @@ const ES_STRINGS: Record<string, string> = {
   "plateStatePicker.errorHint": "Error: {{error}}",
 };
 
-function interpolate(
-  template: string,
-  opts?: Record<string, unknown>,
-): string {
+function interpolate(template: string, opts?: Record<string, unknown>): string {
   if (!opts) return template;
   return template.replace(/\{\{(\w+)\}\}/g, (_, k) =>
     String((opts as Record<string, unknown>)[k] ?? ""),
@@ -129,7 +129,9 @@ const { setTokenMock, setUserMock } = vi.hoisted(() => ({
   setUserMock: vi.fn(),
 }));
 const { authUserRef } = vi.hoisted(() => ({
-  authUserRef: { current: { id: -1, role: "guest" } as { id: number; role: string } | null },
+  authUserRef: {
+    current: { id: -1, role: "guest" } as { id: number; role: string } | null,
+  },
 }));
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({ user: authUserRef.current }),
@@ -161,7 +163,8 @@ vi.mock("@/lib/guest", () => ({
   fetchActiveVisit: (...a: unknown[]) => fetchActiveVisitMock(...a),
   fetchGuestSession: (...a: unknown[]) => fetchGuestSessionMock(...a),
   fetchSiteContext: (...a: unknown[]) => fetchSiteContextMock(...a),
-  fetchPreferredPlateStates: (...a: unknown[]) => fetchPreferredPlateStatesMock(...a),
+  fetchPreferredPlateStates: (...a: unknown[]) =>
+    fetchPreferredPlateStatesMock(...a),
   visitorCheckOut: (...a: unknown[]) => visitorCheckOutMock(...a),
   guestLogout: (...a: unknown[]) => guestLogoutMock(...a),
   visitorCheckIn: (...a: unknown[]) => visitorCheckInMock(...a),
@@ -246,7 +249,9 @@ beforeEach(() => {
       lastPurpose: null,
     },
   });
-  fetchPreferredPlateStatesMock.mockResolvedValue({ preferred: ["CA", "TX", "NY", "FL", "OH"] });
+  fetchPreferredPlateStatesMock.mockResolvedValue({
+    preferred: ["CA", "TX", "NY", "FL", "OH"],
+  });
 });
 
 const SITE_CTX: SiteContext = {
@@ -267,9 +272,11 @@ const SITE_CTX: SiteContext = {
 };
 
 function renderScreen(client?: QueryClient) {
-  const qc = client ?? new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
+  const qc =
+    client ??
+    new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
   return render(
     <QueryClientProvider client={qc}>
       <VisitorCheckInScreen />
@@ -305,21 +312,36 @@ function isDisabled(el: HTMLElement): boolean {
 describe("VisitorCheckInScreen — full screen render flow", () => {
   it("loads site-preferred states and renders the picker immediately before the plate input", async () => {
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
-    fetchPreferredPlateStatesMock.mockResolvedValue({ preferred: ["OK", "TX"] });
+    fetchPreferredPlateStatesMock.mockResolvedValue({
+      preferred: ["OK", "TX"],
+    });
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(await findFirstByTestId("site-code-input"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("site-lookup-btn"));
     tap(await findFirstByTestId("accept-site-btn"));
 
-    await waitFor(() => expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42));
-    const trigger = screen.getByRole("button", { name: "Seleccionar estado de la placa" });
+    await waitFor(() =>
+      expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42, "ACME-HQ"),
+    );
+    const trigger = screen.getByRole("button", {
+      name: "Seleccionar estado de la placa",
+    });
     const plateInput = firstByTestId("visitor-vehicle-plate");
-    expect(trigger.compareDocumentPosition(plateInput) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      trigger.compareDocumentPosition(plateInput) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     tap(trigger);
-    const options = screen.getAllByRole("button", { name: /opción de estado$/ });
+    const options = screen.getAllByRole("button", {
+      name: /opción de estado$/,
+    });
     expect(options).toHaveLength(51);
-    expect(options.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
+    expect(
+      options.slice(0, 3).map((option) => option.getAttribute("aria-label")),
+    ).toEqual([
       "Oklahoma (OK), opción de estado",
       "Texas (TX), opción de estado",
       "Alabama (AL), opción de estado",
@@ -331,14 +353,22 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     fetchPreferredPlateStatesMock.mockRejectedValue(new Error("unavailable"));
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(await findFirstByTestId("site-code-input"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("site-lookup-btn"));
     tap(await findFirstByTestId("accept-site-btn"));
-    await waitFor(() => expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42));
+    await waitFor(() =>
+      expect(fetchPreferredPlateStatesMock).toHaveBeenCalledWith(42, "ACME-HQ"),
+    );
     tap(screen.getByRole("button", { name: "Seleccionar estado de la placa" }));
 
-    const options = screen.getAllByRole("button", { name: /opción de estado$/ });
-    expect(options.slice(0, 3).map((option) => option.getAttribute("aria-label"))).toEqual([
+    const options = screen.getAllByRole("button", {
+      name: /opción de estado$/,
+    });
+    expect(
+      options.slice(0, 3).map((option) => option.getAttribute("aria-label")),
+    ).toEqual([
       "California (CA), opción de estado",
       "Texas (TX), opción de estado",
       "New York (NY), opción de estado",
@@ -362,20 +392,32 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
       },
     });
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
-    requestForegroundPermissionsAsyncMock.mockResolvedValue({ status: "granted" });
-    getCurrentPositionAsyncMock.mockResolvedValue({ coords: { latitude: 1.23, longitude: 4.56 } });
+    requestForegroundPermissionsAsyncMock.mockResolvedValue({
+      status: "granted",
+    });
+    getCurrentPositionAsyncMock.mockResolvedValue({
+      coords: { latitude: 1.23, longitude: 4.56 },
+    });
     visitorCheckInMock.mockResolvedValue({ id: 999 });
 
     const firstRender = renderScreen();
     await waitFor(() => expect(fetchGuestSessionMock).toHaveBeenCalled());
     firstRender.unmount();
     renderScreen();
-    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(await findFirstByTestId("site-code-input"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("site-lookup-btn"));
     tap(await findFirstByTestId("accept-site-btn"));
 
-    expect(await screen.findByRole("button", { name: "Estado de la placa seleccionado: Texas (TX)" })).toBeTruthy();
-    expect((firstByTestId("visitor-vehicle-plate") as HTMLInputElement).value).toBe("ABC123");
+    expect(
+      await screen.findByRole("button", {
+        name: "Estado de la placa seleccionado: Texas (TX)",
+      }),
+    ).toBeTruthy();
+    expect(
+      (firstByTestId("visitor-vehicle-plate") as HTMLInputElement).value,
+    ).toBe("ABC123");
     tap(firstByTestId("host-option-partner:7"));
     tap(firstByTestId("check-in-btn"));
 
@@ -385,8 +427,12 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
       vehiclePlate: "ABC123",
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Seleccionar estado de la placa" })).toBeTruthy();
-      expect((firstByTestId("visitor-vehicle-plate") as HTMLInputElement).value).toBe("");
+      expect(
+        screen.getByRole("button", { name: "Seleccionar estado de la placa" }),
+      ).toBeTruthy();
+      expect(
+        (firstByTestId("visitor-vehicle-plate") as HTMLInputElement).value,
+      ).toBe("");
     });
   });
 
@@ -412,10 +458,15 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
 
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
     const visitorA = renderScreen(queryClient);
-    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(await findFirstByTestId("site-code-input"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("site-lookup-btn"));
     tap(await findFirstByTestId("accept-site-btn"));
-    expect((await findFirstByTestId("visitor-vehicle-plate") as HTMLInputElement).value).toBe("VISITOR-A");
+    expect(
+      ((await findFirstByTestId("visitor-vehicle-plate")) as HTMLInputElement)
+        .value,
+    ).toBe("VISITOR-A");
     visitorA.unmount();
 
     authUserRef.current = { id: -2, role: "guest" };
@@ -436,13 +487,21 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     });
 
     renderScreen(queryClient);
-    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(await findFirstByTestId("site-code-input"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("site-lookup-btn"));
     tap(await findFirstByTestId("accept-site-btn"));
-    const visitorBPlate = await findFirstByTestId("visitor-vehicle-plate") as HTMLInputElement;
+    const visitorBPlate = (await findFirstByTestId(
+      "visitor-vehicle-plate",
+    )) as HTMLInputElement;
     await waitFor(() => expect(visitorBPlate.value).toBe("VISITOR-B"));
     expect(visitorBPlate.value).not.toBe("VISITOR-A");
-    expect(await screen.findByRole("button", { name: "Estado de la placa seleccionado: Oklahoma (OK)" })).toBeTruthy();
+    expect(
+      await screen.findByRole("button", {
+        name: "Estado de la placa seleccionado: Oklahoma (OK)",
+      }),
+    ).toBeTruthy();
     expect(fetchGuestSessionMock).toHaveBeenCalledTimes(2);
   });
 
@@ -465,11 +524,15 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
     renderScreen();
 
-    fireEvent.change(await findFirstByTestId("site-code-input"), { target: { value: "ACME-HQ" } });
+    fireEvent.change(await findFirstByTestId("site-code-input"), {
+      target: { value: "ACME-HQ" },
+    });
     tap(firstByTestId("site-lookup-btn"));
     tap(await findFirstByTestId("accept-site-btn"));
     tap(firstByTestId("host-option-partner:7"));
-    await waitFor(() => expect(isDisabled(firstByTestId("check-in-btn"))).toBe(false));
+    await waitFor(() =>
+      expect(isDisabled(firstByTestId("check-in-btn"))).toBe(false),
+    );
     tap(firstByTestId("check-in-btn"));
 
     expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
@@ -622,7 +685,9 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
       expect(captureAndUploadImageMock).toHaveBeenCalledTimes(1);
     });
     await waitFor(() => {
-      expect(isDisabled(firstByTestId("capture-vehicle-photo-btn"))).toBe(false);
+      expect(isDisabled(firstByTestId("capture-vehicle-photo-btn"))).toBe(
+        false,
+      );
     });
     tap(firstByTestId("capture-vehicle-photo-btn"));
     await waitFor(() => {
@@ -685,10 +750,7 @@ describe("VisitorCheckInScreen — full screen render flow", () => {
 // so the Spanish strings from `lib/locales/es.json` must end up in the
 // Alert (not the raw English `err.message`).
 describe("VisitorCheckInScreen — localized API error rendering", () => {
-  function makeApiError(
-    code: string,
-    extra?: Record<string, unknown>,
-  ): Error {
+  function makeApiError(code: string, extra?: Record<string, unknown>): Error {
     const err = new Error(`raw english copy for ${code}`) as Error & {
       status?: number;
       code?: string;
@@ -786,9 +848,7 @@ describe("VisitorCheckInScreen — localized API error rendering", () => {
     getCurrentPositionAsyncMock.mockResolvedValue({
       coords: { latitude: 1.23, longitude: 4.56 },
     });
-    visitorCheckOutMock.mockRejectedValueOnce(
-      makeApiError("visit.no_access"),
-    );
+    visitorCheckOutMock.mockRejectedValueOnce(makeApiError("visit.no_access"));
 
     renderScreen();
 
@@ -832,7 +892,9 @@ describe("VisitorCheckInScreen — Task #112 expired session", () => {
     renderScreen();
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("session-expired-card").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("session-expired-card").length,
+      ).toBeGreaterThan(0);
     });
     expect(
       screen.getAllByText("Su sesión de visitante expiró").length,
@@ -891,7 +953,9 @@ describe("VisitorCheckInScreen — Task #112 expired session", () => {
     tap(firstByTestId("check-in-btn"));
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("session-expired-card").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("session-expired-card").length,
+      ).toBeGreaterThan(0);
     });
     expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
@@ -929,7 +993,9 @@ describe("VisitorCheckInScreen — Task #112 expired session", () => {
     tap(checkOutBtn);
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("session-expired-card").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("session-expired-card").length,
+      ).toBeGreaterThan(0);
     });
     expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();

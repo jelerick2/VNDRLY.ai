@@ -39,7 +39,9 @@ export type GuestSignUpInput = {
   safetyAcknowledged: boolean;
 };
 
-export async function startGuestSession(input: GuestSignUpInput): Promise<GuestSession> {
+export async function startGuestSession(
+  input: GuestSignUpInput,
+): Promise<GuestSession> {
   const data = await apiFetch<GuestSession>("/api/auth/guest", {
     method: "POST",
     body: JSON.stringify(input),
@@ -75,11 +77,18 @@ export type SiteContext = {
 };
 
 export async function fetchSiteContext(siteCode: string): Promise<SiteContext> {
-  return apiFetch<SiteContext>(`/api/visits/site-context/${encodeURIComponent(siteCode)}`);
+  return apiFetch<SiteContext>(
+    `/api/visits/site-context/${encodeURIComponent(siteCode)}`,
+  );
 }
 
-export async function fetchPreferredPlateStates(siteId: number): Promise<PreferredPlateStatesResponse> {
-  return apiFetch<PreferredPlateStatesResponse>(`/api/visits/sites/${siteId}/preferred-plate-states`);
+export async function fetchPreferredPlateStates(
+  siteId: number,
+  siteCode: string,
+): Promise<PreferredPlateStatesResponse> {
+  return apiFetch<PreferredPlateStatesResponse>(
+    `/api/visits/sites/${siteId}/preferred-plate-states?siteCode=${encodeURIComponent(siteCode)}`,
+  );
 }
 
 export type ActiveVisit = {
@@ -128,7 +137,11 @@ export async function visitorCheckIn(input: {
   });
 }
 
-export async function visitorCheckOut(visitId: number, latitude?: number, longitude?: number): Promise<void> {
+export async function visitorCheckOut(
+  visitId: number,
+  latitude?: number,
+  longitude?: number,
+): Promise<void> {
   await apiFetch(`/api/visits/${visitId}/check-out`, {
     method: "POST",
     body: JSON.stringify({ latitude, longitude }),

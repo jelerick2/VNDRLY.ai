@@ -43,10 +43,7 @@ import {
   visitorCheckOut,
   type SiteContext,
 } from "@/lib/guest";
-import {
-  extractSiteCode,
-  submitVisitorCheckIn,
-} from "@/lib/visitorCheckin";
+import { extractSiteCode, submitVisitorCheckIn } from "@/lib/visitorCheckin";
 
 // Mirrors `app/(tabs)/scan.tsx`: when the host build doesn't actually have
 // the expo-camera native view registered (Expo Go / un-rebuilt dev client),
@@ -79,7 +76,9 @@ class CameraBoundary extends React.Component<
 //   - the mutation catch blocks, so a 401 there bypasses the generic
 //     translateApiError() Alert and routes through the same friendly UI.
 function is401(e: unknown): boolean {
-  return !!e && typeof e === "object" && (e as { status?: number }).status === 401;
+  return (
+    !!e && typeof e === "object" && (e as { status?: number }).status === 401
+  );
 }
 
 export default function VisitorCheckInScreen() {
@@ -163,18 +162,25 @@ export default function VisitorCheckInScreen() {
   });
 
   const preferredPlateStates = useQuery({
-    queryKey: ["preferred-plate-states", ctxQuery.data?.site.id],
-    queryFn: () => fetchPreferredPlateStates(ctxQuery.data!.site.id),
-    enabled: Boolean(ctxQuery.data?.site.id),
+    queryKey: ["preferred-plate-states", ctxQuery.data?.site.id, confirmedCode],
+    queryFn: () =>
+      fetchPreferredPlateStates(ctxQuery.data!.site.id, confirmedCode!),
+    enabled: Boolean(ctxQuery.data?.site.id && confirmedCode),
     retry: false,
   });
-  const orderedStatePreferences = preferredPlateStates.data?.preferred
-    ?? NATIONAL_PLATE_STATE_FALLBACK;
+  const orderedStatePreferences =
+    preferredPlateStates.data?.preferred ?? NATIONAL_PLATE_STATE_FALLBACK;
 
   useEffect(() => {
-    if (!guestQuery.data || restoredGuestSessionId.current === guestQuery.data.guestSessionId) return;
+    if (
+      !guestQuery.data ||
+      restoredGuestSessionId.current === guestQuery.data.guestSessionId
+    )
+      return;
     restoredGuestSessionId.current = guestQuery.data.guestSessionId;
-    setVehiclePlate(normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "");
+    setVehiclePlate(
+      normalizePlateNumber(guestQuery.data.profile.vehiclePlate) ?? "",
+    );
     setPlateState(normalizePlateState(guestQuery.data.profile.plateState));
   }, [guestQuery.data]);
 
@@ -184,7 +190,11 @@ export default function VisitorCheckInScreen() {
   // mutation 401 would.
   useEffect(() => {
     if (sessionExpired) return;
-    if (is401(activeQuery.error) || is401(guestQuery.error) || is401(ctxQuery.error)) {
+    if (
+      is401(activeQuery.error) ||
+      is401(guestQuery.error) ||
+      is401(ctxQuery.error)
+    ) {
       setSessionExpired(true);
     }
   }, [activeQuery.error, guestQuery.error, ctxQuery.error, sessionExpired]);
@@ -249,7 +259,10 @@ export default function VisitorCheckInScreen() {
         setSessionExpired(true);
         return;
       }
-      Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorCheckIn")));
+      Alert.alert(
+        t("visitor.error"),
+        translateApiError(e, t, t("tickets.errorCheckIn")),
+      );
     } finally {
       setBusy(false);
     }
@@ -260,12 +273,16 @@ export default function VisitorCheckInScreen() {
     if (!v) return;
     setBusy(true);
     try {
-      let lat: number | undefined; let lng: number | undefined;
+      let lat: number | undefined;
+      let lng: number | undefined;
       try {
         const perm = await Location.requestForegroundPermissionsAsync();
         if (perm.status === "granted") {
-          const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          lat = pos.coords.latitude; lng = pos.coords.longitude;
+          const pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
         }
       } catch {}
       await visitorCheckOut(v.id, lat, lng);
@@ -284,7 +301,10 @@ export default function VisitorCheckInScreen() {
         setSessionExpired(true);
         return;
       }
-      Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorCheckOut")));
+      Alert.alert(
+        t("visitor.error"),
+        translateApiError(e, t, t("tickets.errorCheckOut")),
+      );
     } finally {
       setBusy(false);
     }
@@ -301,7 +321,10 @@ export default function VisitorCheckInScreen() {
         setVehiclePhotoUrl(result.objectPath);
       }
     } catch (e) {
-      Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorAttachPhoto")));
+      Alert.alert(
+        t("visitor.error"),
+        translateApiError(e, t, t("tickets.errorAttachPhoto")),
+      );
     } finally {
       setBusy(false);
     }
@@ -342,12 +365,20 @@ export default function VisitorCheckInScreen() {
         <View style={[styles.container, styles.sessionExpiredContainer]}>
           <View
             testID="session-expired-card"
-            style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}
+            style={[
+              styles.card,
+              { borderColor: colors.border, backgroundColor: colors.card },
+            ]}
           >
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>
               {t("visitor.sessionExpiredTitle")}
             </Text>
-            <Text style={[styles.muted, { color: colors.mutedForeground, marginTop: 8 }]}>
+            <Text
+              style={[
+                styles.muted,
+                { color: colors.mutedForeground, marginTop: 8 },
+              ]}
+            >
               {t("visitor.sessionExpiredBody")}
             </Text>
             <AmberButton
@@ -366,29 +397,64 @@ export default function VisitorCheckInScreen() {
 
   return (
     <ScreenSafeArea style={styles.flex}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.foreground }]}>{t("visitor.headerTitle")}</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              {t("visitor.headerTitle")}
+            </Text>
             <TouchableOpacity onPress={onSignOut}>
-              <Text style={[styles.signOut, { color: colors.primary }]}>{t("nav.signOut")}</Text>
+              <Text style={[styles.signOut, { color: colors.primary }]}>
+                {t("nav.signOut")}
+              </Text>
             </TouchableOpacity>
           </View>
 
           {activeQuery.isLoading ? (
             <ActivityIndicator color={colors.primary} />
           ) : active ? (
-            <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("visitor.activeAt")} {active.siteName}</Text>
-              {active.siteAddress ? <Text style={[styles.muted, { color: colors.mutedForeground }]}>{active.siteAddress}</Text> : null}
-              <Text style={[styles.muted, { color: colors.mutedForeground }]}>
-                {t("visitor.host")}: {active.hostType === "partner" ? active.hostPartnerName : active.hostVendorName}
+            <View
+              style={[
+                styles.card,
+                { borderColor: colors.border, backgroundColor: colors.card },
+              ]}
+            >
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>
+                {t("visitor.activeAt")} {active.siteName}
               </Text>
-              {active.purpose ? <Text style={[styles.muted, { color: colors.mutedForeground }]}>{t("visitor.purpose")}: {active.purpose}</Text> : null}
+              {active.siteAddress ? (
+                <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                  {active.siteAddress}
+                </Text>
+              ) : null}
               <Text style={[styles.muted, { color: colors.mutedForeground }]}>
-                {t("visitor.checkedInAt")}: {new Date(active.checkInTime).toLocaleString()}
+                {t("visitor.host")}:{" "}
+                {active.hostType === "partner"
+                  ? active.hostPartnerName
+                  : active.hostVendorName}
               </Text>
-              <AmberButton onPress={onCheckOut} loading={busy} disabled={busy} height={48} style={{ marginTop: 14 }}>
+              {active.purpose ? (
+                <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                  {t("visitor.purpose")}: {active.purpose}
+                </Text>
+              ) : null}
+              <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                {t("visitor.checkedInAt")}:{" "}
+                {new Date(active.checkInTime).toLocaleString()}
+              </Text>
+              <AmberButton
+                onPress={onCheckOut}
+                loading={busy}
+                disabled={busy}
+                height={48}
+                style={{ marginTop: 14 }}
+              >
                 {t("visitor.checkOut")}
               </AmberButton>
             </View>
@@ -410,17 +476,39 @@ export default function VisitorCheckInScreen() {
                   onBarcodeScanned={onScanned}
                 />
                 <View style={styles.scannerOverlay} pointerEvents="box-none">
-                  <View style={[styles.scannerFrame, { borderColor: colors.primary }]} />
-                  <Text style={styles.scannerHint}>{t("visitor.scanHint")}</Text>
-                  <TouchableOpacity onPress={() => setScanning(false)} style={[styles.scannerCancel, { backgroundColor: colors.card }]}>
-                    <Text style={[styles.scannerCancelText, { color: colors.foreground }]}>{t("visitor.cancel")}</Text>
+                  <View
+                    style={[
+                      styles.scannerFrame,
+                      { borderColor: colors.primary },
+                    ]}
+                  />
+                  <Text style={styles.scannerHint}>
+                    {t("visitor.scanHint")}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setScanning(false)}
+                    style={[
+                      styles.scannerCancel,
+                      { backgroundColor: colors.card },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.scannerCancelText,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      {t("visitor.cancel")}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </CameraBoundary>
             </View>
           ) : (
             <View>
-              <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.siteCodeLabel")}</Text>
+              <Text style={[styles.label, { color: colors.foreground }]}>
+                {t("visitor.siteCodeLabel")}
+              </Text>
               <View style={styles.row}>
                 <TextInput
                   testID="site-code-input"
@@ -429,44 +517,128 @@ export default function VisitorCheckInScreen() {
                   autoCapitalize="characters"
                   placeholder={t("visitor.siteCodePlaceholder")}
                   placeholderTextColor={colors.mutedForeground}
-                  style={[styles.input, { flex: 1, borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+                  style={[
+                    styles.input,
+                    {
+                      flex: 1,
+                      borderColor: colors.border,
+                      color: colors.foreground,
+                      backgroundColor: colors.card,
+                    },
+                  ]}
                 />
-                <TouchableOpacity testID="site-lookup-btn" onPress={onConfirmSite} style={[styles.lookupBtn, { borderColor: colors.primary }]}>
+                <TouchableOpacity
+                  testID="site-lookup-btn"
+                  onPress={onConfirmSite}
+                  style={[styles.lookupBtn, { borderColor: colors.primary }]}
+                >
                   <Feather name="search" size={18} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity testID="open-scanner-btn" onPress={openScanner} style={[styles.scanBtn, { borderColor: colors.primary }]}>
+              <TouchableOpacity
+                testID="open-scanner-btn"
+                onPress={openScanner}
+                style={[styles.scanBtn, { borderColor: colors.primary }]}
+              >
                 <Feather name="maximize" size={18} color={colors.primary} />
-                <Text style={[styles.scanBtnText, { color: colors.primary }]}>{t("visitor.scanQr")}</Text>
+                <Text style={[styles.scanBtnText, { color: colors.primary }]}>
+                  {t("visitor.scanQr")}
+                </Text>
               </TouchableOpacity>
 
               {ctxQuery.isLoading ? (
-                <View style={{ marginTop: 16 }}><ActivityIndicator color={colors.primary} /></View>
+                <View style={{ marginTop: 16 }}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
               ) : ctxQuery.error ? (
                 <Text style={[styles.error, { color: colors.destructive }]}>
-                  {(ctxQuery.error as Error & { status?: number }).status === 404
+                  {(ctxQuery.error as Error & { status?: number }).status ===
+                  404
                     ? t("visitor.unknownSiteCode")
                     : t("visitor.siteLookupFailed")}
                 </Text>
               ) : ctxQuery.data && !siteConfirmed ? (
-                <View style={[styles.card, { borderColor: colors.primary, backgroundColor: colors.card, marginTop: 16 }]}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("visitor.confirmSiteTitle")}</Text>
-                  <Text style={[styles.muted, { color: colors.mutedForeground, marginBottom: 8 }]}>{t("visitor.confirmSitePrompt")}</Text>
-                  <Text style={[styles.cardTitle, { color: colors.foreground, fontSize: 16, marginTop: 6 }]}>{ctxQuery.data.site.name}</Text>
-                  <Text style={[styles.muted, { color: colors.mutedForeground }]}>{ctxQuery.data.site.address}</Text>
-                  <View style={{ flexDirection: "row", gap: 10, marginTop: 16 }}>
-                    <TouchableOpacity testID="not-my-site-btn" onPress={onChangeSite} style={[styles.secondaryBtn, { borderColor: colors.border }]}>
-                      <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>{t("visitor.notMySite")}</Text>
+                <View
+                  style={[
+                    styles.card,
+                    {
+                      borderColor: colors.primary,
+                      backgroundColor: colors.card,
+                      marginTop: 16,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[styles.cardTitle, { color: colors.foreground }]}
+                  >
+                    {t("visitor.confirmSiteTitle")}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.muted,
+                      { color: colors.mutedForeground, marginBottom: 8 },
+                    ]}
+                  >
+                    {t("visitor.confirmSitePrompt")}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.cardTitle,
+                      { color: colors.foreground, fontSize: 16, marginTop: 6 },
+                    ]}
+                  >
+                    {ctxQuery.data.site.name}
+                  </Text>
+                  <Text
+                    style={[styles.muted, { color: colors.mutedForeground }]}
+                  >
+                    {ctxQuery.data.site.address}
+                  </Text>
+                  <View
+                    style={{ flexDirection: "row", gap: 10, marginTop: 16 }}
+                  >
+                    <TouchableOpacity
+                      testID="not-my-site-btn"
+                      onPress={onChangeSite}
+                      style={[
+                        styles.secondaryBtn,
+                        { borderColor: colors.border },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.secondaryBtnText,
+                          { color: colors.foreground },
+                        ]}
+                      >
+                        {t("visitor.notMySite")}
+                      </Text>
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
-                      <AmberButton testID="accept-site-btn" onPress={onAcceptSite} height={44}>{t("visitor.yesContinue")}</AmberButton>
+                      <AmberButton
+                        testID="accept-site-btn"
+                        onPress={onAcceptSite}
+                        height={44}
+                      >
+                        {t("visitor.yesContinue")}
+                      </AmberButton>
                     </View>
                   </View>
                 </View>
               ) : ctxQuery.data && siteConfirmed ? (
                 <View>
-                  <View style={[styles.vehicleFields, { borderColor: colors.border, backgroundColor: colors.card }]}>
-                    <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.plateState")}</Text>
+                  <View
+                    style={[
+                      styles.vehicleFields,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor: colors.card,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.label, { color: colors.foreground }]}>
+                      {t("visitor.plateState")}
+                    </Text>
                     <PlateStatePicker
                       value={plateState}
                       onChange={(state) => {
@@ -476,7 +648,14 @@ export default function VisitorCheckInScreen() {
                       preferredStates={orderedStatePreferences}
                       error={plateStateError ?? undefined}
                     />
-                    <Text style={[styles.label, { color: colors.foreground, marginTop: 12 }]}>{t("visitor.vehiclePlate")}</Text>
+                    <Text
+                      style={[
+                        styles.label,
+                        { color: colors.foreground, marginTop: 12 },
+                      ]}
+                    >
+                      {t("visitor.vehiclePlate")}
+                    </Text>
                     <TextInput
                       testID="visitor-vehicle-plate"
                       value={vehiclePlate}
@@ -486,7 +665,14 @@ export default function VisitorCheckInScreen() {
                       }}
                       autoCapitalize="characters"
                       placeholderTextColor={colors.mutedForeground}
-                      style={[styles.input, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+                      style={[
+                        styles.input,
+                        {
+                          borderColor: colors.border,
+                          color: colors.foreground,
+                          backgroundColor: colors.card,
+                        },
+                      ]}
                     />
                   </View>
                   <VisitorHostPicker
@@ -532,30 +718,104 @@ export default function VisitorCheckInScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { padding: 20, paddingBottom: 40 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 18 },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 18,
+  },
   title: { fontFamily: "Inter_700Bold", fontSize: 22 },
   signOut: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   label: { fontFamily: "Inter_500Medium", fontSize: 13, marginBottom: 6 },
   row: { flexDirection: "row", gap: 8, alignItems: "center" },
-  input: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontFamily: "Inter_400Regular", fontSize: 16 },
-  lookupBtn: { borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  input: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: "Inter_400Regular",
+    fontSize: 16,
+  },
+  lookupBtn: {
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
   card: { borderWidth: 1, borderRadius: 12, padding: 16 },
   cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 18, marginBottom: 6 },
   muted: { fontFamily: "Inter_400Regular", fontSize: 13, marginTop: 2 },
-  hostOption: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 8 },
+  hostOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+  },
   hostLabel: { fontFamily: "Inter_500Medium", fontSize: 14 },
-  note: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 10, textAlign: "center" },
+  note: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    marginTop: 10,
+    textAlign: "center",
+  },
   error: { fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 12 },
-  scanBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1.5, borderRadius: 10, paddingVertical: 12, marginTop: 10 },
+  scanBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
   scanBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  secondaryBtn: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center", justifyContent: "center" },
+  secondaryBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   secondaryBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  scannerWrap: { height: 420, borderRadius: 14, overflow: "hidden", backgroundColor: "#000", marginTop: 6 },
-  scannerOverlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  scannerWrap: {
+    height: 420,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: "#000",
+    marginTop: 6,
+  },
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   scannerFrame: { width: 220, height: 220, borderWidth: 3, borderRadius: 12 },
-  scannerHint: { color: "#fff", fontFamily: "Inter_500Medium", marginTop: 14, textAlign: "center", paddingHorizontal: 16 },
-  scannerCancel: { position: "absolute", bottom: 18, paddingHorizontal: 22, paddingVertical: 10, borderRadius: 22 },
+  scannerHint: {
+    color: "#fff",
+    fontFamily: "Inter_500Medium",
+    marginTop: 14,
+    textAlign: "center",
+    paddingHorizontal: 16,
+  },
+  scannerCancel: {
+    position: "absolute",
+    bottom: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 22,
+  },
   scannerCancelText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   sessionExpiredContainer: { flex: 1, justifyContent: "center" },
-  vehicleFields: { borderWidth: 1, borderRadius: 12, padding: 16, marginTop: 16, marginBottom: 12 },
+  vehicleFields: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 12,
+  },
 });

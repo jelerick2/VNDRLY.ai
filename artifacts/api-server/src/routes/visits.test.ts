@@ -3,7 +3,10 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import pg from "pg";
 import request from "supertest";
-import { attachTestErrorMiddleware, expectStatus } from "../test-utils/route-app";
+import {
+  attachTestErrorMiddleware,
+  expectStatus,
+} from "../test-utils/route-app";
 import { buildTestCookie } from "../test-utils/session";
 
 // ── Tiny in-memory store with predicate-aware query evaluation ───────────────
@@ -43,20 +46,18 @@ function requireIsolatedTestDatabaseUrl(env: {
 }): string {
   const databaseUrl = env.DATABASE_URL?.trim();
   const testDatabaseUrl = env.TEST_DATABASE_URL?.trim();
-  if (
-    !databaseUrl ||
-    !testDatabaseUrl ||
-    env.VNDRLY_ISOLATED_TEST_DB !== "1"
-  ) {
-    throw new Error("schema contract requires the isolated test wrapper marker and database URLs");
+  if (!databaseUrl || !testDatabaseUrl || env.VNDRLY_ISOLATED_TEST_DB !== "1") {
+    throw new Error(
+      "schema contract requires the isolated test wrapper marker and database URLs",
+    );
   }
 
   const normalizedTarget = (urlString: string) => {
     const url = new URL(urlString);
     const protocol = url.protocol.toLowerCase();
-    const effectivePort = url.port || (
-      protocol === "postgres:" || protocol === "postgresql:" ? "5432" : ""
-    );
+    const effectivePort =
+      url.port ||
+      (protocol === "postgres:" || protocol === "postgresql:" ? "5432" : "");
     return JSON.stringify({
       protocol,
       hostname: url.hostname.toLowerCase(),
@@ -66,7 +67,9 @@ function requireIsolatedTestDatabaseUrl(env: {
     });
   };
   if (normalizedTarget(databaseUrl) !== normalizedTarget(testDatabaseUrl)) {
-    throw new Error("schema contract requires matching isolated database targets");
+    throw new Error(
+      "schema contract requires matching isolated database targets",
+    );
   }
 
   return databaseUrl;
@@ -133,6 +136,9 @@ const tables = {
     "longitude",
     "siteRadiusMeters",
     "partnerId",
+    "isActive",
+    "status",
+    "hidden",
   ]),
   partners: tableTag("partners", [
     "id",
@@ -231,12 +237,19 @@ function evalPred(pred: Pred | undefined, row: Row, now = new Date()): boolean {
 }
 
 let lastInsert: { table: string; values: Row | Row[] } | null = null;
+const selectCounts: Record<string, number> = {};
 
 function isCountExpression(value: unknown): value is CountExpr {
-  return Boolean(value && typeof value === "object" && (value as CountExpr).kind === "count");
+  return Boolean(
+    value && typeof value === "object" && (value as CountExpr).kind === "count",
+  );
 }
 
-function projectRow(row: Row, selection: Selection | undefined, count?: number): Row {
+function projectRow(
+  row: Row,
+  selection: Selection | undefined,
+  count?: number,
+): Row {
   if (!selection) return row;
   return Object.fromEntries(
     Object.entries(selection).map(([key, value]) => {
@@ -261,15 +274,20 @@ function makeQuery(tableName: string, selection?: Selection) {
     if (groupColumns.length > 0) {
       const grouped = new Map<string, Row[]>();
       for (const row of filtered) {
-        const key = groupColumns.map((column) => String(row[column.__col])).join("\u0000");
+        const key = groupColumns
+          .map((column) => String(row[column.__col]))
+          .join("\u0000");
         const rows = grouped.get(key) ?? [];
         rows.push(row);
         grouped.set(key, rows);
       }
-      return [...grouped.values()].map((rows) => projectRow(rows[0], selection, rows.length));
+      return [...grouped.values()].map((rows) =>
+        projectRow(rows[0], selection, rows.length),
+      );
     }
 
-    if (hasCount) return [projectRow(filtered[0] ?? {}, selection, filtered.length)];
+    if (hasCount)
+      return [projectRow(filtered[0] ?? {}, selection, filtered.length)];
 
     const rows = filtered.map((row) => projectRow(row, selection));
     return limitN != null ? rows.slice(0, limitN) : rows;
@@ -301,7 +319,10 @@ function makeQuery(tableName: string, selection?: Selection) {
 vi.mock("@workspace/db", () => {
   const db = {
     select: (_cols?: any) => ({
-      from: (t: any) => makeQuery(t.__name, _cols),
+      from: (t: any) => {
+        selectCounts[t.__name] = (selectCounts[t.__name] ?? 0) + 1;
+        return makeQuery(t.__name, _cols);
+      },
     }),
     selectDistinct: (_cols?: any) => ({
       from: (t: any) => makeQuery(t.__name, _cols),
@@ -354,8 +375,7 @@ vi.mock("@workspace/db", () => {
           const ret: any = {
             returning: async (_cols?: any) => ensure(),
             then: (resolve: any) => Promise.resolve(ensure()).then(resolve),
-            catch: (reject: any) =>
-              Promise.resolve(ensure()).catch(reject),
+            catch: (reject: any) => Promise.resolve(ensure()).catch(reject),
           };
           return ret;
         };
@@ -400,14 +420,28 @@ vi.mock("drizzle-orm", () => {
         values[0] &&
         typeof (values[0] as any).__col === "string"
       ) {
-        return { kind: "stalePlus30", col: values[0] as ColRef, now: new Date() };
+        return {
+          kind: "stalePlus30",
+          col: values[0] as ColRef,
+          now: new Date(),
+        };
       }
       // Range predicates used by GET /api/visits filter (from / to)
       if (values.length === 2 && /\s>=\s/.test(joined)) {
-        return { kind: "tsRange", col: values[0] as ColRef, cmp: ">=", val: values[1] as Date };
+        return {
+          kind: "tsRange",
+          col: values[0] as ColRef,
+          cmp: ">=",
+          val: values[1] as Date,
+        };
       }
       if (values.length === 2 && /\s<=\s/.test(joined)) {
-        return { kind: "tsRange", col: values[0] as ColRef, cmp: "<=", val: values[1] as Date };
+        return {
+          kind: "tsRange",
+          col: values[0] as ColRef,
+          cmp: "<=",
+          val: values[1] as Date,
+        };
       }
     }
     return { kind: "true" };
@@ -468,8 +502,6 @@ vi.mock("../lib/visit-events", () => ({
   }),
 }));
 
-
-
 function staffCookie(
   overrides: Partial<{
     userId: number;
@@ -494,10 +526,22 @@ function staffCookie(
 
 let app: express.Express;
 let visitsModule: typeof import("./visits");
+const hardeningEnvKeys = [
+  "VNDRLY_REQUIRE_PLATE_STATE",
+  "PREFERRED_PLATE_STATES_RATE_LIMIT_MAX",
+  "PREFERRED_PLATE_STATES_RATE_LIMIT_WINDOW_MS",
+  "PREFERRED_PLATE_STATES_GLOBAL_RATE_LIMIT_MAX",
+  "PREFERRED_PLATE_STATES_GLOBAL_RATE_LIMIT_WINDOW_MS",
+] as const;
+const originalHardeningEnv = Object.fromEntries(
+  hardeningEnvKeys.map((key) => [key, process.env[key]]),
+);
 
 beforeEach(async () => {
+  for (const key of hardeningEnvKeys) delete process.env[key];
   for (const k of Object.keys(fixtures)) fixtures[k] = [];
   for (const k of Object.keys(idCounters)) idCounters[k] = 0;
+  for (const k of Object.keys(selectCounts)) delete selectCounts[k];
   lastInsert = null;
   notifyUsersMock.mockClear();
   publishVisitEventMock.mockClear();
@@ -514,6 +558,11 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  for (const key of hardeningEnvKeys) {
+    const original = originalHardeningEnv[key];
+    if (original === undefined) delete process.env[key];
+    else process.env[key] = original;
+  }
   vi.clearAllMocks();
 });
 
@@ -543,7 +592,9 @@ describe("POST /api/visits/gate/read-plate", () => {
           vendorRole: "gatekeeper",
         }),
       )
-      .send({ objectPath: "/objects/uploads/00000000-0000-4000-8000-000000000001" });
+      .send({
+        objectPath: "/objects/uploads/00000000-0000-4000-8000-000000000001",
+      });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -560,14 +611,18 @@ describe("GET /api/visits/events", () => {
     const server = app.listen(0);
     await new Promise<void>((resolve) => server.once("listening", resolve));
     const address = server.address();
-    if (!address || typeof address === "string") throw new Error("test server did not bind a TCP port");
+    if (!address || typeof address === "string")
+      throw new Error("test server did not bind a TCP port");
     const controller = new AbortController();
 
     try {
-      const response = await fetch(`http://127.0.0.1:${address.port}/api/visits/events`, {
-        headers: { Cookie: staffCookie({ role: "admin" }) },
-        signal: controller.signal,
-      });
+      const response = await fetch(
+        `http://127.0.0.1:${address.port}/api/visits/events`,
+        {
+          headers: { Cookie: staffCookie({ role: "admin" }) },
+          signal: controller.signal,
+        },
+      );
       expect(response.status).toBe(200);
       expect(response.body).not.toBeNull();
       const subscriber = visitEventSubscriber;
@@ -607,7 +662,10 @@ describe("GET /api/visits/events", () => {
         const chunk = await Promise.race([
           reader.read(),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("timed out waiting for SSE visit event")), 2_000),
+            setTimeout(
+              () => reject(new Error("timed out waiting for SSE visit event")),
+              2_000,
+            ),
           ),
         ]);
         if (chunk.done) break;
@@ -640,6 +698,9 @@ function seedScenario() {
     longitude: -74.0,
     siteRadiusMeters: 150,
     partnerId: partner.id,
+    isActive: true,
+    status: "active",
+    hidden: false,
   };
   const otherSite = {
     id: 11,
@@ -650,6 +711,9 @@ function seedScenario() {
     longitude: -75.0,
     siteRadiusMeters: 150,
     partnerId: 99,
+    isActive: true,
+    status: "active",
+    hidden: false,
   };
   fixtures.partners = [partner];
   fixtures.vendors = [vendor, otherVendor];
@@ -679,9 +743,10 @@ async function startGuest(extras: Partial<Row> = {}) {
   return {
     token: res.body.token as string,
     guestSessionId: res.body.guestSessionId as number,
-    cookie: (res.headers["set-cookie"] as unknown as string[])?.find((c) =>
-      c.startsWith("vndrly_guest="),
-    ) ?? "",
+    cookie:
+      (res.headers["set-cookie"] as unknown as string[])?.find((c) =>
+        c.startsWith("vndrly_guest="),
+      ) ?? "",
     body: res.body,
   };
 }
@@ -690,8 +755,10 @@ describe("plate state persistence schema contract", () => {
   it("refuses a missing isolated-wrapper marker", () => {
     expect(() =>
       requireIsolatedTestDatabaseUrl({
-        DATABASE_URL: "postgresql://test:test@example.test/explicit_test_database",
-        TEST_DATABASE_URL: "postgresql://test:test@example.test/explicit_test_database",
+        DATABASE_URL:
+          "postgresql://test:test@example.test/explicit_test_database",
+        TEST_DATABASE_URL:
+          "postgresql://test:test@example.test/explicit_test_database",
       }),
     ).toThrow(/isolated test wrapper marker/);
   });
@@ -699,20 +766,26 @@ describe("plate state persistence schema contract", () => {
   it("refuses same-name targets on different hosts", () => {
     expect(() =>
       requireIsolatedTestDatabaseUrl({
-        DATABASE_URL: "postgresql://test:test@isolated-a.example.test/explicit_test_database",
-        TEST_DATABASE_URL: "postgresql://test:test@isolated-b.example.test/explicit_test_database",
+        DATABASE_URL:
+          "postgresql://test:test@isolated-a.example.test/explicit_test_database",
+        TEST_DATABASE_URL:
+          "postgresql://test:test@isolated-b.example.test/explicit_test_database",
         VNDRLY_ISOLATED_TEST_DB: "1",
       }),
     ).toThrow(/matching isolated database targets/);
   });
 
   it("accepts the exact wrapper target without requiring a database-name suffix", () => {
-    const databaseUrl = "postgresql://test%20user:password@isolated.example.test:5432/explicit_database?sslmode=require";
-    expect(requireIsolatedTestDatabaseUrl({
-      DATABASE_URL: databaseUrl,
-      TEST_DATABASE_URL: "postgresql://test%20user:other-password@isolated.example.test/explicit_database?application_name=vitest",
-      VNDRLY_ISOLATED_TEST_DB: "1",
-    })).toBe(databaseUrl);
+    const databaseUrl =
+      "postgresql://test%20user:password@isolated.example.test:5432/explicit_database?sslmode=require";
+    expect(
+      requireIsolatedTestDatabaseUrl({
+        DATABASE_URL: databaseUrl,
+        TEST_DATABASE_URL:
+          "postgresql://test%20user:other-password@isolated.example.test/explicit_database?application_name=vitest",
+        VNDRLY_ISOLATED_TEST_DB: "1",
+      }),
+    ).toBe(databaseUrl);
   });
 
   it("stores and returns TX for guest sessions and site visits", async () => {
@@ -748,11 +821,20 @@ describe("plate state persistence schema contract", () => {
       ]);
 
       const suffix = `plate-state-${Date.now()}`;
-      const guest = await isolatedClient.query<{ id: number; plate_state: string }>(
+      const guest = await isolatedClient.query<{
+        id: number;
+        plate_state: string;
+      }>(
         `INSERT INTO guest_sessions (token_jti, first_name, last_name, expires_at, plate_state)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id, plate_state`,
-        [suffix, "Schema", "Contract", new Date(Date.now() + 60 * 60 * 1000), "TX"],
+        [
+          suffix,
+          "Schema",
+          "Contract",
+          new Date(Date.now() + 60 * 60 * 1000),
+          "TX",
+        ],
       );
       expect(guest.rows[0]?.plate_state).toBe("TX");
 
@@ -766,7 +848,14 @@ describe("plate state persistence schema contract", () => {
         `INSERT INTO site_locations (partner_id, name, address, latitude, longitude, site_code)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [partner.rows[0]!.id, "Plate State Test Site", "1 Isolated Test Way", 31, -102, suffix.toUpperCase()],
+        [
+          partner.rows[0]!.id,
+          "Plate State Test Site",
+          "1 Isolated Test Way",
+          31,
+          -102,
+          suffix.toUpperCase(),
+        ],
       );
       const visit = await isolatedClient.query<{ plate_state: string }>(
         `INSERT INTO site_visits (
@@ -774,7 +863,15 @@ describe("plate state persistence schema contract", () => {
           host_type, host_partner_id, plate_state
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING plate_state`,
-        [site.rows[0]!.id, guest.rows[0]!.id, "Schema", "Contract", "partner", partner.rows[0]!.id, "TX"],
+        [
+          site.rows[0]!.id,
+          guest.rows[0]!.id,
+          "Schema",
+          "Contract",
+          "partner",
+          partner.rows[0]!.id,
+          "TX",
+        ],
       );
       expect(visit.rows[0]?.plate_state).toBe("TX");
     } finally {
@@ -789,24 +886,45 @@ describe("plate state persistence schema contract", () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("POST /api/auth/guest", () => {
+  it("accepts a legacy plate-only request while the rollout flag is disabled", async () => {
+    const res = await request(app).post("/api/auth/guest").send({
+      firstName: "Legacy",
+      lastName: "Driver",
+      vehiclePlate: "LEGACY-1",
+      safetyAcknowledged: true,
+    });
+
+    expectStatus(res, 200);
+    expect(res.body.profile).toMatchObject({
+      vehiclePlate: "LEGACY-1",
+      plateState: null,
+    });
+    expect(fixtures.guestSessions[0]).toMatchObject({
+      vehiclePlate: "LEGACY-1",
+      plateState: null,
+    });
+  });
+
   it.each([
     ["absent", undefined],
     ["null", null],
     ["empty", ""],
     ["blank", "   "],
   ])("rejects a vehicle plate when state is %s", async (_label, plateState) => {
-    const res = await request(app)
-      .post("/api/auth/guest")
-      .send({
-        firstName: "Jane",
-        lastName: "Doe",
-        vehiclePlate: "ABC123",
-        plateState,
-        safetyAcknowledged: true,
-      });
+    process.env.VNDRLY_REQUIRE_PLATE_STATE = "1";
+    const res = await request(app).post("/api/auth/guest").send({
+      firstName: "Jane",
+      lastName: "Doe",
+      vehiclePlate: "ABC123",
+      plateState,
+      safetyAcknowledged: true,
+    });
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ code: "missing-state", message: expect.any(String) });
+    expect(res.body).toMatchObject({
+      code: "missing-state",
+      message: expect.any(String),
+    });
     expect(fixtures.guestSessions).toHaveLength(0);
   });
 
@@ -816,10 +934,10 @@ describe("POST /api/auth/guest", () => {
     ["array", ["TX"]],
     ["object", { code: "TX" }],
     ["boolean", true],
-  ])("rejects a vehicle plate when state is an invalid %s", async (_label, plateState) => {
-    const res = await request(app)
-      .post("/api/auth/guest")
-      .send({
+  ])(
+    "rejects a vehicle plate when state is an invalid %s",
+    async (_label, plateState) => {
+      const res = await request(app).post("/api/auth/guest").send({
         firstName: "Jane",
         lastName: "Doe",
         vehiclePlate: "ABC123",
@@ -827,10 +945,14 @@ describe("POST /api/auth/guest", () => {
         safetyAcknowledged: true,
       });
 
-    expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ code: "invalid-state", message: expect.any(String) });
-    expect(fixtures.guestSessions).toHaveLength(0);
-  });
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({
+        code: "invalid-state",
+        message: expect.any(String),
+      });
+      expect(fixtures.guestSessions).toHaveLength(0);
+    },
+  );
 
   it("normalizes and returns the guest vehicle state", async () => {
     const guest = await startGuest({ plateState: " tx " });
@@ -839,20 +961,32 @@ describe("POST /api/auth/guest", () => {
       vehiclePlate: "ABC123",
       plateState: "TX",
     });
-    expect(guest.body.profile).toMatchObject({ vehiclePlate: "ABC123", plateState: "TX" });
+    expect(guest.body.profile).toMatchObject({
+      vehiclePlate: "ABC123",
+      plateState: "TX",
+    });
 
     const me = await request(app)
       .get("/api/auth/guest/me")
       .set("Authorization", `Bearer ${guest.token}`);
     expectStatus(me, 200);
-    expect(me.body.profile).toMatchObject({ vehiclePlate: "ABC123", plateState: "TX" });
+    expect(me.body.profile).toMatchObject({
+      vehiclePlate: "ABC123",
+      plateState: "TX",
+    });
   });
 
   it("discards a state when no vehicle plate is supplied", async () => {
     const guest = await startGuest({ vehiclePlate: " ", plateState: "tx" });
 
-    expect(fixtures.guestSessions[0]).toMatchObject({ vehiclePlate: null, plateState: null });
-    expect(guest.body.profile).toMatchObject({ vehiclePlate: null, plateState: null });
+    expect(fixtures.guestSessions[0]).toMatchObject({
+      vehiclePlate: null,
+      plateState: null,
+    });
+    expect(guest.body.profile).toMatchObject({
+      vehiclePlate: null,
+      plateState: null,
+    });
   });
 
   it("requires firstName and lastName", async () => {
@@ -873,15 +1007,13 @@ describe("POST /api/auth/guest", () => {
   });
 
   it("creates a guest session, sets cookie, returns bearer token", async () => {
-    const res = await request(app)
-      .post("/api/auth/guest")
-      .send({
-        firstName: "  Jane  ",
-        lastName: "Visitor",
-        phone: "555",
-        email: "j@e.com",
-        safetyAcknowledged: true,
-      });
+    const res = await request(app).post("/api/auth/guest").send({
+      firstName: "  Jane  ",
+      lastName: "Visitor",
+      phone: "555",
+      email: "j@e.com",
+      safetyAcknowledged: true,
+    });
     expectStatus(res, 200);
     expect(res.body.role).toBe("guest");
     expect(typeof res.body.token).toBe("string");
@@ -928,6 +1060,7 @@ describe("POST /api/auth/guest", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe("POST /api/visits/check-in", () => {
   it("rejects a supplied vehicle plate without a state", async () => {
+    process.env.VNDRLY_REQUIRE_PLATE_STATE = "1";
     const { site } = seedScenario();
     const { token } = await startGuest({ vehiclePlate: "", plateState: "" });
     const res = await request(app)
@@ -943,7 +1076,10 @@ describe("POST /api/visits/check-in", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ code: "missing-state", message: expect.any(String) });
+    expect(res.body).toMatchObject({
+      code: "missing-state",
+      message: expect.any(String),
+    });
     expect(fixtures.siteVisits).toHaveLength(0);
   });
 
@@ -964,7 +1100,10 @@ describe("POST /api/visits/check-in", () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({ code: "invalid-state", message: expect.any(String) });
+    expect(res.body).toMatchObject({
+      code: "invalid-state",
+      message: expect.any(String),
+    });
     expect(fixtures.siteVisits).toHaveLength(0);
   });
 
@@ -985,26 +1124,47 @@ describe("POST /api/visits/check-in", () => {
       });
 
     expectStatus(res, 201);
-    expect(fixtures.guestSessions[0]).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
-    expect(fixtures.siteVisits[0]).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
-    expect(res.body).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
-    expect(publishVisitEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: "visit.checked_in",
-      visit: expect.objectContaining({ vehiclePlate: "NEW-123", plateState: "TX" }),
-    }));
+    expect(fixtures.guestSessions[0]).toMatchObject({
+      vehiclePlate: "NEW-123",
+      plateState: "TX",
+    });
+    expect(fixtures.siteVisits[0]).toMatchObject({
+      vehiclePlate: "NEW-123",
+      plateState: "TX",
+    });
+    expect(res.body).toMatchObject({
+      vehiclePlate: "NEW-123",
+      plateState: "TX",
+    });
+    expect(publishVisitEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "visit.checked_in",
+        visit: expect.objectContaining({
+          vehiclePlate: "NEW-123",
+          plateState: "TX",
+        }),
+      }),
+    );
 
     fixtures.siteVisits[0].siteName = site.name;
     const active = await request(app)
       .get("/api/visits/me/active")
       .set("Authorization", `Bearer ${token}`);
     expectStatus(active, 200);
-    expect(active.body).toMatchObject({ vehiclePlate: "NEW-123", plateState: "TX" });
+    expect(active.body).toMatchObject({
+      vehiclePlate: "NEW-123",
+      plateState: "TX",
+    });
   });
 
   it("requires a state when a historical guest plate is written to a new visit", async () => {
+    process.env.VNDRLY_REQUIRE_PLATE_STATE = "1";
     const { site } = seedScenario();
     const { token } = await startGuest({ vehiclePlate: "", plateState: "" });
-    Object.assign(fixtures.guestSessions[0], { vehiclePlate: "LEGACY-1", plateState: null });
+    Object.assign(fixtures.guestSessions[0], {
+      vehiclePlate: "LEGACY-1",
+      plateState: null,
+    });
 
     const res = await request(app)
       .post("/api/visits/check-in")
@@ -1026,7 +1186,13 @@ describe("POST /api/visits/check-in", () => {
     seedScenario();
     const res = await request(app)
       .post("/api/visits/check-in")
-      .send({ siteLocationId: 10, hostType: "partner", hostPartnerId: 1, latitude: 40, longitude: -74 });
+      .send({
+        siteLocationId: 10,
+        hostType: "partner",
+        hostPartnerId: 1,
+        latitude: 40,
+        longitude: -74,
+      });
     expect(res.status).toBe(401);
     expect(res.body.code).toBe("auth.guest_required");
   });
@@ -1179,7 +1345,10 @@ describe("POST /api/visits/check-in", () => {
     expect(notifyUsersMock).toHaveBeenCalledTimes(1);
     const [recipients, notif] = notifyUsersMock.mock.calls[0] as any;
     expect(recipients).toEqual([100, 101]);
-    expect(notif).toMatchObject({ type: "visitor_checked_in", category: "visitor" });
+    expect(notif).toMatchObject({
+      type: "visitor_checked_in",
+      category: "visitor",
+    });
   });
 
   it("stores gate vehicle evidence photos on check-in and returns them to staff", async () => {
@@ -1331,7 +1500,10 @@ describe("POST /api/visits/:id/check-out", () => {
   it("returns 404 if the visit does not belong to the calling guest", async () => {
     const { visitId } = await checkInOnce();
     // Start a *different* guest session and try to check out the visit.
-    const otherGuest = await startGuest({ firstName: "Other", lastName: "Guest" });
+    const otherGuest = await startGuest({
+      firstName: "Other",
+      lastName: "Guest",
+    });
     const res = await request(app)
       .post(`/api/visits/${visitId}/check-out`)
       .set("Authorization", `Bearer ${otherGuest.token}`)
@@ -1445,14 +1617,20 @@ describe("GET /api/visits role-aware filtering", () => {
 
   it("serializes a historical visit with a null vehicle state in the staff list", async () => {
     await seedTwoVisits();
-    Object.assign(fixtures.siteVisits[0], { vehiclePlate: "LEGACY-1", plateState: null });
+    Object.assign(fixtures.siteVisits[0], {
+      vehiclePlate: "LEGACY-1",
+      plateState: null,
+    });
 
     const res = await request(app)
       .get("/api/visits")
       .set("Cookie", staffCookie({ role: "admin" }));
 
     expectStatus(res, 200);
-    expect(res.body[0]).toMatchObject({ vehiclePlate: "LEGACY-1", plateState: null });
+    expect(res.body[0]).toMatchObject({
+      vehiclePlate: "LEGACY-1",
+      plateState: null,
+    });
   });
 
   it("vendor sees only its own hosted visits", async () => {
@@ -1491,36 +1669,62 @@ describe("GET /api/visits role-aware filtering", () => {
 });
 
 describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
-  function addConfirmedVisits(siteId: number, plateState: string | null, count: number, daysAgo: number) {
+  function addConfirmedVisits(
+    siteId: number,
+    plateState: string | null,
+    count: number,
+    daysAgo: number,
+  ) {
     for (let index = 0; index < count; index += 1) {
       fixtures.siteVisits.push({
         id: nextId("siteVisits"),
         siteLocationId: siteId,
         plateState,
-        checkInTime: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000 - index),
+        checkInTime: new Date(
+          Date.now() - daysAgo * 24 * 60 * 60 * 1000 - index,
+        ),
       });
     }
   }
 
-  it("allows unauthenticated self-service callers and discloses only aggregate recommendations", async () => {
+  it("allows public self-service callers with matching QR proof and discloses only aggregate recommendations", async () => {
     const { site } = seedScenario();
     addConfirmedVisits(site.id, "OK", 2, 1);
 
-    const res = await request(app)
-      .get(`/api/visits/sites/${site.id}/preferred-plate-states`);
+    const res = await request(app).get(
+      `/api/visits/sites/${site.id}/preferred-plate-states?siteCode=${site.siteCode}`,
+    );
 
     expectStatus(res, 200);
     expect(res.body).toEqual({ preferred: ["OK", "CA", "TX", "NY", "FL"] });
     expect(Object.keys(res.body)).toEqual(["preferred"]);
   });
 
-  it("allows an authenticated guest to retrieve the same aggregate-only recommendations", async () => {
+  it("rejects a public numeric-id request without matching QR proof", async () => {
+    const { site } = seedScenario();
+
+    const missingProof = await request(app).get(
+      `/api/visits/sites/${site.id}/preferred-plate-states`,
+    );
+    const wrongProof = await request(app).get(
+      `/api/visits/sites/${site.id}/preferred-plate-states?siteCode=SITE-WRONG`,
+    );
+
+    expect(missingProof.status).toBe(404);
+    expect(missingProof.body.code).toBe("site.not_found");
+    expect(wrongProof.status).toBe(404);
+    expect(wrongProof.body.code).toBe("site.not_found");
+  });
+
+  it("allows an authenticated guest with matching QR proof to retrieve aggregate-only recommendations", async () => {
     const { site } = seedScenario();
     addConfirmedVisits(site.id, "NM", 2, 1);
     const { token } = await startGuest();
 
     const res = await request(app)
-      .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
+      .get(
+        `/api/visits/sites/${site.id}/preferred-plate-states?siteCode=${site.siteCode}`,
+      )
       .set("Authorization", `Bearer ${token}`);
 
     expectStatus(res, 200);
@@ -1528,11 +1732,53 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
     expect(Object.keys(res.body)).toEqual(["preferred"]);
   });
 
+  it("binds an authenticated guest to the site of their active visit", async () => {
+    const { site, otherSite } = seedScenario();
+    const { token, guestSessionId } = await startGuest();
+    fixtures.siteVisits.push({
+      id: nextId("siteVisits"),
+      guestSessionId,
+      siteLocationId: site.id,
+      plateState: "TX",
+      checkInTime: new Date(),
+      checkOutTime: null,
+    });
+
+    const res = await request(app)
+      .get(
+        `/api/visits/sites/${otherSite.id}/preferred-plate-states?siteCode=${otherSite.siteCode}`,
+      )
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("visit.no_access");
+  });
+
+  it.each([
+    ["inactive", { isActive: false }],
+    ["non-active status", { status: "inactive" }],
+    ["hidden", { hidden: true }],
+  ])(
+    "does not expose a %s site to public proof holders",
+    async (_label, patch) => {
+      const { site } = seedScenario();
+      Object.assign(site, patch);
+
+      const res = await request(app).get(
+        `/api/visits/sites/${site.id}/preferred-plate-states?siteCode=${site.siteCode}`,
+      );
+
+      expect(res.status).toBe(404);
+      expect(res.body.code).toBe("site.not_found");
+    },
+  );
+
   it("returns not found for a missing site to an unauthenticated self-service caller", async () => {
     seedScenario();
 
-    const res = await request(app)
-      .get("/api/visits/sites/9999/preferred-plate-states");
+    const res = await request(app).get(
+      "/api/visits/sites/9999/preferred-plate-states?siteCode=SITE-NOT-FOUND",
+    );
 
     expect(res.status).toBe(404);
     expect(res.body.code).toBe("site.not_found");
@@ -1564,13 +1810,76 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
     expect(res.body).toEqual({ preferred: ["TX", "NM", "OK", "CA", "NY"] });
   });
 
+  it("caches aggregate ranking work briefly after authorization", async () => {
+    const { site } = seedScenario();
+    addConfirmedVisits(site.id, "OK", 2, 1);
+
+    const first = await request(app).get(
+      `/api/visits/sites/${site.id}/preferred-plate-states?siteCode=${site.siteCode}`,
+    );
+    const aggregateReadsAfterFirst = selectCounts.siteVisits;
+    const second = await request(app).get(
+      `/api/visits/sites/${site.id}/preferred-plate-states?siteCode=${site.siteCode}`,
+    );
+
+    expectStatus(first, 200);
+    expectStatus(second, 200);
+    expect(aggregateReadsAfterFirst).toBe(2);
+    expect(selectCounts.siteVisits).toBe(aggregateReadsAfterFirst);
+  });
+
+  it("uses trusted request IP semantics so spoofed X-Forwarded-For values cannot bypass the dedicated limit", async () => {
+    process.env.PREFERRED_PLATE_STATES_RATE_LIMIT_MAX = "1";
+    process.env.PREFERRED_PLATE_STATES_RATE_LIMIT_WINDOW_MS = "60000";
+    process.env.PREFERRED_PLATE_STATES_GLOBAL_RATE_LIMIT_MAX = "100";
+    const { site } = seedScenario();
+    const path = `/api/visits/sites/${site.id}/preferred-plate-states?siteCode=${site.siteCode}`;
+
+    const first = await request(app)
+      .get(path)
+      .set("X-Forwarded-For", "198.51.100.10");
+    const second = await request(app)
+      .get(path)
+      .set("X-Forwarded-For", "203.0.113.99");
+
+    expectStatus(first, 200);
+    expect(second.status).toBe(429);
+    expect(second.body.code).toBe("preferred_plate_states.rate_limited");
+  });
+
+  it("enforces a global cost ceiling that different authenticated identities cannot bypass", async () => {
+    process.env.PREFERRED_PLATE_STATES_RATE_LIMIT_MAX = "100";
+    process.env.PREFERRED_PLATE_STATES_GLOBAL_RATE_LIMIT_MAX = "1";
+    process.env.PREFERRED_PLATE_STATES_GLOBAL_RATE_LIMIT_WINDOW_MS = "60000";
+    const { site } = seedScenario();
+    const path = `/api/visits/sites/${site.id}/preferred-plate-states`;
+
+    const first = await request(app)
+      .get(path)
+      .set("Cookie", staffCookie({ userId: 10, role: "admin" }));
+    const second = await request(app)
+      .get(path)
+      .set("Cookie", staffCookie({ userId: 11, role: "admin" }));
+
+    expectStatus(first, 200);
+    expect(second.status).toBe(429);
+    expect(second.body.code).toBe("preferred_plate_states.rate_limited");
+  });
+
   it("allows gatekeepers to load recommendations for an assigned site", async () => {
     const { site, vendor } = seedScenario();
     addConfirmedVisits(site.id, "TX", 1, 1);
 
     const res = await request(app)
       .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }));
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      );
 
     expectStatus(res, 200);
     expect(res.body).toEqual({ preferred: ["TX", "CA", "NY", "FL", "OH"] });
@@ -1581,7 +1890,14 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
 
     const res = await request(app)
       .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "office" }));
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "office",
+        }),
+      );
 
     expectStatus(res, 200);
     expect(res.body).toEqual({ preferred: ["CA", "TX", "NY", "FL", "OH"] });
@@ -1592,7 +1908,14 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
 
     const res = await request(app)
       .get(`/api/visits/sites/${otherSite.id}/preferred-plate-states`)
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }));
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      );
 
     expect(res.status).toBe(403);
     expect(res.body.code).toBe("visit.no_access");
@@ -1617,7 +1940,10 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
 
     const res = await request(app)
       .get(`/api/visits/sites/${site.id}/preferred-plate-states`)
-      .set("Cookie", staffCookie({ role: "partner", partnerId: site.partnerId }));
+      .set(
+        "Cookie",
+        staffCookie({ role: "partner", partnerId: site.partnerId }),
+      );
 
     expectStatus(res, 200);
     expect(res.body).toEqual({ preferred: ["OK", "NM", "TX", "CA", "NY"] });
@@ -1645,9 +1971,24 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
       const { site } = seedScenario();
       const cutoff = now - 90 * 24 * 60 * 60 * 1000;
       fixtures.siteVisits.push(
-        { id: nextId("siteVisits"), siteLocationId: site.id, plateState: "OK", checkInTime: new Date(cutoff) },
-        { id: nextId("siteVisits"), siteLocationId: site.id, plateState: "TX", checkInTime: new Date(cutoff - 1) },
-        { id: nextId("siteVisits"), siteLocationId: site.id, plateState: "TX", checkInTime: new Date(cutoff - 2) },
+        {
+          id: nextId("siteVisits"),
+          siteLocationId: site.id,
+          plateState: "OK",
+          checkInTime: new Date(cutoff),
+        },
+        {
+          id: nextId("siteVisits"),
+          siteLocationId: site.id,
+          plateState: "TX",
+          checkInTime: new Date(cutoff - 1),
+        },
+        {
+          id: nextId("siteVisits"),
+          siteLocationId: site.id,
+          plateState: "TX",
+          checkInTime: new Date(cutoff - 2),
+        },
       );
 
       const res = await request(app)
@@ -1675,10 +2016,18 @@ describe("GET /api/visits/sites/:siteId/preferred-plate-states", () => {
 
 describe("gatekeeper visit workflow", () => {
   it("rejects a gatekeeper vehicle plate without a state", async () => {
+    process.env.VNDRLY_REQUIRE_PLATE_STATE = "1";
     const { site, vendor } = seedScenario();
     const response = await request(app)
       .post("/api/visits/gate/check-in")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      )
       .send({
         firstName: "Pat",
         lastName: "Guarded",
@@ -1699,7 +2048,14 @@ describe("gatekeeper visit workflow", () => {
     const { site, vendor } = seedScenario();
     const response = await request(app)
       .post("/api/visits/gate/check-in")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      )
       .send({
         firstName: "Pat",
         lastName: "Guarded",
@@ -1721,7 +2077,14 @@ describe("gatekeeper visit workflow", () => {
     const { site, vendor } = seedScenario();
     const response = await request(app)
       .post("/api/visits/gate/check-in")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      )
       .send({
         firstName: "Pat",
         lastName: "Guarded",
@@ -1735,19 +2098,33 @@ describe("gatekeeper visit workflow", () => {
       });
 
     expectStatus(response, 201);
-    expect(response.body).toMatchObject({ vehiclePlate: "GATE-1", plateState: "TX" });
-    expect(fixtures.siteVisits[0]).toMatchObject({ vehiclePlate: "GATE-1", plateState: "TX" });
-    expect(publishVisitEventMock).toHaveBeenCalledWith(expect.objectContaining({
-      type: "visit.checked_in",
-      visit: expect.objectContaining({ vehiclePlate: "GATE-1", plateState: "TX" }),
-    }));
+    expect(response.body).toMatchObject({
+      vehiclePlate: "GATE-1",
+      plateState: "TX",
+    });
+    expect(fixtures.siteVisits[0]).toMatchObject({
+      vehiclePlate: "GATE-1",
+      plateState: "TX",
+    });
+    expect(publishVisitEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "visit.checked_in",
+        visit: expect.objectContaining({
+          vehiclePlate: "GATE-1",
+          plateState: "TX",
+        }),
+      }),
+    );
   });
 
   it("requires the explicit gatekeeper role", async () => {
     const { site, vendor } = seedScenario();
     const response = await request(app)
       .post("/api/visits/gate/check-in")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: null }))
+      .set(
+        "Cookie",
+        staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: null }),
+      )
       .send({
         firstName: "Pat",
         lastName: "Guarded",
@@ -1763,7 +2140,11 @@ describe("gatekeeper visit workflow", () => {
 
   it("keeps partner-hosted visits visible and check-outable at assigned sites", async () => {
     const { site, vendor } = seedScenario();
-    const cookie = staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" });
+    const cookie = staffCookie({
+      role: "vendor",
+      vendorId: vendor.id,
+      vendorRole: "gatekeeper",
+    });
     const checkIn = await request(app)
       .post("/api/visits/gate/check-in")
       .set("Cookie", cookie)
@@ -1783,7 +2164,10 @@ describe("gatekeeper visit workflow", () => {
     const list = await request(app).get("/api/visits").set("Cookie", cookie);
     expectStatus(list, 200);
     expect(list.body).toHaveLength(1);
-    expect(list.body[0]).toMatchObject({ firstName: "Jamie", hostType: "partner" });
+    expect(list.body[0]).toMatchObject({
+      firstName: "Jamie",
+      hostType: "partner",
+    });
 
     const checkOut = await request(app)
       .post(`/api/visits/gate/${checkIn.body.id}/check-out`)
@@ -1795,10 +2179,21 @@ describe("gatekeeper visit workflow", () => {
 
   it("can check in a visitor for another vendor assigned to the same guarded site", async () => {
     const { site, vendor, otherVendor } = seedScenario();
-    fixtures.siteWorkAssignments.push({ id: 2, siteLocationId: site.id, vendorId: otherVendor.id });
+    fixtures.siteWorkAssignments.push({
+      id: 2,
+      siteLocationId: site.id,
+      vendorId: otherVendor.id,
+    });
     const response = await request(app)
       .post("/api/visits/gate/check-in")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      )
       .send({
         firstName: "Morgan",
         lastName: "Driver",
@@ -1816,7 +2211,14 @@ describe("gatekeeper visit workflow", () => {
     const { otherSite, vendor } = seedScenario();
     const response = await request(app)
       .post("/api/visits/gate/check-in")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }))
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      )
       .send({
         firstName: "Pat",
         lastName: "Guarded",
@@ -1834,13 +2236,31 @@ describe("gatekeeper visit workflow", () => {
     const { vendor } = seedScenario();
     const office = await request(app)
       .get("/api/visits/gate/ops")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "office" }));
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "office",
+        }),
+      );
     expectStatus(office, 200);
-    expect(office.body).toMatchObject({ enabled: expect.any(Boolean), visits: expect.any(Array), staff: expect.any(Array) });
+    expect(office.body).toMatchObject({
+      enabled: expect.any(Boolean),
+      visits: expect.any(Array),
+      staff: expect.any(Array),
+    });
 
     const booth = await request(app)
       .get("/api/visits/gate/ops")
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: vendor.id, vendorRole: "gatekeeper" }));
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: vendor.id,
+          vendorRole: "gatekeeper",
+        }),
+      );
     expect(booth.status).toBe(403);
   });
 });
@@ -1908,14 +2328,20 @@ describe("GET /api/visits/:id (staff detail)", () => {
 
   it("serializes a historical visit with a null vehicle state in detail", async () => {
     const { visitId } = seedDetailVisit();
-    Object.assign(fixtures.siteVisits[0], { vehiclePlate: "LEGACY-1", plateState: null });
+    Object.assign(fixtures.siteVisits[0], {
+      vehiclePlate: "LEGACY-1",
+      plateState: null,
+    });
 
     const res = await request(app)
       .get(`/api/visits/${visitId}`)
       .set("Cookie", staffCookie({ role: "admin" }));
 
     expectStatus(res, 200);
-    expect(res.body).toMatchObject({ vehiclePlate: "LEGACY-1", plateState: null });
+    expect(res.body).toMatchObject({
+      vehiclePlate: "LEGACY-1",
+      plateState: null,
+    });
   });
 
   it("returns 403 when a vendor reads a visit hosted by another vendor", async () => {
@@ -1932,7 +2358,14 @@ describe("GET /api/visits/:id (staff detail)", () => {
     const assignedVendorId = fixtures.siteWorkAssignments[0].vendorId as number;
     const res = await request(app)
       .get(`/api/visits/${visitId}`)
-      .set("Cookie", staffCookie({ role: "vendor", vendorId: assignedVendorId, vendorRole: "gatekeeper" }));
+      .set(
+        "Cookie",
+        staffCookie({
+          role: "vendor",
+          vendorId: assignedVendorId,
+          vendorRole: "gatekeeper",
+        }),
+      );
     expectStatus(res, 200);
     expect(res.body.id).toBe(visitId);
   });
@@ -2042,7 +2475,9 @@ describe("guest visit flow (e2e via route layer)", () => {
     const guest = await startGuest();
 
     // 2) Fetch public site context (no auth required).
-    const ctx = await request(app).get(`/api/visits/site-context/${site.siteCode}`);
+    const ctx = await request(app).get(
+      `/api/visits/site-context/${site.siteCode}`,
+    );
     expectStatus(ctx, 200);
     expect(ctx.body.site.id).toBe(site.id);
     expect(ctx.body.partner?.id).toBe(1);

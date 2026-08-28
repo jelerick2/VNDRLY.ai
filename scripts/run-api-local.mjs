@@ -1,11 +1,22 @@
-process.env.VNDRLY_LOAD_ENV_LOCAL = "1";
-import "./load-env-local.mjs";
-import "./dev-local-defaults.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { shouldLoadLocalEnvironment } from "./run-api-local-config.mjs";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+if (shouldLoadLocalEnvironment(process.env)) {
+  process.env.VNDRLY_LOAD_ENV_LOCAL = "1";
+  await import("./load-env-local.mjs");
+} else {
+  // Never allow a wrapper-supplied DATABASE_URL to be replaced by the
+  // shared .env.local target, even if the parent shell carried this flag.
+  process.env.VNDRLY_LOAD_ENV_LOCAL = "0";
+}
+await import("./dev-local-defaults.mjs");
+
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 const apiDir = path.resolve(repoRoot, "artifacts/api-server");
 
 function sleep(ms) {
@@ -26,11 +37,12 @@ function buildApi() {
 
 async function runOnce() {
   return new Promise((resolve) => {
-    const child = spawn(
-      "node",
-      ["--enable-source-maps", "./dist/index.mjs"],
-      { cwd: apiDir, stdio: "inherit", shell: true, env: process.env },
-    );
+    const child = spawn("node", ["--enable-source-maps", "./dist/index.mjs"], {
+      cwd: apiDir,
+      stdio: "inherit",
+      shell: true,
+      env: process.env,
+    });
     child.on("exit", (code) => resolve(code ?? 1));
   });
 }
@@ -44,7 +56,9 @@ while (true) {
   if (code === 0) {
     process.exit(0);
   }
-  console.error(`[vndrly-api] Exited with code ${code}; rebuilding and restarting in 3s...`);
+  console.error(
+    `[vndrly-api] Exited with code ${code}; rebuilding and restarting in 3s...`,
+  );
   await sleep(3000);
   buildApi();
 }

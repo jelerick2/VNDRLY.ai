@@ -30,7 +30,11 @@ import {
   resolveAssignedGateSites,
   shouldApplyDefaultGateSite,
 } from "@/lib/gate-default-site";
-import { fetchSiteContext, type ActiveVisit, type SiteContext } from "@/lib/guest";
+import {
+  fetchSiteContext,
+  type ActiveVisit,
+  type SiteContext,
+} from "@/lib/guest";
 import {
   fetchAssignedGateSites,
   fetchPreferredPlateStates,
@@ -45,18 +49,28 @@ import { captureAndUploadImage } from "@/lib/photos";
 import { formatPlateForDisplay } from "@/lib/plate-display";
 import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
-import { createPttRecorder, PttMicPermissionError, type PttRecorder } from "@/lib/ptt";
+import {
+  createPttRecorder,
+  PttMicPermissionError,
+  type PttRecorder,
+} from "@/lib/ptt";
 import { buildHostOptions } from "@/lib/visitorCheckin";
 import {
   NATIONAL_PLATE_STATE_FALLBACK,
   PLATE_OCR_STATE_CONFIDENCE_THRESHOLD,
   normalizePlateState,
   plateMatchKey,
+  reconcileAutomatedPlateUpdate,
   type PlateStateCode,
 } from "@workspace/plate-state";
 
 type DriverNameField = "firstName" | "lastName";
-type PlateAutoFillField = "firstName" | "lastName" | "company" | "purpose" | "duration";
+type PlateAutoFillField =
+  | "firstName"
+  | "lastName"
+  | "company"
+  | "purpose"
+  | "duration";
 type PlateAutoFillSnapshot = {
   matchKey: string;
   values: Partial<Record<PlateAutoFillField, string>>;
@@ -75,8 +89,13 @@ function driverSuggestions(
   return [...visits]
     .sort((a, b) => Date.parse(b.checkInTime) - Date.parse(a.checkInTime))
     .filter((visit) => {
-      if (!(visit[field] ?? "").trim().toLowerCase().startsWith(needle)) return false;
-      if (companyNeedle && !(visit.company ?? "").trim().toLowerCase().startsWith(companyNeedle)) return false;
+      if (!(visit[field] ?? "").trim().toLowerCase().startsWith(needle))
+        return false;
+      if (
+        companyNeedle &&
+        !(visit.company ?? "").trim().toLowerCase().startsWith(companyNeedle)
+      )
+        return false;
       const key = `${(visit.firstName ?? "").trim().toLowerCase()}|${(visit.lastName ?? "").trim().toLowerCase()}|${(visit.company ?? "").trim().toLowerCase()}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -112,7 +131,8 @@ export default function GatekeeperScreen() {
   const [platePhotoUrl, setPlatePhotoUrl] = useState<string | null>(null);
   const [vehiclePhotoUrl, setVehiclePhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [activeNameField, setActiveNameField] = useState<DriverNameField | null>(null);
+  const [activeNameField, setActiveNameField] =
+    useState<DriverNameField | null>(null);
   const [voiceListening, setVoiceListening] = useState(false);
 
   const activeVisits = useQuery({
@@ -149,17 +169,25 @@ export default function GatekeeperScreen() {
     retry: false,
   });
   const preferredPlateStates = useQuery({
-    queryKey: ["preferred-plate-states", ctxQuery.data?.site.id],
-    queryFn: () => fetchPreferredPlateStates(ctxQuery.data!.site.id),
-    enabled: Boolean(ctxQuery.data?.site.id),
+    queryKey: ["preferred-plate-states", ctxQuery.data?.site.id, confirmedCode],
+    queryFn: () =>
+      fetchPreferredPlateStates(ctxQuery.data!.site.id, confirmedCode!),
+    enabled: Boolean(ctxQuery.data?.site.id && confirmedCode),
     retry: false,
   });
-  const orderedStatePreferences = preferredPlateStates.data?.preferred
-    ?? NATIONAL_PLATE_STATE_FALLBACK;
+  const orderedStatePreferences =
+    preferredPlateStates.data?.preferred ?? NATIONAL_PLATE_STATE_FALLBACK;
 
   useEffect(() => {
     if (appliedDefault.current) return;
-    if (!shouldApplyDefaultGateSite({ confirmedCode, typedCode: siteCode, defaultSiteCode })) return;
+    if (
+      !shouldApplyDefaultGateSite({
+        confirmedCode,
+        typedCode: siteCode,
+        defaultSiteCode,
+      })
+    )
+      return;
     if (!defaultSiteCode) return;
     appliedDefault.current = true;
     setSiteCode(defaultSiteCode);
@@ -176,15 +204,20 @@ export default function GatekeeperScreen() {
 
   const inputStyle = [
     styles.input,
-    { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card },
+    {
+      borderColor: colors.border,
+      color: colors.foreground,
+      backgroundColor: colors.card,
+    },
   ];
   const matchingDrivers = useMemo(
-    () => driverSuggestions(
-      recentVisits.data ?? [],
-      activeNameField,
-      activeNameField === "firstName" ? firstName : lastName,
-      company,
-    ),
+    () =>
+      driverSuggestions(
+        recentVisits.data ?? [],
+        activeNameField,
+        activeNameField === "firstName" ? firstName : lastName,
+        company,
+      ),
     [activeNameField, company, firstName, lastName, recentVisits.data],
   );
 
@@ -198,7 +231,8 @@ export default function GatekeeperScreen() {
       if (!plateState) setPlateState(normalizePlateState(visit.plateState));
     }
     if (!purpose.trim()) setPurpose(visit.purpose ?? "");
-    if (duration === "60" && visit.expectedDurationMinutes) setDuration(String(visit.expectedDurationMinutes));
+    if (duration === "60" && visit.expectedDurationMinutes)
+      setDuration(String(visit.expectedDurationMinutes));
     setActiveNameField(null);
   };
 
@@ -220,8 +254,16 @@ export default function GatekeeperScreen() {
       if (fill.firstName) setFirstName(fill.firstName);
       if (fill.lastName) setLastName(fill.lastName);
       if (fill.company) setCompany(fill.company);
-      if (fill.vehiclePlate) setVehiclePlate(fill.vehiclePlate);
-      if (fill.plateState) setPlateState(fill.plateState);
+      const automatedPlate = reconcileAutomatedPlateUpdate({
+        currentPlate: vehiclePlate,
+        currentState: plateState,
+        automatedPlate: fill.vehiclePlate,
+        automatedState: fill.plateState,
+      });
+      setVehiclePlate(automatedPlate.vehiclePlate ?? "");
+      setPlateState(automatedPlate.plateState);
+      setPlateStateError(null);
+      setOcrStateNotice(null);
       if (fill.purpose) setPurpose(fill.purpose);
       if (fill.duration) setDuration(fill.duration);
       plateAutoFillRef.current = null;
@@ -229,7 +271,9 @@ export default function GatekeeperScreen() {
     } catch (error) {
       Alert.alert(
         t("visitor.error"),
-        error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
+        error instanceof PttMicPermissionError
+          ? t("foremanHome.pttMicDeniedBody")
+          : t("gatekeeper.voiceNotUnderstood"),
       );
     } finally {
       await recorder.dispose();
@@ -244,27 +288,38 @@ export default function GatekeeperScreen() {
       voiceRecorderRef.current = recorder;
       await recorder.start();
       setVoiceListening(true);
-      voiceTimerRef.current = setTimeout(() => void finishGateVoiceEntry(), 6500);
+      voiceTimerRef.current = setTimeout(
+        () => void finishGateVoiceEntry(),
+        6500,
+      );
     } catch (error) {
       voiceRecorderRef.current = null;
       Alert.alert(
         t("visitor.error"),
-        error instanceof PttMicPermissionError ? t("foremanHome.pttMicDeniedBody") : t("gatekeeper.voiceNotUnderstood"),
+        error instanceof PttMicPermissionError
+          ? t("foremanHome.pttMicDeniedBody")
+          : t("gatekeeper.voiceNotUnderstood"),
       );
     }
   };
 
   useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener("vndrly:gate-voice", () => {
-      void startGateVoiceEntry();
-    });
+    const subscription = DeviceEventEmitter.addListener(
+      "vndrly:gate-voice",
+      () => {
+        void startGateVoiceEntry();
+      },
+    );
     return () => subscription.remove();
   }, [voiceListening]);
 
-  useEffect(() => () => {
-    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
-    void voiceRecorderRef.current?.dispose();
-  }, []);
+  useEffect(
+    () => () => {
+      if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+      void voiceRecorderRef.current?.dispose();
+    },
+    [],
+  );
 
   const resetForm = () => {
     plateAutoFillRef.current = null;
@@ -293,35 +348,49 @@ export default function GatekeeperScreen() {
   const onCaptureEvidence = async (kind: "plate" | "vehicle") => {
     setBusy(true);
     try {
-      const result = await captureAndUploadImage({ maxBytes: 8 * 1024 * 1024, purpose: "gate-evidence" });
+      const result = await captureAndUploadImage({
+        maxBytes: 8 * 1024 * 1024,
+        purpose: "gate-evidence",
+      });
       if (!result) return;
       if (kind === "plate") {
         setOcrStateNotice(null);
         void deleteGateEvidence(platePhotoUrl).catch(() => undefined);
         setPlatePhotoUrl(result.objectPath);
-        const candidate = await readGatePlate(result.objectPath).catch(() => null);
-        if (candidate?.plate) setVehiclePlate(candidate.plate);
-        if (
-          candidate?.stateConfidence != null
-          && candidate.stateConfidence >= PLATE_OCR_STATE_CONFIDENCE_THRESHOLD
-        ) {
-          const normalizedState = normalizePlateState(candidate.state);
-          if (normalizedState) {
-            setPlateState(normalizedState);
-            setPlateStateError(null);
+        const candidate = await readGatePlate(result.objectPath).catch(
+          () => null,
+        );
+        if (candidate?.plate) {
+          const confidentState =
+            candidate?.stateConfidence != null &&
+            candidate.stateConfidence >= PLATE_OCR_STATE_CONFIDENCE_THRESHOLD
+              ? normalizePlateState(candidate.state)
+              : null;
+          const automatedPlate = reconcileAutomatedPlateUpdate({
+            currentPlate: vehiclePlate,
+            currentState: plateState,
+            automatedPlate: candidate.plate,
+            automatedState: confidentState,
+          });
+          setVehiclePlate(automatedPlate.vehiclePlate ?? "");
+          setPlateState(automatedPlate.plateState);
+          setPlateStateError(null);
+          if (confidentState) {
             setOcrStateNotice({
-              suggestedState: normalizedState,
-              selectedState: normalizedState,
+              suggestedState: confidentState,
+              selectedState: confidentState,
             });
           }
         }
-      }
-      else {
+      } else {
         void deleteGateEvidence(vehiclePhotoUrl).catch(() => undefined);
         setVehiclePhotoUrl(result.objectPath);
       }
     } catch (e) {
-      Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorAttachPhoto")));
+      Alert.alert(
+        t("visitor.error"),
+        translateApiError(e, t, t("tickets.errorAttachPhoto")),
+      );
     } finally {
       setBusy(false);
     }
@@ -331,7 +400,8 @@ export default function GatekeeperScreen() {
     const snapshot = plateAutoFillRef.current;
     if (!snapshot) return;
     delete snapshot.values[field];
-    if (Object.keys(snapshot.values).length === 0) plateAutoFillRef.current = null;
+    if (Object.keys(snapshot.values).length === 0)
+      plateAutoFillRef.current = null;
   };
 
   const currentPlateMatchKey = plateMatchKey(plateState, vehiclePlate);
@@ -352,20 +422,34 @@ export default function GatekeeperScreen() {
     const exactKey = plateMatchKey(plateState, vehiclePlate);
     const prior = [...(recentVisits.data ?? [])]
       .filter((visit) => {
-        if ((visit.vehiclePlate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") !== normalized) return false;
+        if (
+          (visit.vehiclePlate ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "") !==
+          normalized
+        )
+          return false;
         if (!plateState) return true;
         const visitState = normalizePlateState(visit.plateState);
-        return !visitState || plateMatchKey(visitState, visit.vehiclePlate) === exactKey;
+        return (
+          !visitState ||
+          plateMatchKey(visitState, visit.vehiclePlate) === exactKey
+        );
       })
       .sort((a, b) => {
         const priority = (visit: ActiveVisit) =>
-          exactKey && plateMatchKey(visit.plateState, visit.vehiclePlate) === exactKey ? 0 : 1;
-        return priority(a) - priority(b) || Date.parse(b.checkInTime) - Date.parse(a.checkInTime);
+          exactKey &&
+          plateMatchKey(visit.plateState, visit.vehiclePlate) === exactKey
+            ? 0
+            : 1;
+        return (
+          priority(a) - priority(b) ||
+          Date.parse(b.checkInTime) - Date.parse(a.checkInTime)
+        );
       })[0];
     if (!prior) return;
-    const values = plateAutoFillRef.current?.matchKey === exactKey
-      ? { ...plateAutoFillRef.current.values }
-      : {};
+    const values =
+      plateAutoFillRef.current?.matchKey === exactKey
+        ? { ...plateAutoFillRef.current.values }
+        : {};
     if (!firstName && prior.firstName) {
       values.firstName = prior.firstName;
       setFirstName(prior.firstName);
@@ -389,7 +473,16 @@ export default function GatekeeperScreen() {
     if (exactKey && Object.keys(values).length > 0) {
       plateAutoFillRef.current = { matchKey: exactKey, values };
     }
-  }, [company, duration, firstName, lastName, plateState, purpose, recentVisits.data, vehiclePlate]);
+  }, [
+    company,
+    duration,
+    firstName,
+    lastName,
+    plateState,
+    purpose,
+    recentVisits.data,
+    vehiclePlate,
+  ]);
 
   const onCheckIn = async () => {
     const ctx = ctxQuery.data;
@@ -423,20 +516,26 @@ export default function GatekeeperScreen() {
             ? t("gatekeeper.nameRequired")
             : result.reason === "missing-plate"
               ? t("gatekeeper.plateRequired")
-            : result.reason === "missing-state"
-              ? t("gatekeeper.plateStateRequired")
-            : result.reason === "no-host"
-              ? t("visitor.pickHost")
-              : t("visitor.locationDenied");
+              : result.reason === "missing-state"
+                ? t("gatekeeper.plateStateRequired")
+                : result.reason === "no-host"
+                  ? t("visitor.pickHost")
+                  : t("visitor.locationDenied");
         Alert.alert(t("visitor.error"), message);
         return;
       }
       resetForm();
       await qc.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
       await qc.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
-      Alert.alert(t("gatekeeper.checkedInTitle"), t("gatekeeper.checkedInBody"));
+      Alert.alert(
+        t("gatekeeper.checkedInTitle"),
+        t("gatekeeper.checkedInBody"),
+      );
     } catch (e) {
-      Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorCheckIn")));
+      Alert.alert(
+        t("visitor.error"),
+        translateApiError(e, t, t("tickets.errorCheckIn")),
+      );
     } finally {
       setBusy(false);
     }
@@ -449,7 +548,10 @@ export default function GatekeeperScreen() {
       await qc.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
       await qc.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
     } catch (e) {
-      Alert.alert(t("visitor.error"), translateApiError(e, t, t("tickets.errorCheckOut")));
+      Alert.alert(
+        t("visitor.error"),
+        translateApiError(e, t, t("tickets.errorCheckOut")),
+      );
     } finally {
       setBusy(false);
     }
@@ -457,26 +559,46 @@ export default function GatekeeperScreen() {
 
   return (
     <ScreenSafeArea style={styles.flex}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
           <BrandTitleRow
             title={t("gatekeeper.portal")}
             subtitle={t("gatekeeper.subtitle")}
             logoTestId="gate-brand-logo"
           />
 
-          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("gatekeeper.activeNow")}</Text>
+          <View
+            style={[
+              styles.card,
+              { borderColor: colors.border, backgroundColor: colors.card },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>
+              {t("gatekeeper.activeNow")}
+            </Text>
             {activeVisits.isLoading ? (
               <ActivityIndicator color={colors.primary} />
             ) : activeVisits.data && activeVisits.data.length > 0 ? (
               activeVisits.data.map((visit) => (
-                <View key={visit.id} style={[styles.visitRow, { borderColor: colors.border }]}>
+                <View
+                  key={visit.id}
+                  style={[styles.visitRow, { borderColor: colors.border }]}
+                >
                   <View style={styles.visitText}>
-                    <Text style={[styles.visitName, { color: colors.foreground }]}>
+                    <Text
+                      style={[styles.visitName, { color: colors.foreground }]}
+                    >
                       {visit.firstName} {visit.lastName}
                     </Text>
-                    <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                    <Text
+                      style={[styles.muted, { color: colors.mutedForeground }]}
+                    >
                       {[
                         visit.company,
                         formatPlateForDisplay(
@@ -485,9 +607,13 @@ export default function GatekeeperScreen() {
                           t("gatekeeper.plateStateUnconfirmed"),
                         ),
                         visit.siteName,
-                      ].filter(Boolean).join(" - ")}
+                      ]
+                        .filter(Boolean)
+                        .join(" - ")}
                     </Text>
-                    <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                    <Text
+                      style={[styles.muted, { color: colors.mutedForeground }]}
+                    >
                       {new Date(visit.checkInTime).toLocaleString()}
                     </Text>
                   </View>
@@ -502,53 +628,97 @@ export default function GatekeeperScreen() {
                 </View>
               ))
             ) : (
-              <Text style={[styles.muted, { color: colors.mutedForeground }]}>{t("gatekeeper.noActive")}</Text>
+              <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                {t("gatekeeper.noActive")}
+              </Text>
             )}
           </View>
 
-          <View style={[styles.card, { borderColor: colors.border, backgroundColor: colors.card }]}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>{t("gatekeeper.newEntry")}</Text>
+          <View
+            style={[
+              styles.card,
+              { borderColor: colors.border, backgroundColor: colors.card },
+            ]}
+          >
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>
+              {t("gatekeeper.newEntry")}
+            </Text>
             {voiceListening ? (
-              <View style={[styles.voiceStatus, { borderColor: colors.primary }]}>
+              <View
+                style={[styles.voiceStatus, { borderColor: colors.primary }]}
+              >
                 <Feather name="mic" size={18} color={colors.primary} />
-                <Text style={[styles.voiceStatusText, { color: colors.primary }]}>{t("gatekeeper.voiceListening")}</Text>
+                <Text
+                  style={[styles.voiceStatusText, { color: colors.primary }]}
+                >
+                  {t("gatekeeper.voiceListening")}
+                </Text>
               </View>
             ) : null}
             <View style={styles.twoCol}>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.firstName")} *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>
+                  {t("visitor.firstName")} *
+                </Text>
                 <TextInput
                   testID="gate-first-name"
                   value={firstName}
                   onFocus={() => setActiveNameField("firstName")}
-                  onChangeText={(value) => { forgetPlateAutoFill("firstName"); setActiveNameField("firstName"); setFirstName(value); }}
+                  onChangeText={(value) => {
+                    forgetPlateAutoFill("firstName");
+                    setActiveNameField("firstName");
+                    setFirstName(value);
+                  }}
                   style={inputStyle}
                   placeholderTextColor={colors.mutedForeground}
                 />
               </View>
               <View style={styles.field}>
-                <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.lastName")} *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>
+                  {t("visitor.lastName")} *
+                </Text>
                 <TextInput
                   testID="gate-last-name"
                   value={lastName}
                   onFocus={() => setActiveNameField("lastName")}
-                  onChangeText={(value) => { forgetPlateAutoFill("lastName"); setActiveNameField("lastName"); setLastName(value); }}
+                  onChangeText={(value) => {
+                    forgetPlateAutoFill("lastName");
+                    setActiveNameField("lastName");
+                    setLastName(value);
+                  }}
                   style={inputStyle}
                   placeholderTextColor={colors.mutedForeground}
                 />
               </View>
             </View>
             {matchingDrivers.length > 0 ? (
-              <View style={[styles.suggestions, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <View
+                style={[
+                  styles.suggestions,
+                  { borderColor: colors.border, backgroundColor: colors.card },
+                ]}
+              >
                 {matchingDrivers.map((visit) => (
                   <TouchableOpacity
                     key={`${visit.firstName}-${visit.lastName}-${visit.company ?? ""}-${visit.id}`}
                     testID={`gate-driver-suggestion-${visit.id}`}
                     onPress={() => useDriver(visit)}
-                    style={[styles.suggestionRow, { borderColor: colors.border }]}
+                    style={[
+                      styles.suggestionRow,
+                      { borderColor: colors.border },
+                    ]}
                   >
-                    <Text style={[styles.suggestionName, { color: colors.foreground }]}>{visit.firstName} {visit.lastName}</Text>
-                    <Text style={[styles.muted, { color: colors.mutedForeground }]}>
+                    <Text
+                      style={[
+                        styles.suggestionName,
+                        { color: colors.foreground },
+                      ]}
+                    >
+                      {visit.firstName} {visit.lastName}
+                    </Text>
+                    <Text
+                      style={[styles.muted, { color: colors.mutedForeground }]}
+                    >
                       {[
                         visit.company,
                         formatPlateForDisplay(
@@ -556,22 +726,34 @@ export default function GatekeeperScreen() {
                           visit.vehiclePlate,
                           t("gatekeeper.plateStateUnconfirmed"),
                         ),
-                      ].filter(Boolean).join(" - ")}
+                      ]
+                        .filter(Boolean)
+                        .join(" - ")}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             ) : null}
-            <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.company")}</Text>
-            <TextInput value={company} onChangeText={(value) => { forgetPlateAutoFill("company"); setCompany(value); }} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <Text style={[styles.label, { color: colors.foreground }]}>
+              {t("visitor.company")}
+            </Text>
+            <TextInput
+              value={company}
+              onChangeText={(value) => {
+                forgetPlateAutoFill("company");
+                setCompany(value);
+              }}
+              style={inputStyle}
+              placeholderTextColor={colors.mutedForeground}
+            />
             <PlateStatePicker
               value={plateState}
               onChange={(state) => {
                 setPlateState(state);
                 setPlateStateError(null);
-                setOcrStateNotice((notice) => notice
-                  ? { ...notice, selectedState: state }
-                  : null);
+                setOcrStateNotice((notice) =>
+                  notice ? { ...notice, selectedState: state } : null,
+                );
               }}
               preferredStates={orderedStatePreferences}
               error={plateStateError ?? undefined}
@@ -589,42 +771,65 @@ export default function GatekeeperScreen() {
                 )}
               </Text>
             ) : null}
-            <Text style={[styles.label, { color: colors.foreground }]}>{t("visitor.vehiclePlate")} *</Text>
-            <TextInput testID="gate-vehicle-plate" value={vehiclePlate} onChangeText={(value) => setVehiclePlate(value.toUpperCase())} autoCapitalize="characters" style={inputStyle} placeholderTextColor={colors.mutedForeground} />
+            <Text style={[styles.label, { color: colors.foreground }]}>
+              {t("visitor.vehiclePlate")} *
+            </Text>
+            <TextInput
+              testID="gate-vehicle-plate"
+              value={vehiclePlate}
+              onChangeText={(value) => setVehiclePlate(value.toUpperCase())}
+              autoCapitalize="characters"
+              style={inputStyle}
+              placeholderTextColor={colors.mutedForeground}
+            />
             <View style={styles.twoCol}>
               <TouchableOpacity
                 testID="gate-capture-tag-photo"
                 onPress={() => onCaptureEvidence("plate")}
                 disabled={busy}
-                style={[styles.photoButton, { borderColor: colors.border, opacity: busy ? 0.6 : 1 }]}
+                style={[
+                  styles.photoButton,
+                  { borderColor: colors.border, opacity: busy ? 0.6 : 1 },
+                ]}
               >
                 <Feather
                   name={platePhotoUrl ? "check-circle" : "camera"}
                   size={16}
-                  color={platePhotoUrl ? colors.primary : colors.mutedForeground}
+                  color={
+                    platePhotoUrl ? colors.primary : colors.mutedForeground
+                  }
                 />
                 <Text style={[styles.photoLabel, { color: colors.foreground }]}>
-                  {t("gatekeeper.tagPhoto")}{platePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
+                  {t("gatekeeper.tagPhoto")}
+                  {platePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 testID="gate-capture-vehicle-photo"
                 onPress={() => onCaptureEvidence("vehicle")}
                 disabled={busy}
-                style={[styles.photoButton, { borderColor: colors.border, opacity: busy ? 0.6 : 1 }]}
+                style={[
+                  styles.photoButton,
+                  { borderColor: colors.border, opacity: busy ? 0.6 : 1 },
+                ]}
               >
                 <Feather
                   name={vehiclePhotoUrl ? "check-circle" : "truck"}
                   size={16}
-                  color={vehiclePhotoUrl ? colors.primary : colors.mutedForeground}
+                  color={
+                    vehiclePhotoUrl ? colors.primary : colors.mutedForeground
+                  }
                 />
                 <Text style={[styles.photoLabel, { color: colors.foreground }]}>
-                  {t("gatekeeper.vehiclePhoto")}{vehiclePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
+                  {t("gatekeeper.vehiclePhoto")}
+                  {vehiclePhotoUrl ? ` ${t("visitor.photoAttached")}` : ""}
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.label, { color: colors.foreground }]}>{t("gatekeeper.currentLocation")}</Text>
+            <Text style={[styles.label, { color: colors.foreground }]}>
+              {t("gatekeeper.currentLocation")}
+            </Text>
             {assignedSites.map((site) => {
               const selected = confirmedCode === site.siteCode;
               return (
@@ -645,13 +850,26 @@ export default function GatekeeperScreen() {
                     },
                   ]}
                 >
-                  <Text style={[styles.siteOptionName, { color: colors.foreground }]}>{site.name}</Text>
-                  <Text style={[styles.muted, { color: colors.mutedForeground }]}>{site.siteCode}</Text>
+                  <Text
+                    style={[
+                      styles.siteOptionName,
+                      { color: colors.foreground },
+                    ]}
+                  >
+                    {site.name}
+                  </Text>
+                  <Text
+                    style={[styles.muted, { color: colors.mutedForeground }]}
+                  >
+                    {site.siteCode}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
 
-            <Text style={[styles.label, { color: colors.foreground }]}>{t("gatekeeper.siteCode")}</Text>
+            <Text style={[styles.label, { color: colors.foreground }]}>
+              {t("gatekeeper.siteCode")}
+            </Text>
             <View style={styles.lookupRow}>
               <TextInput
                 testID="gate-site-code"
@@ -660,25 +878,47 @@ export default function GatekeeperScreen() {
                 autoCapitalize="characters"
                 placeholder={t("visitor.siteCodePlaceholder")}
                 placeholderTextColor={colors.mutedForeground}
-                style={[styles.input, { flex: 1, borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+                style={[
+                  styles.input,
+                  {
+                    flex: 1,
+                    borderColor: colors.border,
+                    color: colors.foreground,
+                    backgroundColor: colors.card,
+                  },
+                ]}
               />
-              <TouchableOpacity testID="gate-site-lookup" onPress={onLookupSite} style={[styles.iconButton, { borderColor: colors.primary }]}>
+              <TouchableOpacity
+                testID="gate-site-lookup"
+                onPress={onLookupSite}
+                style={[styles.iconButton, { borderColor: colors.primary }]}
+              >
                 <Feather name="search" size={18} color={colors.primary} />
               </TouchableOpacity>
             </View>
             {ctxQuery.isLoading ? (
-              <View style={styles.loading}><ActivityIndicator color={colors.primary} /></View>
+              <View style={styles.loading}>
+                <ActivityIndicator color={colors.primary} />
+              </View>
             ) : ctxQuery.error ? (
-              <Text style={[styles.error, { color: colors.destructive }]}>{t("visitor.siteLookupFailed")}</Text>
+              <Text style={[styles.error, { color: colors.destructive }]}>
+                {t("visitor.siteLookupFailed")}
+              </Text>
             ) : ctxQuery.data ? (
               <VisitorHostPicker
                 ctx={ctxQuery.data}
                 hostKey={hostKey}
                 onSelectHost={setHostKey}
                 purpose={purpose}
-                onPurposeChange={(value) => { forgetPlateAutoFill("purpose"); setPurpose(value); }}
+                onPurposeChange={(value) => {
+                  forgetPlateAutoFill("purpose");
+                  setPurpose(value);
+                }}
                 duration={duration}
-                onDurationChange={(value) => { forgetPlateAutoFill("duration"); setDuration(value); }}
+                onDurationChange={(value) => {
+                  forgetPlateAutoFill("duration");
+                  setDuration(value);
+                }}
                 busy={busy}
                 onSubmit={onCheckIn}
                 onChangeSite={() => {
@@ -713,23 +953,79 @@ const styles = StyleSheet.create({
   cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 17 },
   twoCol: { flexDirection: "row", gap: 10 },
   field: { flex: 1, minWidth: 0 },
-  photoButton: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 12 },
-  photoLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, textAlign: "center" },
-  label: { fontFamily: "Inter_500Medium", fontSize: 13, marginBottom: 6, marginTop: 6 },
-  input: { borderRadius: 10, borderWidth: 1, fontFamily: "Inter_400Regular", fontSize: 15, paddingHorizontal: 12, paddingVertical: 10 },
+  photoButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+  },
+  photoLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textAlign: "center",
+  },
+  label: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    marginBottom: 6,
+    marginTop: 6,
+  },
+  input: {
+    borderRadius: 10,
+    borderWidth: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   lookupRow: { alignItems: "center", flexDirection: "row", gap: 8 },
-  siteOption: { borderRadius: 10, borderWidth: 1, gap: 2, paddingHorizontal: 12, paddingVertical: 10 },
+  siteOption: {
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
   siteOptionName: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
-  iconButton: { alignItems: "center", borderRadius: 10, borderWidth: 1.5, justifyContent: "center", minHeight: 44, minWidth: 44 },
+  iconButton: {
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 44,
+  },
   loading: { marginTop: 10 },
   error: { fontFamily: "Inter_500Medium", fontSize: 13, marginTop: 10 },
-  visitRow: { alignItems: "center", borderTopWidth: StyleSheet.hairlineWidth, flexDirection: "row", gap: 10, paddingTop: 10 },
+  visitRow: {
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    gap: 10,
+    paddingTop: 10,
+  },
   visitText: { flex: 1, minWidth: 0 },
   visitName: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   muted: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
   suggestions: { borderRadius: 10, borderWidth: 1, overflow: "hidden" },
-  suggestionRow: { borderBottomWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 9 },
+  suggestionRow: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
   suggestionName: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  voiceStatus: { alignItems: "center", borderRadius: 10, borderWidth: 1, flexDirection: "row", gap: 8, padding: 10 },
+  voiceStatus: {
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    padding: 10,
+  },
   voiceStatusText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
 });

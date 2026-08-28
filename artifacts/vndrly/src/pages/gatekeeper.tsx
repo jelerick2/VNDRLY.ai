@@ -1,6 +1,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Camera, FileText, History, Loader2, RefreshCw, Search, Sheet, Shield } from "lucide-react";
+import {
+  Camera,
+  FileText,
+  History,
+  Loader2,
+  RefreshCw,
+  Search,
+  Sheet,
+  Shield,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -8,6 +17,7 @@ import {
   PLATE_OCR_STATE_CONFIDENCE_THRESHOLD,
   normalizePlateState,
   plateMatchKey,
+  reconcileAutomatedPlateUpdate,
   type PlateStateCode,
 } from "@workspace/plate-state";
 
@@ -16,17 +26,40 @@ import BlueButton from "@/components/blue-button";
 import { LiveConnectionPill } from "@/components/live-connection-pill";
 import { GateMemoryInput } from "@/components/gate-memory-input";
 import { PlateStatePicker } from "@/components/plate-state-picker";
-import { Card, CardContent, CardHeader, CardTitle, CARD_INNER_TILE_CLASS, CARD_TITLE_ICON_CLASS } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CARD_INNER_TILE_CLASS,
+  CARD_TITLE_ICON_CLASS,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/hooks/use-brand";
 import { useGateLiveMonitor } from "@/hooks/use-gate-live-monitor";
 import { FIELD_OPS_PAGE_CLASS } from "@/lib/field-ops-content-pane";
-import { exportExcel, exportPdf, exportWord, latestVisitForPlate, toGateLogRows } from "@/lib/gatekeeper-log-export";
-import { pickDefaultGateHostKey, resolveAssignedGateSites, shouldApplyDefaultGateSite } from "@/lib/gate-default-site";
+import {
+  exportExcel,
+  exportPdf,
+  exportWord,
+  latestVisitForPlate,
+  toGateLogRows,
+} from "@/lib/gatekeeper-log-export";
+import {
+  pickDefaultGateHostKey,
+  resolveAssignedGateSites,
+  shouldApplyDefaultGateSite,
+} from "@/lib/gate-default-site";
 import {
   draftsEqual,
   evaluateGateMemory,
@@ -49,7 +82,12 @@ function evidenceUrl(path: string): string {
 
 type Coordinates = { latitude: number; longitude: number };
 type Translate = (key: string) => string;
-type PlateAutoFillField = "firstName" | "lastName" | "company" | "purpose" | "expectedDuration";
+type PlateAutoFillField =
+  | "firstName"
+  | "lastName"
+  | "company"
+  | "purpose"
+  | "expectedDuration";
 type PlateAutoFillSnapshot = {
   matchKey: string;
   values: Partial<Record<PlateAutoFillField, string>>;
@@ -68,12 +106,22 @@ type GateSpeechRecognition = {
   lang: string;
   start: () => void;
   stop: () => void;
-  onresult: ((event: { results: { [index: number]: { [index: number]: { transcript: string } }; length: number } }) => void) | null;
+  onresult:
+    | ((event: {
+        results: {
+          [index: number]: { [index: number]: { transcript: string } };
+          length: number;
+        };
+      }) => void)
+    | null;
   onerror: (() => void) | null;
   onend: (() => void) | null;
 };
 
-function currentPosition(required: boolean, t: Translate): Promise<Coordinates | undefined> {
+function currentPosition(
+  required: boolean,
+  t: Translate,
+): Promise<Coordinates | undefined> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       if (required) reject(new Error(t("gatekeeper.locationUnavailable")));
@@ -81,38 +129,71 @@ function currentPosition(required: boolean, t: Translate): Promise<Coordinates |
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-      () => required ? reject(new Error(t("gatekeeper.locationDenied"))) : resolve(undefined),
+      (position) =>
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        }),
+      () =>
+        required
+          ? reject(new Error(t("gatekeeper.locationDenied")))
+          : resolve(undefined),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 },
     );
   });
 }
 
 async function uploadEvidence(file: File, t: Translate): Promise<string> {
-  if (!file.type.startsWith("image/")) throw new Error(t("gatekeeper.selectImage"));
-  if (file.size > 8 * 1024 * 1024) throw new Error(t("gatekeeper.photoTooLarge"));
+  if (!file.type.startsWith("image/"))
+    throw new Error(t("gatekeeper.selectImage"));
+  if (file.size > 8 * 1024 * 1024)
+    throw new Error(t("gatekeeper.photoTooLarge"));
   const request = await fetch(`${BASE}/api/storage/uploads/request-url`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: file.name || `gate-photo-${Date.now()}.jpg`, size: file.size, contentType: file.type || "image/jpeg" }),
+    body: JSON.stringify({
+      name: file.name || `gate-photo-${Date.now()}.jpg`,
+      size: file.size,
+      contentType: file.type || "image/jpeg",
+    }),
   });
   if (!request.ok) throw new Error(t("gatekeeper.photoPrepareFailed"));
-  const descriptor = await request.json() as { uploadURL: string; objectPath: string };
-  const uploadUrl = /^https?:\/\//i.test(descriptor.uploadURL) ? descriptor.uploadURL : `${BASE}${descriptor.uploadURL}`;
-  const upload = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": file.type || "image/jpeg" }, body: file });
-  if (!upload.ok) throw new Error(upload.status === 413 ? t("gatekeeper.photoTooLarge") : t("gatekeeper.photoUploadFailed"));
+  const descriptor = (await request.json()) as {
+    uploadURL: string;
+    objectPath: string;
+  };
+  const uploadUrl = /^https?:\/\//i.test(descriptor.uploadURL)
+    ? descriptor.uploadURL
+    : `${BASE}${descriptor.uploadURL}`;
+  const upload = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "image/jpeg" },
+    body: file,
+  });
+  if (!upload.ok)
+    throw new Error(
+      upload.status === 413
+        ? t("gatekeeper.photoTooLarge")
+        : t("gatekeeper.photoUploadFailed"),
+    );
   const finalize = await fetch(`${BASE}/api/storage/uploads/finalize`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ objectURL: descriptor.uploadURL, visibility: "private", purpose: "gate-evidence" }),
+    body: JSON.stringify({
+      objectURL: descriptor.uploadURL,
+      visibility: "private",
+      purpose: "gate-evidence",
+    }),
   });
   if (!finalize.ok) throw new Error(t("gatekeeper.photoFinalizeFailed"));
   return descriptor.objectPath;
 }
 
-async function deleteUnattachedEvidence(objectPath: string | null): Promise<void> {
+async function deleteUnattachedEvidence(
+  objectPath: string | null,
+): Promise<void> {
   if (!objectPath) return;
   await fetch(`${BASE}/api/storage/uploads`, {
     method: "DELETE",
@@ -153,12 +234,18 @@ export default function GatekeeperPage() {
   const [voiceListening, setVoiceListening] = useState(false);
   const recognitionRef = useRef<GateSpeechRecognition | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeMemoryField, setActiveMemoryField] = useState<GateMemoryField | null>(null);
+  const [activeMemoryField, setActiveMemoryField] =
+    useState<GateMemoryField | null>(null);
   const [memoryDeleting, setMemoryDeleting] = useState(false);
-  const [plateOcrStatus, setPlateOcrStatus] = useState<"idle" | "reading" | "read" | "unreadable">("idle");
+  const [plateOcrStatus, setPlateOcrStatus] = useState<
+    "idle" | "reading" | "read" | "unreadable"
+  >("idle");
   const [ocrPlate, setOcrPlate] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const displayPlate = (state: string | null | undefined, plate: string | null | undefined) =>
+  const displayPlate = (
+    state: string | null | undefined,
+    plate: string | null | undefined,
+  ) =>
     formatPlateForDisplay(state, plate, t("gatekeeper.plateStateUnconfirmed"));
 
   const visits = useQuery({
@@ -189,13 +276,14 @@ export default function GatekeeperPage() {
     retry: false,
   });
   const preferredPlateStates = useQuery({
-    queryKey: ["preferred-plate-states", site.data?.site.id],
-    queryFn: () => visitsApi.listPreferredPlateStates(site.data!.site.id),
-    enabled: Boolean(site.data?.site.id),
+    queryKey: ["preferred-plate-states", site.data?.site.id, confirmedCode],
+    queryFn: () =>
+      visitsApi.listPreferredPlateStates(site.data!.site.id, confirmedCode!),
+    enabled: Boolean(site.data?.site.id && confirmedCode),
     retry: false,
   });
-  const orderedStatePreferences = preferredPlateStates.data?.preferred
-    ?? NATIONAL_PLATE_STATE_FALLBACK;
+  const orderedStatePreferences =
+    preferredPlateStates.data?.preferred ?? NATIONAL_PLATE_STATE_FALLBACK;
   const activeVisits = visits.data ?? [];
   const live = useGateLiveMonitor({
     enabled: Boolean(user),
@@ -213,29 +301,37 @@ export default function GatekeeperPage() {
     })),
     queryKey: ["gatekeeper-visits"],
   });
-  const exportRows = useMemo(() => toGateLogRows(recentVisits.data ?? []), [recentVisits.data]);
+  const exportRows = useMemo(
+    () => toGateLogRows(recentVisits.data ?? []),
+    [recentVisits.data],
+  );
   const previousPlateVisit = useMemo(
-    () => plateState
-      ? latestVisitForPlate(recentVisits.data ?? [], plateState, vehiclePlate)
-      : null,
+    () =>
+      plateState
+        ? latestVisitForPlate(recentVisits.data ?? [], plateState, vehiclePlate)
+        : null,
     [plateState, vehiclePlate, recentVisits.data],
   );
-  const entryDraft = useMemo<GateEntryDraft>(() => ({
-    firstName,
-    lastName,
-    company,
-    vehiclePlate,
-    plateState,
-    purpose,
-    expectedDuration: duration,
-  }), [company, duration, firstName, lastName, plateState, purpose, vehiclePlate]);
-  const memory = useMemo(
-    () => evaluateGateMemory({
-      visits: recentVisits.data ?? [],
-      draft: entryDraft,
-      activeField: activeMemoryField,
-      isDeleting: memoryDeleting,
+  const entryDraft = useMemo<GateEntryDraft>(
+    () => ({
+      firstName,
+      lastName,
+      company,
+      vehiclePlate,
+      plateState,
+      purpose,
+      expectedDuration: duration,
     }),
+    [company, duration, firstName, lastName, plateState, purpose, vehiclePlate],
+  );
+  const memory = useMemo(
+    () =>
+      evaluateGateMemory({
+        visits: recentVisits.data ?? [],
+        draft: entryDraft,
+        activeField: activeMemoryField,
+        isDeleting: memoryDeleting,
+      }),
     [activeMemoryField, entryDraft, memoryDeleting, recentVisits.data],
   );
   const displayMemorySuggestions = memory.suggestions.map((suggestion) => {
@@ -244,10 +340,14 @@ export default function GatekeeperPage() {
     if (!rawPlate || !displayedPlate) return suggestion;
     return {
       ...suggestion,
-      label: activeMemoryField === "vehiclePlate" ? displayedPlate : suggestion.label,
-      detail: activeMemoryField === "vehiclePlate"
-        ? suggestion.detail
-        : suggestion.detail.replace(rawPlate, displayedPlate),
+      label:
+        activeMemoryField === "vehiclePlate"
+          ? displayedPlate
+          : suggestion.label,
+      detail:
+        activeMemoryField === "vehiclePlate"
+          ? suggestion.detail
+          : suggestion.detail.replace(rawPlate, displayedPlate),
     };
   });
 
@@ -264,7 +364,8 @@ export default function GatekeeperPage() {
     const snapshot = plateAutoFillRef.current;
     if (!snapshot) return;
     delete snapshot.values[field];
-    if (Object.keys(snapshot.values).length === 0) plateAutoFillRef.current = null;
+    if (Object.keys(snapshot.values).length === 0)
+      plateAutoFillRef.current = null;
   };
   const onMemoryFieldChange = (field: GateMemoryField, value: string) => {
     const nextValue = field === "vehiclePlate" ? value.toUpperCase() : value;
@@ -299,13 +400,29 @@ export default function GatekeeperPage() {
     recognition.interimResults = false;
     recognition.lang = "en-US";
     recognition.onresult = (event) => {
-      const transcript = Array.from({ length: event.results.length }, (_, index) => event.results[index][0].transcript).join(" ");
+      const transcript = Array.from(
+        { length: event.results.length },
+        (_, index) => event.results[index][0].transcript,
+      ).join(" ");
       const fill = parseGateVoiceEntry(transcript);
       if (Object.keys(fill).length === 0) {
         setError(t("gatekeeper.voiceNotUnderstood"));
         return;
       }
-      applyEntryDraft({ ...entryDraft, ...fill });
+      const automatedPlate = reconcileAutomatedPlateUpdate({
+        currentPlate: entryDraft.vehiclePlate,
+        currentState: entryDraft.plateState,
+        automatedPlate: fill.vehiclePlate,
+        automatedState: fill.plateState,
+      });
+      applyEntryDraft({
+        ...entryDraft,
+        ...fill,
+        vehiclePlate: automatedPlate.vehiclePlate ?? "",
+        plateState: automatedPlate.plateState,
+      });
+      setPlateStateError(null);
+      setOcrStateNotice(null);
       plateAutoFillRef.current = null;
       setError(null);
     };
@@ -333,7 +450,14 @@ export default function GatekeeperPage() {
     if (!site.data) return [];
     return [
       ...(site.data.partner
-        ? [{ key: `partner:${site.data.partner.id}`, id: site.data.partner.id, type: "partner" as const, label: site.data.partner.name }]
+        ? [
+            {
+              key: `partner:${site.data.partner.id}`,
+              id: site.data.partner.id,
+              type: "partner" as const,
+              label: site.data.partner.name,
+            },
+          ]
         : []),
       ...site.data.vendors.map((vendor) => ({
         key: `vendor:${vendor.id}`,
@@ -346,15 +470,23 @@ export default function GatekeeperPage() {
   const assignedSites = assigned.data?.sites ?? [];
   const defaultSiteCode = assigned.data?.defaultSite?.siteCode;
   const showPreviousBanner = Boolean(
-    previousPlateVisit
-    && (!firstName.trim() || !lastName.trim()
-      || firstName !== previousPlateVisit.firstName
-      || lastName !== previousPlateVisit.lastName),
+    previousPlateVisit &&
+    (!firstName.trim() ||
+      !lastName.trim() ||
+      firstName !== previousPlateVisit.firstName ||
+      lastName !== previousPlateVisit.lastName),
   );
 
   useEffect(() => {
     if (appliedDefault.current) return;
-    if (!shouldApplyDefaultGateSite({ confirmedCode, typedCode: siteCode, defaultSiteCode })) return;
+    if (
+      !shouldApplyDefaultGateSite({
+        confirmedCode,
+        typedCode: siteCode,
+        defaultSiteCode,
+      })
+    )
+      return;
     appliedDefault.current = true;
     setSiteCode(defaultSiteCode!);
     setConfirmedCode(defaultSiteCode!);
@@ -372,19 +504,23 @@ export default function GatekeeperPage() {
     const snapshot = plateAutoFillRef.current;
     if (!snapshot || snapshot.matchKey === currentPlateMatchKey) return;
     const next = { ...entryDraft };
-    const replacement = previousPlateVisit ? fillFromVisit(previousPlateVisit) : null;
+    const replacement = previousPlateVisit
+      ? fillFromVisit(previousPlateVisit)
+      : null;
     const replacementValues: Partial<Record<PlateAutoFillField, string>> = {};
     for (const field of PLATE_AUTO_FILL_FIELDS) {
       const autoFilledValue = snapshot.values[field];
-      if (autoFilledValue == null || entryDraft[field] !== autoFilledValue) continue;
-      const replacementValue = replacement?.[field]
-        || (field === "expectedDuration" ? "60" : "");
+      if (autoFilledValue == null || entryDraft[field] !== autoFilledValue)
+        continue;
+      const replacementValue =
+        replacement?.[field] || (field === "expectedDuration" ? "60" : "");
       next[field] = replacementValue;
       if (replacement?.[field]) replacementValues[field] = replacementValue;
     }
-    plateAutoFillRef.current = currentPlateMatchKey && Object.keys(replacementValues).length > 0
-      ? { matchKey: currentPlateMatchKey, values: replacementValues }
-      : null;
+    plateAutoFillRef.current =
+      currentPlateMatchKey && Object.keys(replacementValues).length > 0
+        ? { matchKey: currentPlateMatchKey, values: replacementValues }
+        : null;
     if (!draftsEqual(next, entryDraft)) applyEntryDraft(next);
   }, [currentPlateMatchKey, entryDraft, previousPlateVisit]);
 
@@ -393,9 +529,10 @@ export default function GatekeeperPage() {
     const next = mergeGateFill(entryDraft, memory.fill);
     if (draftsEqual(next, entryDraft)) return;
     if (currentPlateMatchKey) {
-      const values = plateAutoFillRef.current?.matchKey === currentPlateMatchKey
-        ? { ...plateAutoFillRef.current.values }
-        : {};
+      const values =
+        plateAutoFillRef.current?.matchKey === currentPlateMatchKey
+          ? { ...plateAutoFillRef.current.values }
+          : {};
       for (const field of PLATE_AUTO_FILL_FIELDS) {
         if (next[field] !== entryDraft[field]) values[field] = next[field];
       }
@@ -409,11 +546,18 @@ export default function GatekeeperPage() {
 
   const resetEntry = () => {
     plateAutoFillRef.current = null;
-    setFirstName(""); setLastName(""); setCompany("");
-    setVehiclePlate(""); setPurpose(""); setDuration("60"); setHostKey("");
-    setPlateState(null); setPlateStateError(null);
+    setFirstName("");
+    setLastName("");
+    setCompany("");
+    setVehiclePlate("");
+    setPurpose("");
+    setDuration("60");
+    setHostKey("");
+    setPlateState(null);
+    setPlateStateError(null);
     setOcrStateNotice(null);
-    setPlatePhotoUrl(null); setVehiclePhotoUrl(null);
+    setPlatePhotoUrl(null);
+    setVehiclePhotoUrl(null);
     setActiveMemoryField(null);
     setMemoryDeleting(false);
     setPlateOcrStatus("idle");
@@ -424,20 +568,24 @@ export default function GatekeeperPage() {
     if (!previousPlateVisit) return;
     plateAutoFillRef.current = null;
     setMemoryDeleting(false);
-    applyEntryDraft(mergeGateFill(entryDraft, {
-      firstName: previousPlateVisit.firstName,
-      lastName: previousPlateVisit.lastName,
-      company: previousPlateVisit.company ?? "",
-      vehiclePlate: previousPlateVisit.vehiclePlate ?? "",
-      plateState: previousPlateVisit.plateState,
-      purpose: previousPlateVisit.purpose ?? "",
-      expectedDuration: previousPlateVisit.expectedDurationMinutes?.toString() ?? "60",
-    }));
+    applyEntryDraft(
+      mergeGateFill(entryDraft, {
+        firstName: previousPlateVisit.firstName,
+        lastName: previousPlateVisit.lastName,
+        company: previousPlateVisit.company ?? "",
+        vehiclePlate: previousPlateVisit.vehiclePlate ?? "",
+        plateState: previousPlateVisit.plateState,
+        purpose: previousPlateVisit.purpose ?? "",
+        expectedDuration:
+          previousPlateVisit.expectedDurationMinutes?.toString() ?? "60",
+      }),
+    );
   };
 
   const capture = async (file: File | undefined, kind: "plate" | "vehicle") => {
     if (!file) return;
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     if (kind === "plate") {
       setPlateOcrStatus("reading");
       setOcrStateNotice(null);
@@ -450,34 +598,45 @@ export default function GatekeeperPage() {
         return;
       }
       const objectPath = await uploadEvidence(file, t);
-      const candidate = await visitsApi.readPlate({ objectPath }).catch(() => null);
+      const candidate = await visitsApi
+        .readPlate({ objectPath })
+        .catch(() => null);
       void deleteUnattachedEvidence(platePhotoUrl);
       setPlatePhotoUrl(objectPath);
       if (candidate?.plate) {
         setMemoryDeleting(false);
         setActiveMemoryField("vehiclePlate");
-        setVehiclePlate(candidate.plate);
-        setOcrPlate(candidate.plate);
-        if (
-          candidate.stateConfidence != null
-          && candidate.stateConfidence >= PLATE_OCR_STATE_CONFIDENCE_THRESHOLD
-        ) {
-          const normalizedState = normalizePlateState(candidate.state);
-          if (normalizedState) {
-            setPlateState(normalizedState);
-            setPlateStateError(null);
-            setOcrStateNotice({
-              suggestedState: normalizedState,
-              selectedState: normalizedState,
-            });
-          }
+        const confidentState =
+          candidate.stateConfidence != null &&
+          candidate.stateConfidence >= PLATE_OCR_STATE_CONFIDENCE_THRESHOLD
+            ? normalizePlateState(candidate.state)
+            : null;
+        const automatedPlate = reconcileAutomatedPlateUpdate({
+          currentPlate: vehiclePlate,
+          currentState: plateState,
+          automatedPlate: candidate.plate,
+          automatedState: confidentState,
+        });
+        setVehiclePlate(automatedPlate.vehiclePlate ?? "");
+        setPlateState(automatedPlate.plateState);
+        setPlateStateError(null);
+        setOcrPlate(automatedPlate.vehiclePlate);
+        if (confidentState) {
+          setOcrStateNotice({
+            suggestedState: confidentState,
+            selectedState: confidentState,
+          });
         }
         setPlateOcrStatus("read");
       } else {
         setPlateOcrStatus("unreadable");
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("gatekeeper.photoUploadFailed"));
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : t("gatekeeper.photoUploadFailed"),
+      );
       if (kind === "plate") setPlateOcrStatus("unreadable");
     } finally {
       setBusy(false);
@@ -487,7 +646,13 @@ export default function GatekeeperPage() {
   const checkIn = async () => {
     const context = site.data;
     const host = hosts.find((candidate) => candidate.key === hostKey);
-    if (!context || !host || !firstName.trim() || !lastName.trim() || !vehiclePlate.trim()) {
+    if (
+      !context ||
+      !host ||
+      !firstName.trim() ||
+      !lastName.trim() ||
+      !vehiclePlate.trim()
+    ) {
       setError(t("gatekeeper.requiredFields"));
       return;
     }
@@ -496,7 +661,8 @@ export default function GatekeeperPage() {
       return;
     }
     setPlateStateError(null);
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       const coords = await currentPosition(true, t);
       const minutes = Number.parseInt(duration, 10);
@@ -507,7 +673,8 @@ export default function GatekeeperPage() {
         vehiclePlate: vehiclePlate.trim() || undefined,
         plateState,
         purpose: purpose.trim() || undefined,
-        expectedDurationMinutes: Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
+        expectedDurationMinutes:
+          Number.isFinite(minutes) && minutes > 0 ? minutes : undefined,
         siteLocationId: context.site.id,
         hostType: host.type,
         hostPartnerId: host.type === "partner" ? host.id : undefined,
@@ -519,37 +686,55 @@ export default function GatekeeperPage() {
       });
       resetEntry();
       await queryClient.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
-      await queryClient.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["gatekeeper-recent-visits"],
+      });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("gatekeeper.checkInFailed"));
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : t("gatekeeper.checkInFailed"),
+      );
     } finally {
       setBusy(false);
     }
   };
 
   const checkOut = async (id: number) => {
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       const coords = await currentPosition(false, t);
       await visitsApi.gateCheckOut(id, coords?.latitude, coords?.longitude);
       await queryClient.invalidateQueries({ queryKey: ["gatekeeper-visits"] });
-      await queryClient.invalidateQueries({ queryKey: ["gatekeeper-recent-visits"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["gatekeeper-recent-visits"],
+      });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("gatekeeper.checkOutFailed"));
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : t("gatekeeper.checkOutFailed"),
+      );
     } finally {
       setBusy(false);
     }
   };
 
   const exportCompleteLog = async (format: "pdf" | "excel" | "word") => {
-    setExporting(true); setError(null);
+    setExporting(true);
+    setError(null);
     try {
       const rows = toGateLogRows(await listAllVisits());
       if (format === "pdf") await exportPdf(rows);
       else if (format === "excel") exportExcel(rows);
       else exportWord(rows);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("gatekeeper.historyLoadFailed"));
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : t("gatekeeper.historyLoadFailed"),
+      );
     } finally {
       setExporting(false);
     }
@@ -559,10 +744,20 @@ export default function GatekeeperPage() {
     <div className={FIELD_OPS_PAGE_CLASS} data-testid="gatekeeper-page">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("gatekeeper.title")}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.subtitle")}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t("gatekeeper.handsFreeHint")}</p>
-          {voiceListening && <p className="mt-1 text-sm font-medium text-[color:var(--brand-primary)]">{t("gatekeeper.voiceListening")}</p>}
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            {t("gatekeeper.title")}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("gatekeeper.subtitle")}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {t("gatekeeper.handsFreeHint")}
+          </p>
+          {voiceListening && (
+            <p className="mt-1 text-sm font-medium text-[color:var(--brand-primary)]">
+              {t("gatekeeper.voiceListening")}
+            </p>
+          )}
         </div>
         <Link
           href="/gate/history"
@@ -581,21 +776,39 @@ export default function GatekeeperPage() {
           role="status"
         >
           {live.flash.platePhotoUrl ? (
-            <img src={evidenceUrl(live.flash.platePhotoUrl)} alt="" className="h-16 w-24 shrink-0 rounded-md object-cover" />
+            <img
+              src={evidenceUrl(live.flash.platePhotoUrl)}
+              alt=""
+              className="h-16 w-24 shrink-0 rounded-md object-cover"
+            />
           ) : (
             <Shield className="h-10 w-10 shrink-0" style={iconStyle} />
           )}
           <div className="min-w-0 flex-1">
             <p className="text-lg font-bold leading-tight">
               {live.flash.kind === "checked_in"
-                ? t("gatekeeper.liveCheckedIn", { name: `${live.flash.firstName} ${live.flash.lastName}`.trim() })
-                : t("gatekeeper.liveCheckedOut", { name: `${live.flash.firstName} ${live.flash.lastName}`.trim() })}
+                ? t("gatekeeper.liveCheckedIn", {
+                    name: `${live.flash.firstName} ${live.flash.lastName}`.trim(),
+                  })
+                : t("gatekeeper.liveCheckedOut", {
+                    name: `${live.flash.firstName} ${live.flash.lastName}`.trim(),
+                  })}
             </p>
             <p className="mt-1 truncate text-sm text-muted-foreground">
-              {[live.flash.company, displayPlate(live.flash.plateState, live.flash.vehiclePlate), live.flash.siteName].filter(Boolean).join(" · ")}
+              {[
+                live.flash.company,
+                displayPlate(live.flash.plateState, live.flash.vehiclePlate),
+                live.flash.siteName,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </div>
-          <LiveConnectionPill status={live.liveStatus} compact onRefresh={() => void visits.refetch()} />
+          <LiveConnectionPill
+            status={live.liveStatus}
+            compact
+            onRefresh={() => void visits.refetch()}
+          />
         </div>
       )}
 
@@ -608,9 +821,17 @@ export default function GatekeeperPage() {
             </CardTitle>
             <div className="flex items-center gap-2">
               {!live.flash && (
-                <LiveConnectionPill status={live.liveStatus} compact onRefresh={() => void visits.refetch()} />
+                <LiveConnectionPill
+                  status={live.liveStatus}
+                  compact
+                  onRefresh={() => void visits.refetch()}
+                />
               )}
-              <BlueButton onClick={() => void visits.refetch()} disabled={visits.isFetching} data-testid="button-gate-refresh">
+              <BlueButton
+                onClick={() => void visits.refetch()}
+                disabled={visits.isFetching}
+                data-testid="button-gate-refresh"
+              >
                 <RefreshCw className="h-4 w-4" />
               </BlueButton>
             </div>
@@ -619,7 +840,9 @@ export default function GatekeeperPage() {
             {visits.isLoading ? (
               <Loader2 className="animate-spin text-muted-foreground" />
             ) : activeVisits.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("gatekeeper.noActive")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("gatekeeper.noActive")}
+              </p>
             ) : (
               activeVisits.map((visit) => (
                 <div
@@ -627,25 +850,62 @@ export default function GatekeeperPage() {
                   className={`${CARD_INNER_TILE_CLASS} flex items-center justify-between gap-3 ${live.flash?.visitId === visit.id ? "ring-2 ring-amber-500" : ""}`}
                 >
                   <div className="min-w-0">
-                    <p className="font-semibold text-foreground">{visit.firstName} {visit.lastName}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[visit.company, displayPlate(visit.plateState, visit.vehiclePlate), visit.siteName].filter(Boolean).join(" · ")}
+                    <p className="font-semibold text-foreground">
+                      {visit.firstName} {visit.lastName}
                     </p>
-                    <p className="text-xs text-muted-foreground">{new Date(visit.checkInTime).toLocaleString()}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[
+                        visit.company,
+                        displayPlate(visit.plateState, visit.vehiclePlate),
+                        visit.siteName,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(visit.checkInTime).toLocaleString()}
+                    </p>
                   </div>
-                  <AmberButton onClick={() => void checkOut(visit.id)} disabled={busy}>{t("gatekeeper.checkOut")}</AmberButton>
+                  <AmberButton
+                    onClick={() => void checkOut(visit.id)}
+                    disabled={busy}
+                  >
+                    {t("gatekeeper.checkOut")}
+                  </AmberButton>
                 </div>
               ))
             )}
             <div className="border-t-2 border-gray-300 pt-3 dark:border-gray-400">
               <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-foreground">{t("gatekeeper.gateLog")}</p>
-                <span className="text-xs text-muted-foreground">{t("gatekeeper.records", { count: exportRows.length })}</span>
+                <p className="text-sm font-semibold text-foreground">
+                  {t("gatekeeper.gateLog")}
+                </p>
+                <span className="text-xs text-muted-foreground">
+                  {t("gatekeeper.records", { count: exportRows.length })}
+                </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <BlueButton onClick={() => void exportCompleteLog("pdf")} disabled={!exportRows.length || exporting}><FileText className="mr-1 h-4 w-4" />PDF</BlueButton>
-                <BlueButton onClick={() => void exportCompleteLog("excel")} disabled={!exportRows.length || exporting}><Sheet className="mr-1 h-4 w-4" />Excel</BlueButton>
-                <BlueButton onClick={() => void exportCompleteLog("word")} disabled={!exportRows.length || exporting}><FileText className="mr-1 h-4 w-4" />Word</BlueButton>
+                <BlueButton
+                  onClick={() => void exportCompleteLog("pdf")}
+                  disabled={!exportRows.length || exporting}
+                >
+                  <FileText className="mr-1 h-4 w-4" />
+                  PDF
+                </BlueButton>
+                <BlueButton
+                  onClick={() => void exportCompleteLog("excel")}
+                  disabled={!exportRows.length || exporting}
+                >
+                  <Sheet className="mr-1 h-4 w-4" />
+                  Excel
+                </BlueButton>
+                <BlueButton
+                  onClick={() => void exportCompleteLog("word")}
+                  disabled={!exportRows.length || exporting}
+                >
+                  <FileText className="mr-1 h-4 w-4" />
+                  Word
+                </BlueButton>
               </div>
             </div>
           </CardContent>
@@ -654,19 +914,34 @@ export default function GatekeeperPage() {
         <Card>
           <CardHeader>
             <CardTitle>{t("gatekeeper.newEntry")}</CardTitle>
-            <p className="text-sm text-muted-foreground">{t("gatekeeper.memoryHint")}</p>
+            <p className="text-sm text-muted-foreground">
+              {t("gatekeeper.memoryHint")}
+            </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            {error && <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
+            {error && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {error}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>{t("gatekeeper.firstName")} *</Label>
                 <GateMemoryInput
                   value={firstName}
-                  suggestions={activeMemoryField === "firstName" ? displayMemorySuggestions : []}
+                  suggestions={
+                    activeMemoryField === "firstName"
+                      ? displayMemorySuggestions
+                      : []
+                  }
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
-                  onChange={(event) => onMemoryFieldChange("firstName", event.target.value)}
+                  onChange={(event) =>
+                    onMemoryFieldChange("firstName", event.target.value)
+                  }
                   onFocus={() => setActiveMemoryField("firstName")}
                   data-testid="input-gate-first-name"
                 />
@@ -675,10 +950,16 @@ export default function GatekeeperPage() {
                 <Label>{t("gatekeeper.lastName")} *</Label>
                 <GateMemoryInput
                   value={lastName}
-                  suggestions={activeMemoryField === "lastName" ? displayMemorySuggestions : []}
+                  suggestions={
+                    activeMemoryField === "lastName"
+                      ? displayMemorySuggestions
+                      : []
+                  }
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
-                  onChange={(event) => onMemoryFieldChange("lastName", event.target.value)}
+                  onChange={(event) =>
+                    onMemoryFieldChange("lastName", event.target.value)
+                  }
                   onFocus={() => setActiveMemoryField("lastName")}
                   data-testid="input-gate-last-name"
                 />
@@ -689,10 +970,16 @@ export default function GatekeeperPage() {
                 <Label>{t("gatekeeper.company")}</Label>
                 <GateMemoryInput
                   value={company}
-                  suggestions={activeMemoryField === "company" ? displayMemorySuggestions : []}
+                  suggestions={
+                    activeMemoryField === "company"
+                      ? displayMemorySuggestions
+                      : []
+                  }
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
-                  onChange={(event) => onMemoryFieldChange("company", event.target.value)}
+                  onChange={(event) =>
+                    onMemoryFieldChange("company", event.target.value)
+                  }
                   onFocus={() => setActiveMemoryField("company")}
                   data-testid="input-gate-company"
                 />
@@ -703,43 +990,77 @@ export default function GatekeeperPage() {
                   onChange={(stateCode) => {
                     setPlateState(stateCode);
                     setPlateStateError(null);
-                    setOcrStateNotice((notice) => notice
-                      ? { ...notice, selectedState: stateCode }
-                      : null);
+                    setOcrStateNotice((notice) =>
+                      notice ? { ...notice, selectedState: stateCode } : null,
+                    );
                   }}
                   preferredStates={orderedStatePreferences}
                   error={plateStateError ?? undefined}
                 />
-                <Label className="mt-2 block">{t("gatekeeper.vehiclePlate")} *</Label>
+                <Label className="mt-2 block">
+                  {t("gatekeeper.vehiclePlate")} *
+                </Label>
                 <GateMemoryInput
                   value={vehiclePlate}
-                  suggestions={activeMemoryField === "vehiclePlate" ? displayMemorySuggestions : []}
+                  suggestions={
+                    activeMemoryField === "vehiclePlate"
+                      ? displayMemorySuggestions
+                      : []
+                  }
                   suggestionsLabel={t("gatekeeper.memorySuggestions")}
                   onPick={onMemoryPick}
-                  onChange={(event) => onMemoryFieldChange("vehiclePlate", event.target.value)}
+                  onChange={(event) =>
+                    onMemoryFieldChange("vehiclePlate", event.target.value)
+                  }
                   onFocus={() => setActiveMemoryField("vehiclePlate")}
                   data-testid="input-gate-plate"
                 />
               </div>
             </div>
             {showPreviousBanner && previousPlateVisit && (
-              <div className={`${CARD_INNER_TILE_CLASS} flex items-center justify-between gap-3 text-sm`}>
-                <span>{t("gatekeeper.previousVisit", { firstName: previousPlateVisit.firstName, lastName: previousPlateVisit.lastName })}</span>
-                <BlueButton onClick={usePreviousPlateDetails}>{t("gatekeeper.useDetails")}</BlueButton>
+              <div
+                className={`${CARD_INNER_TILE_CLASS} flex items-center justify-between gap-3 text-sm`}
+              >
+                <span>
+                  {t("gatekeeper.previousVisit", {
+                    firstName: previousPlateVisit.firstName,
+                    lastName: previousPlateVisit.lastName,
+                  })}
+                </span>
+                <BlueButton onClick={usePreviousPlateDetails}>
+                  {t("gatekeeper.useDetails")}
+                </BlueButton>
               </div>
             )}
             {previousPlateVisit && firstName.trim() && lastName.trim() && (
-              <p className="text-sm text-muted-foreground" data-testid="gate-last-driver-hint">
+              <p
+                className="text-sm text-muted-foreground"
+                data-testid="gate-last-driver-hint"
+              >
                 {t("gatekeeper.lastDriverHint", {
                   firstName: previousPlateVisit.firstName,
                   lastName: previousPlateVisit.lastName,
-                  company: previousPlateVisit.company ? ` · ${previousPlateVisit.company}` : "",
+                  company: previousPlateVisit.company
+                    ? ` · ${previousPlateVisit.company}`
+                    : "",
                 })}
               </p>
             )}
-            {plateOcrStatus === "reading" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateReading")}</p>}
-            {plateOcrStatus === "read" && ocrPlate && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateRead", { plate: ocrPlate })}</p>}
-            {plateOcrStatus === "unreadable" && <p className="text-sm text-muted-foreground">{t("gatekeeper.plateUnreadable")}</p>}
+            {plateOcrStatus === "reading" && (
+              <p className="text-sm text-muted-foreground">
+                {t("gatekeeper.plateReading")}
+              </p>
+            )}
+            {plateOcrStatus === "read" && ocrPlate && (
+              <p className="text-sm text-muted-foreground">
+                {t("gatekeeper.plateRead", { plate: ocrPlate })}
+              </p>
+            )}
+            {plateOcrStatus === "unreadable" && (
+              <p className="text-sm text-muted-foreground">
+                {t("gatekeeper.plateUnreadable")}
+              </p>
+            )}
             {ocrStateNotice ? (
               <p className="text-sm text-muted-foreground" role="status">
                 {t(
@@ -754,64 +1075,147 @@ export default function GatekeeperPage() {
               <Label>{t("gatekeeper.currentLocation")} *</Label>
               {assignedSites.length > 0 ? (
                 <Select
-                  value={assignedSites.some((row) => row.siteCode === confirmedCode) ? confirmedCode! : ""}
+                  value={
+                    assignedSites.some((row) => row.siteCode === confirmedCode)
+                      ? confirmedCode!
+                      : ""
+                  }
                   onValueChange={(code) => {
                     setSiteCode(code);
                     setConfirmedCode(code);
                     setHostKey("");
                   }}
                 >
-                  <SelectTrigger data-testid="select-gate-current-location"><SelectValue placeholder={t("gatekeeper.selectSite")} /></SelectTrigger>
+                  <SelectTrigger data-testid="select-gate-current-location">
+                    <SelectValue placeholder={t("gatekeeper.selectSite")} />
+                  </SelectTrigger>
                   <SelectContent>
                     {assignedSites.map((row) => (
-                      <SelectItem key={row.siteCode} value={row.siteCode}>{row.name}</SelectItem>
+                      <SelectItem key={row.siteCode} value={row.siteCode}>
+                        {row.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : null}
               <div className="mt-2 flex gap-2">
-                <Input value={siteCode} onChange={(e) => setSiteCode(e.target.value.toUpperCase())} placeholder="SITE-XXXXXXXX" aria-label={t("gatekeeper.siteCode")} />
-                <BlueButton onClick={() => { setConfirmedCode(siteCode.trim().toUpperCase() || null); setHostKey(""); }}><Search className="h-4 w-4" /></BlueButton>
+                <Input
+                  value={siteCode}
+                  onChange={(e) => setSiteCode(e.target.value.toUpperCase())}
+                  placeholder="SITE-XXXXXXXX"
+                  aria-label={t("gatekeeper.siteCode")}
+                />
+                <BlueButton
+                  onClick={() => {
+                    setConfirmedCode(siteCode.trim().toUpperCase() || null);
+                    setHostKey("");
+                  }}
+                >
+                  <Search className="h-4 w-4" />
+                </BlueButton>
               </div>
             </div>
-            {site.isLoading && <Loader2 className="animate-spin text-muted-foreground" />}
-            {site.error && <p className="text-sm text-destructive">{t("gatekeeper.siteNotFound")}</p>}
+            {site.isLoading && (
+              <Loader2 className="animate-spin text-muted-foreground" />
+            )}
+            {site.error && (
+              <p className="text-sm text-destructive">
+                {t("gatekeeper.siteNotFound")}
+              </p>
+            )}
             {site.data && (
               <>
                 <p className={`${CARD_INNER_TILE_CLASS} text-sm`}>
                   <strong>{site.data.site.name}</strong>
                   <br />
-                  <span className="text-muted-foreground">{site.data.site.address}</span>
+                  <span className="text-muted-foreground">
+                    {site.data.site.address}
+                  </span>
                 </p>
                 <div>
                   <Label>{t("gatekeeper.host")} *</Label>
                   <Select value={hostKey} onValueChange={setHostKey}>
-                    <SelectTrigger><SelectValue placeholder={t("gatekeeper.selectHost")} /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("gatekeeper.selectHost")} />
+                    </SelectTrigger>
                     <SelectContent>
                       {hosts.map((host) => (
-                        <SelectItem key={host.key} value={host.key}>{host.label} ({host.type})</SelectItem>
+                        <SelectItem key={host.key} value={host.key}>
+                          {host.label} ({host.type})
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </>
             )}
-            <div><Label>{t("gatekeeper.purpose")}</Label><Textarea value={purpose} onChange={(e) => { forgetPlateAutoFill("purpose"); setPurpose(e.target.value); }} /></div>
-            <div><Label>{t("gatekeeper.expectedMinutes")}</Label><Input inputMode="numeric" value={duration} onChange={(e) => { forgetPlateAutoFill("expectedDuration"); setDuration(e.target.value); }} /></div>
+            <div>
+              <Label>{t("gatekeeper.purpose")}</Label>
+              <Textarea
+                value={purpose}
+                onChange={(e) => {
+                  forgetPlateAutoFill("purpose");
+                  setPurpose(e.target.value);
+                }}
+              />
+            </div>
+            <div>
+              <Label>{t("gatekeeper.expectedMinutes")}</Label>
+              <Input
+                inputMode="numeric"
+                value={duration}
+                onChange={(e) => {
+                  forgetPlateAutoFill("expectedDuration");
+                  setDuration(e.target.value);
+                }}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <BlueButton onClick={() => plateInput.current?.click()} disabled={busy}>
-                <Camera className="mr-2 h-4 w-4" />{platePhotoUrl ? t("gatekeeper.plateAttached") : t("gatekeeper.platePhoto")}
+              <BlueButton
+                onClick={() => plateInput.current?.click()}
+                disabled={busy}
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                {platePhotoUrl
+                  ? t("gatekeeper.plateAttached")
+                  : t("gatekeeper.platePhoto")}
               </BlueButton>
-              <BlueButton onClick={() => vehicleInput.current?.click()} disabled={busy}>
-                <Camera className="mr-2 h-4 w-4" />{vehiclePhotoUrl ? t("gatekeeper.vehicleAttached") : t("gatekeeper.vehiclePhoto")}
+              <BlueButton
+                onClick={() => vehicleInput.current?.click()}
+                disabled={busy}
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                {vehiclePhotoUrl
+                  ? t("gatekeeper.vehicleAttached")
+                  : t("gatekeeper.vehiclePhoto")}
               </BlueButton>
             </div>
-            <input ref={plateInput} className="hidden" type="file" accept="image/*" capture="environment" onChange={(e) => void capture(e.target.files?.[0], "plate")} />
-            <input ref={vehicleInput} className="hidden" type="file" accept="image/*" capture="environment" onChange={(e) => void capture(e.target.files?.[0], "vehicle")} />
-            <AmberButton className="w-full" onClick={() => void checkIn()} disabled={busy || !site.data}>
+            <input
+              ref={plateInput}
+              className="hidden"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => void capture(e.target.files?.[0], "plate")}
+            />
+            <input
+              ref={vehicleInput}
+              className="hidden"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => void capture(e.target.files?.[0], "vehicle")}
+            />
+            <AmberButton
+              className="w-full"
+              onClick={() => void checkIn()}
+              disabled={busy || !site.data}
+            >
               {busy ? t("gatekeeper.working") : t("gatekeeper.checkInVisitor")}
             </AmberButton>
-            <p className="text-center text-xs text-muted-foreground">{t("gatekeeper.locationRequired")}</p>
+            <p className="text-center text-xs text-muted-foreground">
+              {t("gatekeeper.locationRequired")}
+            </p>
           </CardContent>
         </Card>
       </div>
