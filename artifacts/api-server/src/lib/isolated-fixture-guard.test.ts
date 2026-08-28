@@ -6,6 +6,7 @@ import { requireIsolatedFixtureContext } from "./isolated-fixture-guard";
 
 const originalEnvironment = {
   DATABASE_URL: process.env.DATABASE_URL,
+  PGPORT: process.env.PGPORT,
   TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
   VNDRLY_ISOLATED_TEST_DB: process.env.VNDRLY_ISOLATED_TEST_DB,
 };
@@ -21,6 +22,7 @@ function restoreEnvironment(key: keyof typeof originalEnvironment): void {
 
 afterEach(() => {
   restoreEnvironment("DATABASE_URL");
+  restoreEnvironment("PGPORT");
   restoreEnvironment("TEST_DATABASE_URL");
   restoreEnvironment("VNDRLY_ISOLATED_TEST_DB");
 });
@@ -61,7 +63,7 @@ describe("requireIsolatedFixtureContext", () => {
   it("refuses before any database action when the matching target lacks _test", async () => {
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
     process.env.DATABASE_URL =
-      "postgresql://runner:secret@isolated.example.test/vndrly";
+      "postgresql://runner:secret@isolated.example.test:5432/vndrly";
     process.env.TEST_DATABASE_URL = process.env.DATABASE_URL;
     const databaseAction = vi.fn();
 
@@ -74,9 +76,9 @@ describe("requireIsolatedFixtureContext", () => {
   it("refuses before any database action when normalized targets differ", async () => {
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
     process.env.DATABASE_URL =
-      "postgresql://runner:secret@one.example.test/vndrly_test";
+      "postgresql://runner:secret@one.example.test:5432/vndrly_test";
     process.env.TEST_DATABASE_URL =
-      "postgresql://runner:secret@two.example.test/vndrly_test";
+      "postgresql://runner:secret@two.example.test:5432/vndrly_test";
     const databaseAction = vi.fn();
 
     const response = await request(fixtureApp(databaseAction)).post("/fixture");
@@ -85,10 +87,24 @@ describe("requireIsolatedFixtureContext", () => {
     expect(databaseAction).not.toHaveBeenCalled();
   });
 
-  it("refuses query-parameter target overrides before any database action", async () => {
+  it("refuses query parameters with encoded controls before any database action", async () => {
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
     process.env.DATABASE_URL =
-      "postgresql://runner:secret@isolated.example.test/vndrly_test?sslmode=require&HoSt=shared.example.test&host=other.example.test";
+      "postgresql://runner:secret@isolated.example.test:5432/vndrly_test?application_name=%00evil";
+    process.env.TEST_DATABASE_URL = process.env.DATABASE_URL;
+    const databaseAction = vi.fn();
+
+    const response = await request(fixtureApp(databaseAction)).post("/fixture");
+
+    expect(response.status).toBe(503);
+    expect(databaseAction).not.toHaveBeenCalled();
+  });
+
+  it("refuses an omitted URL port even when PGPORT supplies one", async () => {
+    process.env.VNDRLY_ISOLATED_TEST_DB = "1";
+    process.env.PGPORT = "5432";
+    process.env.DATABASE_URL =
+      "postgresql://runner:secret@isolated.example.test/vndrly_test";
     process.env.TEST_DATABASE_URL = process.env.DATABASE_URL;
     const databaseAction = vi.fn();
 
@@ -101,9 +117,9 @@ describe("requireIsolatedFixtureContext", () => {
   it("permits the database action only for the exact isolated _test target", async () => {
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
     process.env.DATABASE_URL =
-      "postgresql://runner:first@ISOLATED.EXAMPLE.TEST/vndrly_test?sslmode=require";
+      "postgres://runner:first@ISOLATED.EXAMPLE.TEST:5432/vndrly_test";
     process.env.TEST_DATABASE_URL =
-      "postgresql://runner:second@isolated.example.test:5432/vndrly_test?application_name=fixture";
+      "postgresql://runner:second@isolated.example.test:5432/vndrly_test";
     const databaseAction = vi.fn();
 
     const response = await request(fixtureApp(databaseAction)).post("/fixture");

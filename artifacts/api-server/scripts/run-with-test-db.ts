@@ -25,8 +25,9 @@
  *        target.
  *      - Otherwise derives `<dev-db>_test` on the same Postgres server
  *        as `DATABASE_URL`.
- *      - Allows only `sslmode` and `application_name` URL options and rejects
- *        target-changing/unknown options or fragments before any connection.
+ *      - Accepts only explicit, query-free Postgres URLs with a safe hostname,
+ *        numeric port, and ASCII database name, then rebuilds a canonical URL.
+ *      - Removes libpq target fallback variables before any connection.
  *   2. Ensures that DB exists (creates it via the maintenance `postgres`
  *      DB on the same server if necessary).
  *   3. Drops + recreates the `public` schema in the test DB so it
@@ -53,7 +54,10 @@ import type { PgDatabase } from "drizzle-orm/pg-core";
 import { pushSchema } from "drizzle-kit/api";
 import pg from "pg";
 import * as schema from "@workspace/db/schema";
-import { resolveIsolatedTestDatabaseTarget } from "../../../scripts/e2e-isolation.mjs";
+import {
+  resolveIsolatedTestDatabaseTarget,
+  stripLibpqTargetEnvironment,
+} from "../../../scripts/e2e-isolation.mjs";
 
 interface ResolvedUrls {
   testUrl: string;
@@ -176,7 +180,22 @@ async function main(): Promise<void> {
     );
   }
 
+  const setupEnvironment = stripLibpqTargetEnvironment(process.env);
+  for (const key of Object.keys(process.env)) {
+    if (!(key in setupEnvironment)) {
+      delete process.env[key];
+    }
+  }
+
   const resolved = resolveTestDbUrl();
+  process.env.DATABASE_URL = resolved.testUrl;
+  process.env.TEST_DATABASE_URL = resolved.testUrl;
+  const listenNotifyTestUrl = resolved.listenNotifyTestUrl;
+  if (listenNotifyTestUrl) {
+    process.env.LISTEN_NOTIFY_DATABASE_URL = listenNotifyTestUrl;
+  } else {
+    delete process.env.LISTEN_NOTIFY_DATABASE_URL;
+  }
   process.stdout.write(
     `[test-db] Using isolated test database "${resolved.testDbName}" (${resolved.source}): ${redactPassword(resolved.testUrl)}\n`,
   );
@@ -188,12 +207,12 @@ async function main(): Promise<void> {
   );
 
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...setupEnvironment,
     DATABASE_URL: resolved.testUrl,
     TEST_DATABASE_URL: resolved.testUrl,
     VNDRLY_ISOLATED_TEST_DB: "1",
   };
-  const listenNotifyTestUrl = resolved.listenNotifyTestUrl;
+  delete env.LISTEN_NOTIFY_DATABASE_URL;
   if (listenNotifyTestUrl) {
     env.LISTEN_NOTIFY_DATABASE_URL = listenNotifyTestUrl;
     process.stdout.write(

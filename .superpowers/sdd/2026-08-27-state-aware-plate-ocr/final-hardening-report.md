@@ -18,25 +18,35 @@ deployment paths were tested statically only and were not executed.
   rejects an explicit `TEST_DATABASE_URL` unless its database ends in `_test`
   and its normalized physical host/port/database differs from the original
   `DATABASE_URL`. Derived targets are also required to end in `_test` and retain
-  the source URL's host, credentials, port, and connection options.
-- The shared PostgreSQL parser now rejects query options before normalization.
-  `host`, `hostaddr`, `port`, `dbname`, `database`, `user`, `username`,
-  `password`, `service`, and `servicefile` are explicitly target-changing and
-  rejected case-insensitively; every other unknown option also fails closed.
-  Only `sslmode` and `application_name` are allowed. Repeated/percent-encoded
-  keys and all URL fragments are covered. Query-like text that is percent-
-  encoded inside userinfo remains credential data and cannot alter the target.
+  the source URL's host, decoded credentials, and explicit port.
+- The shared PostgreSQL sanitizer accepts only `postgresql`/`postgres` URLs
+  matching the repository's documented Supabase direct/pooler shapes: an
+  explicit safe ASCII DNS hostname, explicit numeric port, and safe ASCII
+  database identifier. Hostname and database-path percent encoding, absent
+  host/port, encoded or raw C0/C1 credential controls, all query parameters,
+  and all fragments fail closed. This includes `application_name=%00...`,
+  repeated/mixed-case target options, and single/double-encoded path separators.
+- After validation, decoded userinfo is safely re-encoded and the sanitizer
+  reconstructs a canonical `postgresql://...` connection URL. Every wrapper
+  Client, Pool, schema push, LISTEN/NOTIFY override, schema-check child, and test
+  child receives only a reconstructed URL, never the raw input.
+- The wrapper removes libpq target/credential fallbacks from both its setup
+  process and child environment, case-insensitively. This covers `PGHOST`,
+  `PGHOSTADDR`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGPASSFILE`,
+  `PGSERVICE`, `PGSERVICEFILE`, `PGSYSCONFDIR`, `PGTARGETSESSIONATTRS`, and
+  `PGLOADBALANCEHOSTS`; an omitted port therefore cannot be supplied by
+  `PGPORT`.
 - `LISTEN_NOTIFY_DATABASE_URL` now passes through the same parser and is
-  rewritten to the resolved `_test` database during the initial pure target
-  resolution, before any connection/create/reset work.
+  canonically rebuilt against the resolved `_test` database during the initial
+  pure target resolution, before any connection/create/reset work.
 - `scripts/run-api-local.mjs` does not load `.env.local` when
   `VNDRLY_ISOLATED_TEST_DB=1`, so the wrapper-owned `DATABASE_URL` survives
   into the API child.
 - Playwright configuration and global setup require the isolation marker and
   require `DATABASE_URL` and `TEST_DATABASE_URL` to identify the exact same
   normalized Postgres host, port, and database ending in `_test`. Credentials
-  and connection options are ignored because they do not change the physical
-  database target. Both web servers refuse reuse.
+  are ignored only for physical-target comparison; both returned connection
+  strings are independently sanitized. Both web servers refuse reuse.
 - E2E web requests are pinned to `http://localhost:23539`; every external,
   alternate loopback, port, path, credential, query, or fragment override is
   rejected before Playwright/global setup can issue a request.
@@ -188,13 +198,14 @@ Files:
 
 Green:
 
-- `node --test scripts/final-hardening.test.mjs` — 17 passed, including pure
-  explicit/derived target validation, physical-target normalization, external
-  E2E origin rejection, query-override/fragment rejection, wrapper ordering,
-  and static Playwright wiring.
-- Isolated fixture guard focused Vitest — 1 file, 6 passed; marker-only,
-  suffixless, mismatched, and query-override targets all return 503 before the
-  route action.
+- `node --test scripts/final-hardening.test.mjs` — 21 passed, including strict
+  direct/pooler canonicalization, explicit/derived target validation, physical-
+  target normalization, encoded-control/query/fragment/path rejection, libpq
+  environment stripping, external E2E origin rejection, wrapper ordering, and
+  static Playwright wiring.
+- Isolated fixture guard focused Vitest — 1 file, 7 passed; marker-only,
+  suffixless, mismatched, query-bearing, and omitted-port-plus-`PGPORT` targets
+  all return 503 before the route action.
 - API visit-route mocked focus — 63 passed, 27 skipped by test-name filter.
 - Shared plate-state Vitest — 12 passed.
 - Web gate/public focused Vitest — 2 files, 17 passed.
@@ -231,6 +242,7 @@ Not run by design:
 4. The earlier hardening commit normalized several touched legacy compact
    files, so parts of the whole-branch diff are formatting-only. This P0
    follow-up keeps its E2E spec change narrow.
-5. Any future PostgreSQL connection option beyond `sslmode` or
-   `application_name` will now fail closed and must receive a target-safety
-   review plus regression coverage before being allowlisted.
+5. PostgreSQL URL query parameters are intentionally unsupported, including
+   `sslmode` and `application_name`. Any future connection behavior must retain
+   the canonical target contract and receive a target-safety review plus
+   regression coverage; it must not be added as a permissive URL allowlist.

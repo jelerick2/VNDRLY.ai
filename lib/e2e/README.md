@@ -11,14 +11,20 @@ the shared development or production database.
 - Set `TEST_DATABASE_URL` to a database dedicated to tests whose database name
   ends in `_test` and whose normalized host/port/database differs from
   `DATABASE_URL`, or omit it so the wrapper derives a separate `_test` database
-  on the same server. Credentials and connection options do not make the same
-  physical database a distinct target.
-- PostgreSQL URL query parameters are fail-closed across `DATABASE_URL`,
-  `TEST_DATABASE_URL`, and `LISTEN_NOTIFY_DATABASE_URL`. Only `sslmode` and
-  `application_name` are allowed (case-insensitively); target-changing options,
-  unknown options, repeated target overrides, and URL fragments are rejected
-  before any connection or schema work. Future connection options require an
-  explicit safety review and regression coverage before joining the allowlist.
+  on the same server. Credentials do not make the same physical database a
+  distinct target.
+- `DATABASE_URL`, `TEST_DATABASE_URL`, and `LISTEN_NOTIFY_DATABASE_URL` must use
+  the documented `postgresql://user:password@host:port/database` (or
+  `postgres://...`) shape with an explicit DNS hostname, explicit numeric port,
+  and an ASCII database identifier. Percent-encoding is forbidden in the host
+  and database path; decoded credentials may not contain NUL, C0, or C1 control
+  characters. All query strings and fragments are rejected before any
+  connection or schema work.
+- The wrapper reconstructs canonical connection URLs from the validated
+  components and passes only those URLs to setup, schema, LISTEN/NOTIFY, and
+  child processes. It also removes libpq target fallbacks such as `PGHOST`,
+  `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, and `PGSERVICE` from setup and
+  child environments, so they cannot supply or redirect an omitted component.
 - Chromium has been installed for Playwright:
 
   ```
@@ -37,8 +43,9 @@ normalized target in `DATABASE_URL` and `TEST_DATABASE_URL` together with
 `VNDRLY_ISOLATED_TEST_DB=1`. Playwright configuration, global setup, local API
 startup, and destructive fixture routes all fail closed without that
 provenance and an `_test` database name. The wrapper validates the target before
-opening a connection or creating/resetting a schema. Running the Playwright
-package directly is expected to refuse.
+opening a connection or creating/resetting a schema, and the API fixture guard
+applies the same strict parser before entering a route action. Running the
+Playwright package directly is expected to refuse.
 
 The browser base URL is fixed at `http://localhost:23539`. `E2E_BASE_URL` may be
 unset or spell that exact local origin; external hosts, alternate loopback

@@ -15,6 +15,10 @@ export interface ResolvedIsolatedTestDatabaseTarget {
 
 export const LOCAL_E2E_BASE_URL: "http://localhost:23539";
 
+export function sanitizePostgresConnectionUrl(rawUrl: string): string;
+export function stripLibpqTargetEnvironment(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined>;
 export function normalizeDatabaseTarget(rawUrl: string): string;
 export function resolveIsolatedTestDatabaseTarget(
   env: IsolatedDatabaseEnvironment,

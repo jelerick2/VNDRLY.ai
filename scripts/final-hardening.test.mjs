@@ -37,21 +37,54 @@ test("the test database wrapper validates its target before every database opera
   const firstDatabaseOperation = wrapper.indexOf(
     "await ensureDatabaseExists(resolved.maintenanceUrl",
   );
+  const environmentSanitization = wrapper.indexOf(
+    "stripLibpqTargetEnvironment(process.env)",
+  );
+  const setupEnvironmentCleanup = wrapper.indexOf(
+    "delete process.env[key]",
+  );
+  const setupDatabaseRewrite = wrapper.indexOf(
+    "process.env.DATABASE_URL = resolved.testUrl",
+  );
+  const setupTestDatabaseRewrite = wrapper.indexOf(
+    "process.env.TEST_DATABASE_URL = resolved.testUrl",
+  );
 
-  assert.match(
-    wrapper,
-    /import \{ resolveIsolatedTestDatabaseTarget \} from "\.\.\/\.\.\/\.\.\/scripts\/e2e-isolation\.mjs"/,
+  assert.ok(
+    environmentSanitization >= 0,
+    "wrapper must remove libpq target fallbacks from setup and child environments",
+  );
+  assert.ok(
+    setupEnvironmentCleanup > environmentSanitization,
+    "wrapper must clear setup-process libpq target fallbacks",
   );
   assert.ok(resolution >= 0, "wrapper must resolve the validated target");
   assert.ok(
-    firstDatabaseOperation > resolution,
-    "target validation must finish before create/reset/connect work begins",
+    firstDatabaseOperation > resolution && resolution > setupEnvironmentCleanup,
+    "environment cleanup and target validation must finish before create/reset/connect work begins",
+  );
+  assert.ok(
+    setupDatabaseRewrite > resolution &&
+      setupDatabaseRewrite < firstDatabaseOperation &&
+      setupTestDatabaseRewrite > resolution &&
+      setupTestDatabaseRewrite < firstDatabaseOperation,
+    "the setup process must replace raw database URLs with canonical resolved URLs before database work",
+  );
+  assert.match(
+    wrapper,
+    /const env: NodeJS\.ProcessEnv = \{\s*\.\.\.setupEnvironment,\s*DATABASE_URL: resolved\.testUrl,\s*TEST_DATABASE_URL: resolved\.testUrl,/s,
+    "the child must inherit the stripped environment and canonical resolved URLs",
+  );
+  assert.doesNotMatch(
+    wrapper,
+    /new pg\.(?:Client|Pool)\(\{[^}]*connectionString:\s*process\.env/s,
+    "setup clients must never receive a raw environment URL",
   );
 });
 
 test("isolated E2E provenance requires the marker and the same normalized database target", () => {
   const databaseUrl =
-    "postgresql://test%20user:password@isolated.example.test:5432/e2e_database_test?sslmode=require";
+    "postgresql://test%20user:password@isolated.example.test:5432/e2e_database_test";
 
   assert.throws(
     () =>
@@ -75,18 +108,19 @@ test("isolated E2E provenance requires the marker and the same normalized databa
     assertIsolatedTestDatabaseEnvironment({
       DATABASE_URL: databaseUrl,
       TEST_DATABASE_URL:
-        "postgresql://test%20user:different@isolated.example.test/e2e_database_test?application_name=playwright",
+        "postgresql://test%20user:different@isolated.example.test:5432/e2e_database_test",
       VNDRLY_ISOLATED_TEST_DB: "1",
     }).databaseUrl,
-    databaseUrl,
+    "postgresql://test%20user:password@isolated.example.test:5432/e2e_database_test",
   );
 
   assert.throws(
     () =>
       assertIsolatedTestDatabaseEnvironment({
-        DATABASE_URL: "postgresql://runner:secret@isolated.example.test/vndrly",
+        DATABASE_URL:
+          "postgresql://runner:secret@isolated.example.test:5432/vndrly",
         TEST_DATABASE_URL:
-          "postgresql://runner:secret@isolated.example.test/vndrly",
+          "postgresql://runner:secret@isolated.example.test:5432/vndrly",
         VNDRLY_ISOLATED_TEST_DB: "1",
       }),
     /database name ending in _test/,
@@ -95,7 +129,8 @@ test("isolated E2E provenance requires the marker and the same normalized databa
 
 test("test database resolution rejects shared-looking explicit targets before setup", () => {
   const resolve = e2eIsolation.resolveIsolatedTestDatabaseTarget;
-  const shared = "postgresql://runner:secret@db.example.test/vndrly";
+  const shared =
+    "postgresql://runner:secret@db.example.test:5432/vndrly";
 
   assert.throws(
     () =>
@@ -110,7 +145,7 @@ test("test database resolution rejects shared-looking explicit targets before se
       resolve({
         DATABASE_URL: shared,
         TEST_DATABASE_URL:
-          "postgresql://runner:secret@isolated.example.test/vndrly",
+          "postgresql://runner:secret@isolated.example.test:5432/vndrly",
       }),
     /database name ending in _test/,
   );
@@ -118,9 +153,9 @@ test("test database resolution rejects shared-looking explicit targets before se
     () =>
       resolve({
         DATABASE_URL:
-          "postgresql://runner:first@isolated.example.test/vndrly_test?sslmode=require",
+          "postgresql://runner:first@isolated.example.test:5432/vndrly_test",
         TEST_DATABASE_URL:
-          "postgresql://alternate:second@ISOLATED.EXAMPLE.TEST:5432/vndrly_test?application_name=tests",
+          "postgresql://alternate:second@ISOLATED.EXAMPLE.TEST:5432/vndrly_test",
       }),
     /distinct from DATABASE_URL/,
   );
@@ -129,11 +164,11 @@ test("test database resolution rejects shared-looking explicit targets before se
 test("test database resolution preserves safe derived and explicit _test targets", () => {
   const resolve = e2eIsolation.resolveIsolatedTestDatabaseTarget;
   const base =
-    "postgresql://runner:secret@db.example.test:6543/vndrly?sslmode=require";
+    "postgresql://runner:secret@db.example.test:6543/vndrly";
   const derived = resolve({
     DATABASE_URL: base,
     LISTEN_NOTIFY_DATABASE_URL:
-      "postgresql://listener:notify@direct.example.test/postgres?SSLMODE=require&application_name=listen",
+      "postgresql://listener:notify@direct.example.test:5432/postgres",
   });
 
   assert.equal(derived.testDbName, "vndrly_test");
@@ -142,16 +177,17 @@ test("test database resolution preserves safe derived and explicit _test targets
   assert.equal(new URL(derived.testUrl).port, "6543");
   assert.equal(new URL(derived.testUrl).username, "runner");
   assert.equal(new URL(derived.testUrl).password, "secret");
-  assert.equal(new URL(derived.testUrl).search, "?sslmode=require");
+  assert.equal(new URL(derived.testUrl).search, "");
   assert.equal(
     derived.listenNotifyTestUrl,
-    "postgresql://listener:notify@direct.example.test/vndrly_test?SSLMODE=require&application_name=listen",
+    "postgresql://listener:notify@direct.example.test:5432/vndrly_test",
   );
 
   const explicit = resolve({
-    DATABASE_URL: "postgresql://runner:secret@shared.example.test/vndrly_test",
+    DATABASE_URL:
+      "postgresql://runner:secret@shared.example.test:5432/vndrly_test",
     TEST_DATABASE_URL:
-      "postgresql://runner:secret@isolated.example.test/vndrly_test?sslmode=require",
+      "postgresql://runner:secret@isolated.example.test:5432/vndrly_test",
   });
   assert.equal(explicit.testDbName, "vndrly_test");
   assert.equal(explicit.source, "TEST_DATABASE_URL");
@@ -160,13 +196,14 @@ test("test database resolution preserves safe derived and explicit _test targets
 
 test("the wrapper rejects target-changing options on every database URL before setup", () => {
   const resolve = e2eIsolation.resolveIsolatedTestDatabaseTarget;
-  const base = "postgresql://runner:secret@shared.example.test/vndrly";
+  const base =
+    "postgresql://runner:secret@shared.example.test:5432/vndrly";
 
   assert.throws(
     () =>
       resolve({
         DATABASE_URL:
-          "postgresql://runner:secret@isolated.example.test/vndrly?host=shared.example.test",
+          "postgresql://runner:secret@isolated.example.test:5432/vndrly?host=shared.example.test",
       }),
     /target-changing PostgreSQL URL query parameter/i,
   );
@@ -184,7 +221,7 @@ test("the wrapper rejects target-changing options on every database URL before s
       resolve({
         DATABASE_URL: base,
         LISTEN_NOTIFY_DATABASE_URL:
-          "postgresql://runner:secret@isolated.example.test/vndrly?sslmode=require&host=shared.example.test",
+          "postgresql://runner:secret@isolated.example.test:5432/vndrly?host=shared.example.test",
       }),
     /target-changing PostgreSQL URL query parameter/i,
   );
@@ -192,9 +229,10 @@ test("the wrapper rejects target-changing options on every database URL before s
 
 test("same _test database name on a different host is a distinct explicit target", () => {
   const resolved = e2eIsolation.resolveIsolatedTestDatabaseTarget({
-    DATABASE_URL: "postgresql://runner:secret@shared.example.test/vndrly_test",
+    DATABASE_URL:
+      "postgresql://runner:secret@shared.example.test:5432/vndrly_test",
     TEST_DATABASE_URL:
-      "postgresql://runner:secret@isolated.example.test/vndrly_test",
+      "postgresql://runner:secret@isolated.example.test:5432/vndrly_test",
   });
 
   assert.equal(resolved.testDbName, "vndrly_test");
@@ -248,12 +286,42 @@ test("Playwright config and global setup validate the local origin before use", 
   );
 });
 
-test("database target normalization allows only benign options and ignores credentials", () => {
+test("strict sanitizer canonicalizes the documented Supabase direct and pooler URL shapes", () => {
+  const sanitize = e2eIsolation.sanitizePostgresConnectionUrl;
+  const direct = sanitize?.(
+    "postgres://postgres:P%40ss%3Aword@DB.bihjmgbdzbhcnsuhzzwo.supabase.co:5432/postgres",
+  );
+  const pooler = sanitize?.(
+    "postgresql://postgres.bihjmgbdzbhcnsuhzzwo:secret@AWS-1-US-WEST-2.pooler.supabase.com:6543/postgres_test",
+  );
+
+  assert.equal(
+    direct,
+    "postgresql://postgres:P%40ss%3Aword@db.bihjmgbdzbhcnsuhzzwo.supabase.co:5432/postgres",
+  );
+  assert.equal(
+    pooler,
+    "postgresql://postgres.bihjmgbdzbhcnsuhzzwo:secret@aws-1-us-west-2.pooler.supabase.com:6543/postgres_test",
+  );
+
+  const resolved = e2eIsolation.resolveIsolatedTestDatabaseTarget({
+    DATABASE_URL: direct,
+    TEST_DATABASE_URL:
+      "postgres://postgres.bihjmgbdzbhcnsuhzzwo:secret@AWS-1-US-WEST-2.pooler.supabase.com:6543/postgres_test",
+  });
+  assert.equal(resolved.testUrl, pooler);
+  assert.equal(
+    resolved.maintenanceUrl,
+    "postgresql://postgres.bihjmgbdzbhcnsuhzzwo:secret@aws-1-us-west-2.pooler.supabase.com:6543/postgres",
+  );
+});
+
+test("database target normalization ignores sanitized credentials, not physical identity", () => {
   const left = normalizeDatabaseTarget(
-    "postgresql://runner:secret@DB.EXAMPLE.test/e2e?SSLMODE=require&application_name=first&sslmode=verify-full",
+    "postgres://runner:secret@DB.EXAMPLE.test:5432/e2e",
   );
   const sameTarget = normalizeDatabaseTarget(
-    "postgresql://runner:other@db.example.test:5432/e2e?Application_Name=test&application_name=second",
+    "postgresql://runner:other@db.example.test:5432/e2e",
   );
   const sameTargetOtherUser = normalizeDatabaseTarget(
     "postgresql://different%3Fhost%3Dshared:secret%23dbname%3Dprod%40value@db.example.test:5432/e2e",
@@ -267,73 +335,120 @@ test("database target normalization allows only benign options and ignores crede
   assert.notEqual(left, otherDatabase);
 });
 
-test("database target normalization rejects the reviewer query-override exploit and variants", () => {
-  const target = "postgresql://runner:secret@isolated.example.test/safe_test";
-  const targetChangingParameters = [
-    "host",
-    "hostaddr",
-    "port",
-    "dbname",
-    "database",
-    "user",
-    "username",
-    "password",
-    "service",
-    "servicefile",
-  ];
-
-  assert.throws(
-    () =>
-      normalizeDatabaseTarget(
-        `${target}?host=shared.supabase.test&dbname=postgres&port=5432`,
-      ),
-    /target-changing PostgreSQL URL query parameter "host"/i,
-  );
-
-  for (const parameter of targetChangingParameters) {
-    const mixedCase = parameter
-      .split("")
-      .map((character, index) =>
-        index % 2 === 0 ? character.toUpperCase() : character,
-      )
-      .join("");
-    assert.throws(
-      () => normalizeDatabaseTarget(`${target}?${mixedCase}=override`),
-      /target-changing PostgreSQL URL query parameter/i,
-      `${parameter} must be rejected case-insensitively`,
-    );
-  }
-
+test("strict database URLs reject every query parameter including NUL injection", () => {
+  const target =
+    "postgresql://runner:secret@isolated.example.test:5432/safe_test";
   for (const query of [
-    "sslmode=require&host=one.example.test&HOST=two.example.test",
-    "h%6Fst=shared.example.test",
-    "application_name=e2e&PoRt=6543&port=5432",
+    "application_name=%00evil",
+    "application_name=e2e",
+    "sslmode=require",
+    "host=shared.supabase.test&dbname=postgres&port=5432",
+    "HOST=one.example.test&host=two.example.test",
   ]) {
     assert.throws(
       () => normalizeDatabaseTarget(`${target}?${query}`),
-      /target-changing PostgreSQL URL query parameter/i,
+      /PostgreSQL URL query parameters are forbidden/i,
     );
   }
 });
 
-test("database target normalization rejects unknown options and URL fragments", () => {
-  const target = "postgresql://runner:secret@isolated.example.test/safe_test";
+test("strict database URLs reject ambiguous authorities and database paths", () => {
+  const invalid = [
+    {
+      url: "postgresql://runner:secret@exa%6dple.test:5432/safe_test",
+      pattern: /percent-encoding.*hostname/i,
+    },
+    {
+      url: "postgresql://runner:secret@isolated.example.test:5432/safe%2F_test",
+      pattern: /percent-encoding.*database path/i,
+    },
+    {
+      url: "postgresql://runner:secret@isolated.example.test:5432/safe%252F_test",
+      pattern: /percent-encoding.*database path/i,
+    },
+    {
+      url: "postgresql:///safe_test",
+      pattern: /explicit nonempty hostname/i,
+    },
+    {
+      url: "postgresql://runner:secret@isolated.example.test/safe_test",
+      pattern: /explicit numeric port/i,
+    },
+    {
+      url: "postgresql://runner:secret@isolated.example.test:5432/safe-test_test",
+      pattern: /safe ASCII database identifier/i,
+    },
+  ];
+
+  for (const { url, pattern } of invalid) {
+    assert.throws(() => normalizeDatabaseTarget(url), pattern, url);
+  }
 
   assert.throws(
-    () => normalizeDatabaseTarget(`${target}?connect_timeout=10`),
-    /unsupported PostgreSQL URL query parameter "connect_timeout"/i,
-  );
-  assert.throws(
     () =>
-      normalizeDatabaseTarget(
-        `${target}?sslmode=require#?host=shared.example.test&dbname=postgres`,
-      ),
+      e2eIsolation.resolveIsolatedTestDatabaseTarget({
+        DATABASE_URL:
+          "postgresql://runner:secret@isolated.example.test/postgres",
+        PGPORT: "5432",
+      }),
+    /explicit numeric port/i,
+  );
+});
+
+test("strict database URLs reject decoded C0/C1 controls in credentials and raw components", () => {
+  for (const url of [
+    "postgresql://run%00ner:secret@isolated.example.test:5432/safe_test",
+    "postgresql://run%1Fner:secret@isolated.example.test:5432/safe_test",
+    "postgresql://runner:sec%0Aret@isolated.example.test:5432/safe_test",
+    "postgresql://runner:sec%7Fret@isolated.example.test:5432/safe_test",
+    "postgresql://runner:sec%C2%80ret@isolated.example.test:5432/safe_test",
+    "postgresql://runner:sec%C2%9Fret@isolated.example.test:5432/safe_test",
+    "postgresql://run\nner:secret@isolated.example.test:5432/safe_test",
+  ]) {
+    assert.throws(
+      () => normalizeDatabaseTarget(url),
+      /control characters/i,
+      url,
+    );
+  }
+});
+
+test("strict database URLs reject fragments", () => {
+  const target =
+    "postgresql://runner:secret@isolated.example.test:5432/safe_test";
+
+  assert.throws(
+    () => normalizeDatabaseTarget(`${target}#?host=shared&dbname=postgres`),
     /PostgreSQL URL fragments are forbidden/i,
   );
   assert.throws(
     () => normalizeDatabaseTarget(`${target}#`),
     /PostgreSQL URL fragments are forbidden/i,
   );
+});
+
+test("libpq target fallback variables are removed case-insensitively", () => {
+  const stripped = e2eIsolation.stripLibpqTargetEnvironment?.({
+    PATH: "tools",
+    PGHOST: "shared.example.test",
+    pgport: "6543",
+    PGHOSTADDR: "10.0.0.1",
+    PGDATABASE: "postgres",
+    PGUSER: "shared-user",
+    PGPASSWORD: "shared-password",
+    PGPASSFILE: "shared.pgpass",
+    PGSERVICE: "shared",
+    PGSERVICEFILE: "services.conf",
+    PGSYSCONFDIR: "pgconfig",
+    PGTARGETSESSIONATTRS: "read-write",
+    PGLOADBALANCEHOSTS: "random",
+    PGSSLMODE: "require",
+  });
+
+  assert.deepEqual(stripped, {
+    PATH: "tools",
+    PGSSLMODE: "require",
+  });
 });
 
 test("the local API launcher never loads .env.local inside the isolated wrapper", () => {
