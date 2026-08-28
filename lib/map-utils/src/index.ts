@@ -11,6 +11,27 @@ export const SPEED_MIN_MOVING_MPS = 1.8;
 export const AT_SITE_RADIUS_M = DEFAULT_GEOFENCE_RADIUS_METERS;
 export const METERS_PER_MILE = 1609.344;
 export const MPS_TO_MPH = 2.23694;
+
+/** Miles display for US field ops: one decimal unless the value is a whole mile. */
+export function formatMetersAsMiles(meters: number): string {
+  const miles = Math.round((meters / METERS_PER_MILE) * 10) / 10;
+  return Number.isInteger(miles) ? String(miles) : miles.toFixed(1);
+}
+
+function milesNoun(meters: number, singular: string, plural: string): string {
+  const miles = Math.round((meters / METERS_PER_MILE) * 10) / 10;
+  return miles === 1 ? singular : plural;
+}
+
+/** English API fallback shown on Gate when the client displays `error.message`. */
+export function formatTooFarFromSiteMessage(
+  distanceMeters: number,
+  radiusMeters: number,
+): string {
+  const away = `${formatMetersAsMiles(distanceMeters)} ${milesNoun(distanceMeters, "mile", "miles")}`;
+  const within = `${formatMetersAsMiles(radiusMeters)} ${milesNoun(radiusMeters, "mile", "miles")}`;
+  return `You are too far from the site (${away} away, must be within ${within}).`;
+}
 export const STALE_PING_MS = 5 * 60_000;
 export const PROBLEM_ETA_MINUTES = 90;
 

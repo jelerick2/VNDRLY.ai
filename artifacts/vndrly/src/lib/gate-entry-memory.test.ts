@@ -321,6 +321,92 @@ describe("evaluateGateMemory", () => {
     expect(result.suggestions.map((row) => row.label)).toEqual(["Bonnie West", "Bob Villa"]);
   });
 
+  it("ignores the prefilled last name while replacing a driver by first name", () => {
+    const bobVilla = visit({
+      id: 20,
+      firstName: "Bob",
+      lastName: "Villa",
+      company: "Peak Energy",
+      vehiclePlate: "OK-4412",
+    });
+    const bonnieWest = visit({
+      id: 21,
+      firstName: "Bonnie",
+      lastName: "West",
+      company: "Peak Energy",
+      vehiclePlate: "TX-9911",
+      checkInTime: "2026-08-23T10:00:00Z",
+    });
+    const result = evaluateGateMemory({
+      visits: [bobVilla, bonnieWest],
+      draft: draft({
+        firstName: "Bon",
+        lastName: "Villa",
+        company: "Peak Energy",
+        vehiclePlate: "OK-4412",
+      }),
+      activeField: "firstName",
+      isDeleting: true,
+    });
+    expect(result.suggestions.map((row) => row.label)).toEqual(["Bonnie West"]);
+  });
+
+  it("ignores the prefilled first name while replacing a driver by last name", () => {
+    const bobVilla = visit({
+      id: 20,
+      firstName: "Bob",
+      lastName: "Villa",
+      company: "Peak Energy",
+      vehiclePlate: "OK-4412",
+    });
+    const aliceVillanueva = visit({
+      id: 22,
+      firstName: "Alice",
+      lastName: "Villanueva",
+      company: "Peak Energy",
+      vehiclePlate: "TX-2288",
+      checkInTime: "2026-08-24T10:00:00Z",
+    });
+    const result = evaluateGateMemory({
+      visits: [bobVilla, aliceVillanueva],
+      draft: draft({
+        firstName: "Bob",
+        lastName: "Villan",
+        company: "Peak Energy",
+        vehiclePlate: "OK-4412",
+      }),
+      activeField: "lastName",
+      isDeleting: true,
+    });
+    expect(result.suggestions.map((row) => row.label)).toEqual(["Alice Villanueva"]);
+  });
+
+  it("limits replacement-driver suggestions to the exact known company", () => {
+    const peakBonnie = visit({
+      id: 21,
+      firstName: "Bonnie",
+      lastName: "West",
+      company: "Peak Energy",
+      vehiclePlate: "TX-9911",
+      checkInTime: "2026-08-23T10:00:00Z",
+    });
+    const servicesBonnie = visit({
+      id: 22,
+      firstName: "Bonnie",
+      lastName: "Smith",
+      company: "Peak Energy Services",
+      vehiclePlate: "TX-2288",
+      checkInTime: "2026-08-24T10:00:00Z",
+    });
+    const result = evaluateGateMemory({
+      visits: [peakBonnie, servicesBonnie],
+      draft: draft({ firstName: "Bon", company: "Peak Energy", vehiclePlate: "OK-4412" }),
+      activeField: "firstName",
+      isDeleting: true,
+    });
+    expect(result.suggestions.map((row) => row.label)).toEqual(["Bonnie West"]);
+  });
+
   it("does not fill a person when the name prefix is ambiguous", () => {
     const jordanLee = visit({
       id: 5,

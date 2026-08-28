@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Alert,
-  DeviceEventEmitter,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -47,7 +46,14 @@ import {
 } from "@/lib/gatekeeper";
 import { captureAndUploadImage } from "@/lib/photos";
 import { formatPlateForDisplay } from "@/lib/plate-display";
-import { parseGateVoiceEntry } from "@/lib/gate-voice-entry";
+import {
+  matchGateCheckoutVisits,
+  parseGateVoiceCommand,
+} from "@/lib/gate-voice-entry";
+import {
+  setGateVoiceListening,
+  subscribeGateVoiceEntry,
+} from "@/lib/gate-voice-launch";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import {
   createPttRecorder,
@@ -93,7 +99,7 @@ function driverSuggestions(
         return false;
       if (
         companyNeedle &&
-        !(visit.company ?? "").trim().toLowerCase().startsWith(companyNeedle)
+        (visit.company ?? "").trim().toLowerCase() !== companyNeedle
       )
         return false;
       const key = `${(visit.firstName ?? "").trim().toLowerCase()}|${(visit.lastName ?? "").trim().toLowerCase()}|${(visit.company ?? "").trim().toLowerCase()}`;
@@ -111,8 +117,10 @@ export default function GatekeeperScreen() {
   const qc = useQueryClient();
   const appliedDefault = useRef(false);
   const voiceRecorderRef = useRef<PttRecorder | null>(null);
-  const voiceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const plateAutoFillRef = useRef<PlateAutoFillSnapshot | null>(null);
+  const voiceOperationRef = useRef<Promise<void>>(Promise.resolve());
+  const voiceMountedRef = useRef(true);
+  const voiceToggleRef = useRef<() => Promise<void>>(async () => undefined);
   const [siteCode, setSiteCode] = useState("");
   const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
   const [hostKey, setHostKey] = useState<string | null>(null);
@@ -134,6 +142,9 @@ export default function GatekeeperScreen() {
   const [activeNameField, setActiveNameField] =
     useState<DriverNameField | null>(null);
   const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceTranscribing, setVoiceTranscribing] = useState(false);
+  const [voiceCheckInPending, setVoiceCheckInPending] = useState(false);
+  const [voiceCheckoutMatches, setVoiceCheckoutMatches] = useState<ActiveVisit[]>([]);
 
   const activeVisits = useQuery({
     queryKey: ["gatekeeper-visits"],
@@ -237,18 +248,21 @@ export default function GatekeeperScreen() {
   };
 
   const finishGateVoiceEntry = async () => {
-    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
-    voiceTimerRef.current = null;
     const recorder = voiceRecorderRef.current;
     voiceRecorderRef.current = null;
-    setVoiceListening(false);
+    if (voiceMountedRef.current) setVoiceListening(false);
+    setGateVoiceListening(false);
     if (!recorder) return;
     try {
       const { uri, durationSeconds } = await recorder.stop();
       if (durationSeconds < 0.4) return;
-      const fill = parseGateVoiceEntry(await transcribeAskVRecording(uri));
+      if (voiceMountedRef.current) setVoiceTranscribing(true);
+      const transcript = await transcribeAskVRecording(uri);
+      if (!voiceMountedRef.current) return;
+      const command = parseGateVoiceCommand(transcript);
+      const fill = command.fill;
       if (!Object.keys(fill).length) {
-        Alert.alert(t("visitor.error"), t("gatekeeper.voiceNotUnderstood"));
+        if (voiceMountedRef.current) Alert.alert(t("visitor.error"), t("gatekeeper.voiceNotUnderstood"));
         return;
       }
       if (fill.firstName) setFirstName(fill.firstName);
@@ -268,58 +282,90 @@ export default function GatekeeperScreen() {
       if (fill.duration) setDuration(fill.duration);
       plateAutoFillRef.current = null;
       setActiveNameField(null);
+      if (command.intent === "check-out") {
+        const matches = matchGateCheckoutVisits(activeVisits.data ?? [], fill);
+        setVoiceCheckInPending(false);
+        setVoiceCheckoutMatches(matches);
+        if (matches.length === 0 && voiceMountedRef.current) Alert.alert(t("visitor.error"), t("gatekeeper.voiceNoCheckoutMatch"));
+      } else {
+        setVoiceCheckoutMatches([]);
+        setVoiceCheckInPending(true);
+      }
     } catch (error) {
-      Alert.alert(
-        t("visitor.error"),
-        error instanceof PttMicPermissionError
-          ? t("foremanHome.pttMicDeniedBody")
-          : t("gatekeeper.voiceNotUnderstood"),
-      );
+      if (voiceMountedRef.current) {
+        Alert.alert(
+          t("visitor.error"),
+          error instanceof PttMicPermissionError
+            ? t("foremanHome.pttMicDeniedBody")
+            : t("gatekeeper.voiceNotUnderstood"),
+        );
+      }
     } finally {
+      if (voiceMountedRef.current) setVoiceTranscribing(false);
       await recorder.dispose();
     }
   };
 
   const startGateVoiceEntry = async () => {
-    if (voiceListening) return;
+    if (voiceRecorderRef.current) return;
+    let recorder: PttRecorder | null = null;
     try {
-      await voiceRecorderRef.current?.dispose();
-      const recorder = await createPttRecorder();
+      recorder = await createPttRecorder();
+      if (!voiceMountedRef.current) {
+        await recorder.dispose();
+        return;
+      }
       voiceRecorderRef.current = recorder;
       await recorder.start();
+      if (!voiceMountedRef.current || voiceRecorderRef.current !== recorder) {
+        await recorder.dispose();
+        return;
+      }
       setVoiceListening(true);
-      voiceTimerRef.current = setTimeout(
-        () => void finishGateVoiceEntry(),
-        6500,
-      );
+      setGateVoiceListening(true);
     } catch (error) {
-      voiceRecorderRef.current = null;
-      Alert.alert(
-        t("visitor.error"),
-        error instanceof PttMicPermissionError
-          ? t("foremanHome.pttMicDeniedBody")
-          : t("gatekeeper.voiceNotUnderstood"),
-      );
+      if (voiceRecorderRef.current === recorder) voiceRecorderRef.current = null;
+      setGateVoiceListening(false);
+      await recorder?.dispose();
+      if (voiceMountedRef.current) {
+        setVoiceListening(false);
+        Alert.alert(
+          t("visitor.error"),
+          error instanceof PttMicPermissionError
+            ? t("foremanHome.pttMicDeniedBody")
+            : t("gatekeeper.voiceNotUnderstood"),
+        );
+      }
     }
   };
 
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener(
-      "vndrly:gate-voice",
-      () => {
-        void startGateVoiceEntry();
-      },
-    );
-    return () => subscription.remove();
-  }, [voiceListening]);
+  voiceToggleRef.current = async () => {
+    if (voiceRecorderRef.current) await finishGateVoiceEntry();
+    else await startGateVoiceEntry();
+  };
 
   useEffect(
-    () => () => {
-      if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
-      void voiceRecorderRef.current?.dispose();
-    },
+    () =>
+      subscribeGateVoiceEntry(() => {
+        const toggle = () => voiceToggleRef.current();
+        voiceOperationRef.current = voiceOperationRef.current.then(
+          toggle,
+          toggle,
+        );
+      }),
     [],
   );
+
+  useEffect(() => {
+    voiceMountedRef.current = true;
+    return () => {
+      voiceMountedRef.current = false;
+      const recorder = voiceRecorderRef.current;
+      voiceRecorderRef.current = null;
+      setGateVoiceListening(false);
+      void recorder?.dispose();
+    };
+  }, []);
 
   const resetForm = () => {
     plateAutoFillRef.current = null;
@@ -336,6 +382,8 @@ export default function GatekeeperScreen() {
     setVehiclePhotoUrl(null);
     setHostKey(null);
     setActiveNameField(null);
+    setVoiceCheckInPending(false);
+    setVoiceCheckoutMatches([]);
   };
 
   const onLookupSite = () => {
@@ -632,6 +680,37 @@ export default function GatekeeperScreen() {
                 {t("gatekeeper.noActive")}
               </Text>
             )}
+            {voiceCheckoutMatches.length > 0 ? (
+              <View style={[styles.voiceConfirm, { borderColor: colors.primary }]}>
+                <Text style={[styles.voiceConfirmTitle, { color: colors.foreground }]}>
+                  {voiceCheckoutMatches.length === 1
+                    ? t("gatekeeper.voiceConfirmCheckOut")
+                    : t("gatekeeper.voiceChooseCheckout")}
+                </Text>
+                {voiceCheckoutMatches.map((visit) => (
+                  <TouchableOpacity
+                    key={visit.id}
+                    testID={`gate-voice-confirm-checkout-${visit.id}`}
+                    disabled={busy}
+                    onPress={() => {
+                      setVoiceCheckoutMatches([]);
+                      void onCheckOut(visit.id);
+                    }}
+                    style={[styles.voiceActionButton, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.voiceActionText}>
+                      {t("gatekeeper.voiceCheckOutRecord", {
+                        name: `${visit.firstName ?? ""} ${visit.lastName ?? ""}`.trim(),
+                        plate: visit.vehiclePlate ?? "",
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity testID="gate-voice-cancel-checkout" onPress={() => setVoiceCheckoutMatches([])}>
+                  <Text style={[styles.voiceCancelText, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
 
           <View
@@ -653,6 +732,33 @@ export default function GatekeeperScreen() {
                 >
                   {t("gatekeeper.voiceListening")}
                 </Text>
+              </View>
+            ) : null}
+            {voiceTranscribing ? (
+              <View style={[styles.voiceStatus, { borderColor: colors.primary }]}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={[styles.voiceStatusText, { color: colors.primary }]}>{t("gatekeeper.voiceTranscribing")}</Text>
+              </View>
+            ) : null}
+            {voiceCheckInPending ? (
+              <View style={[styles.voiceConfirm, { borderColor: colors.primary }]}>
+                <Text style={[styles.voiceConfirmTitle, { color: colors.foreground }]}>{t("gatekeeper.voiceConfirmCheckIn")}</Text>
+                <View style={styles.voiceConfirmActions}>
+                  <TouchableOpacity testID="gate-voice-cancel-checkin" onPress={() => setVoiceCheckInPending(false)}>
+                    <Text style={[styles.voiceCancelText, { color: colors.mutedForeground }]}>{t("common.cancel")}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="gate-voice-confirm-checkin"
+                    disabled={busy}
+                    onPress={() => {
+                      setVoiceCheckInPending(false);
+                      void onCheckIn();
+                    }}
+                    style={[styles.voiceActionButton, { backgroundColor: colors.primary }]}
+                  >
+                    <Text style={styles.voiceActionText}>{t("gatekeeper.voiceConfirm")}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : null}
             <View style={styles.twoCol}>
@@ -738,6 +844,7 @@ export default function GatekeeperScreen() {
               {t("visitor.company")}
             </Text>
             <TextInput
+              testID="gate-company"
               value={company}
               onChangeText={(value) => {
                 forgetPlateAutoFill("company");
@@ -1028,4 +1135,10 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   voiceStatusText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  voiceConfirm: { borderRadius: 10, borderWidth: 1, gap: 10, padding: 12 },
+  voiceConfirmTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  voiceConfirmActions: { alignItems: "center", flexDirection: "row", justifyContent: "flex-end", gap: 14 },
+  voiceActionButton: { borderRadius: 9, paddingHorizontal: 14, paddingVertical: 10 },
+  voiceActionText: { color: "#FFFFFF", fontFamily: "Inter_600SemiBold", fontSize: 13, textAlign: "center" },
+  voiceCancelText: { fontFamily: "Inter_600SemiBold", fontSize: 13, padding: 8, textAlign: "center" },
 });

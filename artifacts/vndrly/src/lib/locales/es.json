@@ -1378,7 +1378,7 @@
       "siteNotFound": "Sitio no encontrado.",
       "errorTitle": "No se pudo completar la solicitud",
       "metersSuffix": "m",
-      "offGeofence": "Está a {{distance}} m — debe estar a menos de {{radius}} m del sitio para registrarse."
+      "offGeofence": "Está a {{distance}} millas — debe estar a menos de {{radius}} millas del sitio para registrarse."
     }
   },
   "fieldNewTicket": {
@@ -1405,7 +1405,7 @@
     "stamped": "La hora, el GPS y tu identidad se registrarán en este ticket.",
     "createdToast": "Entrada registrada y ticket creado",
     "createFailed": "No se pudo crear el ticket",
-    "offGeofence": "Está a {{distance}} m — debe estar a menos de {{radius}} m del sitio para registrarse."
+    "offGeofence": "Está a {{distance}} millas — debe estar a menos de {{radius}} millas del sitio para registrarse."
   },
   "fieldHome": {
     "portal": "Portal del Empleado de Campo",
@@ -4778,9 +4778,17 @@
     "all": "Todos los estados"
   },
   "gatekeeper": {
-    "voiceListening": "Escuchando: diga la matrícula, el nombre del conductor, la empresa, el propósito y la duración.",
-    "voiceUnavailable": "La entrada por voz no es compatible con este navegador.",
-    "voiceNotUnderstood": "No pude entender la entrada. Inténtelo de nuevo y diga: matrícula ABC123, conductor Bob Villa.",
+    "voiceListening": "Escuchando: diga la matrícula, el nombre del conductor, la empresa, el propósito y la duración; después, vuelva a pulsar el micrófono.",
+    "voiceTranscribing": "Procesando la entrada de voz…",
+    "voicePermissionDenied": "Se denegó el acceso al micrófono. Permítalo en la configuración del navegador e inténtelo de nuevo.",
+    "voiceUnavailable": "La entrada por voz no está disponible en este momento.",
+    "voiceNotUnderstood": "No pude entender. Inténtelo con: Bob Villa saliendo, o matrícula ABC123 saliendo.",
+    "voiceConfirmCheckIn": "Revise el registro completado y confirme esta entrada.",
+    "voiceConfirmCheckOut": "Confirme la salida de este visitante.",
+    "voiceChooseCheckout": "Coincidió más de una visita activa. Elija el registro que desea cerrar.",
+    "voiceCheckOutRecord": "Registrar salida de {{name}} · {{plate}}",
+    "voiceNoCheckoutMatch": "Ninguna entrada activa coincide con ese nombre o matrícula.",
+    "voiceConfirm": "Confirmar",
     "portal": "Portal de portería",
     "title": "Portería",
     "subtitle": "Registre la entrada y salida de visitantes en el sitio actual.",

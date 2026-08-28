@@ -55,7 +55,7 @@ const ES_STRINGS: Record<string, string> = {
   "tickets.errorCheckIn": "No se pudo registrar la entrada",
   "tickets.errorCheckOut": "No se pudo registrar la salida",
   "tickets.offGeofence":
-    "Está a {{distance}} m — debe estar a menos de {{radius}} m del sitio para registrarse.",
+    "Está a {{distance}} millas — debe estar a menos de {{radius}} millas del sitio para registrarse.",
   // Task #112: friendly session-expired screen copy. Asserted in the
   // session-expired suite below to confirm the visitor sees Spanish, not
   // a generic "ERR_HTTP_401" or untranslated key.
@@ -821,7 +821,7 @@ describe("VisitorCheckInScreen — localized API error rendering", () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
         "Error",
-        "Está a 320 m — debe estar a menos de 150 m del sitio para registrarse.",
+        "Está a 0.2 millas — debe estar a menos de 0.1 millas del sitio para registrarse.",
       );
     });
     alertSpy.mockRestore();

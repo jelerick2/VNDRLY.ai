@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { OFF_GEOFENCE } from "@workspace/visit-error-codes";
+import { formatMetersAsMiles } from "@workspace/map-utils";
 import { visitsApi, type SiteContext, type VisitorRow } from "@/lib/visits-api";
 import {
   NATIONAL_PLATE_STATE_FALLBACK,
@@ -300,8 +301,8 @@ export default function VisitPublicPage({ siteCode }: { siteCode: string }) {
       ) {
         setError(
           t("visitor.public.offGeofence", {
-            distance: data.distanceMeters,
-            radius: data.radiusMeters,
+            distance: formatMetersAsMiles(data.distanceMeters),
+            radius: formatMetersAsMiles(data.radiusMeters),
           }),
         );
       } else {

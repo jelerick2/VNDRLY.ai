@@ -1,6 +1,14 @@
 import type { TFunction } from "i18next";
 
 import { CREW_VALIDATION_CODES } from "@workspace/crew-validation-codes";
+
+const METERS_PER_MILE = 1609.344;
+
+/** Keep in lockstep with `formatMetersAsMiles` in `@workspace/map-utils`. */
+function formatMetersAsMiles(meters: number): string {
+  const miles = Math.round((meters / METERS_PER_MILE) * 10) / 10;
+  return Number.isInteger(miles) ? String(miles) : miles.toFixed(1);
+}
 import { TICKET_STATE_CONFLICT_CODES } from "@workspace/ticket-state-conflict-codes";
 import {
   OFF_GEOFENCE,
@@ -152,8 +160,8 @@ export function translateApiError(
     typeof err?.data?.radiusMeters === "number"
   ) {
     return t("tickets.offGeofence", {
-      distance: err.data.distanceMeters,
-      radius: err.data.radiusMeters,
+      distance: formatMetersAsMiles(err.data.distanceMeters),
+      radius: formatMetersAsMiles(err.data.radiusMeters),
     });
   }
 

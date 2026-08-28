@@ -1378,7 +1378,7 @@
       "siteNotFound": "Site not found.",
       "errorTitle": "Could not complete request",
       "metersSuffix": "m",
-      "offGeofence": "You are {{distance}} m away — must be within {{radius}} m of the site to check in."
+      "offGeofence": "You are {{distance}} miles away — must be within {{radius}} miles of the site to check in."
     }
   },
   "fieldNewTicket": {
@@ -1405,7 +1405,7 @@
     "stamped": "Time, GPS, and your identity will be stamped on this ticket.",
     "createdToast": "Checked in & ticket created",
     "createFailed": "Failed to create ticket",
-    "offGeofence": "You are {{distance}} m away — must be within {{radius}} m of the site to check in."
+    "offGeofence": "You are {{distance}} miles away — must be within {{radius}} miles of the site to check in."
   },
   "fieldHome": {
     "portal": "Field Employee Portal",
@@ -4778,9 +4778,17 @@
     "all": "All states"
   },
   "gatekeeper": {
-    "voiceListening": "Listening — say the plate, driver name, company, purpose, and duration.",
-    "voiceUnavailable": "Voice entry is not supported in this browser.",
-    "voiceNotUnderstood": "I couldn't understand the gate entry. Try again and say: plate ABC123, driver Bob Villa.",
+    "voiceListening": "Listening — say the plate, driver name, company, purpose, and duration, then press the microphone again.",
+    "voiceTranscribing": "Processing voice entry…",
+    "voicePermissionDenied": "Microphone access was denied. Allow it in your browser settings and try again.",
+    "voiceUnavailable": "Voice entry is not available right now.",
+    "voiceNotUnderstood": "I couldn't understand that. Try: Bob Villa checking out, or plate ABC123 checking out.",
+    "voiceConfirmCheckIn": "Review the filled record, then confirm this check-in.",
+    "voiceConfirmCheckOut": "Confirm this visitor is checking out.",
+    "voiceChooseCheckout": "More than one active visit matched. Choose the record to check out.",
+    "voiceCheckOutRecord": "Check out {{name}} · {{plate}}",
+    "voiceNoCheckoutMatch": "No active gate entry matched that name or plate.",
+    "voiceConfirm": "Confirm",
     "portal": "Gate portal",
     "title": "Gate",
     "subtitle": "Check visitors in and out at the current site.",

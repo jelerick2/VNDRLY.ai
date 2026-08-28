@@ -113,9 +113,26 @@ function visitMatchesDraft(
   draft: GateEntryDraft,
   activeField: GateMemoryField,
 ): boolean {
-  if (draft.firstName.trim() && !prefixMatch(visit.firstName, draft.firstName)) return false;
-  if (draft.lastName.trim() && !prefixMatch(visit.lastName, draft.lastName)) return false;
-  if (draft.company.trim() && !prefixMatch(visit.company, draft.company)) return false;
+  const editingDriver = activeField === "firstName" || activeField === "lastName";
+  // A plate prefills the last driver. Once the gatekeeper edits either name,
+  // the opposite prefilled name must not exclude another driver at the same
+  // company from autocomplete results.
+  if (
+    (!editingDriver || activeField === "firstName")
+    && draft.firstName.trim()
+    && !prefixMatch(visit.firstName, draft.firstName)
+  ) return false;
+  if (
+    (!editingDriver || activeField === "lastName")
+    && draft.lastName.trim()
+    && !prefixMatch(visit.lastName, draft.lastName)
+  ) return false;
+  if (draft.company.trim()) {
+    const companyMatches = editingDriver
+      ? norm(visit.company) === norm(draft.company)
+      : prefixMatch(visit.company, draft.company);
+    if (!companyMatches) return false;
+  }
   // A truck can have different drivers. While finding a driver, use the known
   // company but do not let the truck's last plate/driver pairing hide coworkers.
   if (
@@ -324,6 +341,22 @@ export function pickSuggestionFill(suggestion: GateMemorySuggestion): Partial<Ga
     return { company: suggestion.visit.company ?? suggestion.label };
   }
   return fillFromVisit(suggestion.visit);
+}
+
+export function applyGateMemorySuggestion(
+  draft: GateEntryDraft,
+  suggestion: GateMemorySuggestion,
+  activeField: GateMemoryField | null,
+): GateEntryDraft {
+  const next = mergeGateFill(draft, pickSuggestionFill(suggestion));
+  if (
+    suggestion.mode === "visitor"
+    && (activeField === "firstName" || activeField === "lastName")
+  ) {
+    next.firstName = suggestion.visit.firstName;
+    next.lastName = suggestion.visit.lastName;
+  }
+  return next;
 }
 
 export function evaluateGateMemory(input: {

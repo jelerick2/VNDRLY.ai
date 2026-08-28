@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { OFF_GEOFENCE } from "@workspace/visit-error-codes";
+import { formatMetersAsMiles } from "@workspace/map-utils";
 import { translateApiError } from "@/lib/api-error";
 import { MapPin, Wrench, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -91,8 +92,8 @@ export default function FieldNewTicket() {
           ) {
             toast({
               title: t("fieldNewTicket.offGeofence", {
-                distance: data.distanceMeters,
-                radius: data.radiusMeters,
+                distance: formatMetersAsMiles(data.distanceMeters),
+                radius: formatMetersAsMiles(data.radiusMeters),
               }),
               variant: "destructive",
             });

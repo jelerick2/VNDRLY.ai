@@ -9,6 +9,7 @@ const api = vi.hoisted(() => ({
   gateCheckOut: vi.fn(),
   getSiteContext: vi.fn(),
   list: vi.fn(),
+  listAllVisits: vi.fn(),
   listAssignedGateSites: vi.fn(),
   listPreferredPlateStates: vi.fn(),
   readPlate: vi.fn(),
@@ -72,7 +73,7 @@ vi.mock("@/lib/gatekeeper-log-export", async (importOriginal) => {
 });
 
 vi.mock("@/lib/visits-api", () => ({
-  listAllVisits: vi.fn(async () => []),
+  listAllVisits: (...args: unknown[]) => api.listAllVisits(...args),
   visitsApi: api,
 }));
 
@@ -171,6 +172,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   liveMonitor.flash = null;
   api.list.mockResolvedValue([]);
+  api.listAllVisits.mockResolvedValue([]);
   api.listAssignedGateSites.mockResolvedValue({
     sites: [ASSIGNED_SITE],
     defaultSite: ASSIGNED_SITE,
@@ -493,7 +495,7 @@ describe("GatekeeperPage plate state", () => {
   });
 
   it("replaces prior composite auto-fill after switching to a state with a different exact match and preserves manual edits", async () => {
-    api.list.mockResolvedValue([
+    api.listAllVisits.mockResolvedValue([
       recentVisit(),
       recentVisit({
         id: 2,
@@ -556,7 +558,7 @@ describe("GatekeeperPage plate state", () => {
   });
 
   it("clears prior composite auto-fill after switching to a state with no match and preserves manual edits", async () => {
-    api.list.mockResolvedValue([recentVisit()]);
+    api.listAllVisits.mockResolvedValue([recentVisit()]);
     renderPage();
     await screen.findByTestId("input-gate-plate");
 
@@ -610,7 +612,7 @@ describe("GatekeeperPage plate state", () => {
   });
 
   it("uses the selected state for same-number previous-visit behavior", async () => {
-    api.list.mockResolvedValue([
+    api.listAllVisits.mockResolvedValue([
       recentVisit(),
       recentVisit({
         id: 2,

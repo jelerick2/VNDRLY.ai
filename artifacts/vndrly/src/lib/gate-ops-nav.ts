@@ -22,7 +22,7 @@ export function canViewGateLog(user: GateLogViewer | null | undefined): boolean 
   return role == null || role === "office" || role === "both";
 }
 
-export function gateLogNavAnchorKey(items: Pick<NavItem, "key">[]): string {
+export function gateLogNavAnchorKey(items: Array<Pick<NavItem, "key">>): string {
   if (items.some((item) => item.key === "crew-map")) return "crew-map";
   if (items.some((item) => item.key === "site-map")) return "site-map";
   return "tracking";

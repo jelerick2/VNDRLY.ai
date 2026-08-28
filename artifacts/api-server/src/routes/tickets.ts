@@ -228,6 +228,7 @@ import {
   FOREMAN_VENDOR_MISMATCH,
 } from "@workspace/crew-validation-codes";
 import { OFF_GEOFENCE } from "@workspace/visit-error-codes";
+import { formatTooFarFromSiteMessage } from "@workspace/map-utils";
 
 // Returns true if the ticket has cleared the accept gate. If not, sends a
 // 409 ticket_not_accepted response and returns false. Use at the top of any
@@ -1367,7 +1368,7 @@ router.post("/tickets", async (req, res): Promise<void> => {
   ) {
     const distance = Math.round(metersFromSite);
     res.status(403).json({
-      message: `You are too far from the site (${distance}m away, must be within ${radius}m).`,
+      message: formatTooFarFromSiteMessage(distance, radius),
       code: OFF_GEOFENCE,
       distanceMeters: distance,
       radiusMeters: radius,
@@ -1733,7 +1734,7 @@ router.post("/tickets/:id/check-in", async (req, res): Promise<void> => {
     if (meters > radius && !isGeofenceBypassActive()) {
       const distance = Math.round(meters);
       res.status(403).json({
-        message: `You are too far from the site (${distance}m away, must be within ${radius}m).`,
+        message: formatTooFarFromSiteMessage(distance, radius),
         code: OFF_GEOFENCE,
         distanceMeters: distance,
         radiusMeters: radius,

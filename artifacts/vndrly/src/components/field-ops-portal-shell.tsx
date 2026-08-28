@@ -1,7 +1,7 @@
 import { lazy, Suspense, type ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { LogOut, Menu, Mic, type LucideIcon } from "lucide-react";
+import { LogOut, Menu, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
@@ -10,6 +10,7 @@ import LanguageToggle from "@/components/language-toggle";
 import DarkLightToggle from "@/components/dark-light-toggle";
 import NotificationsBell from "@/components/notifications-bell";
 import SidebarButton from "@/components/sidebar-button";
+import GateVoiceCircleButton from "@/components/gate-voice-circle-button";
 import ReferToVndrlyDialog from "@/components/refer-to-vndrly-dialog";
 import { PoweredByVndrly } from "@/components/powered-by-vndrly";
 import ContextSwitcher from "@/components/context-switcher";
@@ -19,6 +20,7 @@ import {
   portalDisplayLogo,
   shouldUseLayeredPortalLogo,
 } from "@/lib/portal-branding";
+import { requestGateVoiceEntry, subscribeGateVoiceListening } from "@/lib/gate-voice-launch";
 import { VNDRLY_LOGO_SQUARE as vndrlyLogo } from "@/lib/vndrly-brand-assets";
 import {
   useGetVendor,
@@ -77,6 +79,9 @@ export function FieldOpsPortalShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vendorName, setVendorName] = useState<string | null>(null);
   const [employeeName, setEmployeeName] = useState<string | null>(null);
+  const [gateVoiceListening, setGateVoiceListening] = useState(false);
+
+  useEffect(() => subscribeGateVoiceListening(setGateVoiceListening), []);
 
   const vendorId = user?.vendorId ?? null;
   const { data: vendor } = useGetVendor(vendorId ?? 0, {
@@ -235,11 +240,10 @@ export function FieldOpsPortalShell({
             if (tab.voiceEntry) {
               return (
                 <div key={tab.href} className="flex justify-center py-3">
-                  <SidebarButton
-                    isActive={false}
-                    activeOnHover
+                  <GateVoiceCircleButton
+                    active={gateVoiceListening}
                     onClick={() => {
-                      const launch = () => window.dispatchEvent(new Event("vndrly:gate-voice"));
+                      const launch = () => requestGateVoiceEntry();
                       if (!location.startsWith("/gate") || location.startsWith("/gate/history")) {
                         sessionStorage.setItem("vndrly:gate-voice-pending", "1");
                         setLocation("/gate");
@@ -247,17 +251,8 @@ export function FieldOpsPortalShell({
                       setSidebarOpen(false);
                     }}
                     testId={tab.testId}
-                    branded={branded}
-                    brandPrimary={brand.primary}
-                    brandAccent={brand.accent}
-                    className="h-32 w-32"
-                    solidIdleText
-                  >
-                    <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-sm">
-                      <Mic className="h-10 w-10" />
-                      {t(tab.labelKey)}
-                    </span>
-                  </SidebarButton>
+                    label={t(tab.labelKey)}
+                  />
                 </div>
               );
             }

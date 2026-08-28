@@ -3,6 +3,14 @@ name: Publish
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vndrly-production-web
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -22,3 +30,81 @@ jobs:
         env:
           BASE_PATH: /
           NODE_ENV: production
+      - name: Upload web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: vndrly-web-${{ github.sha }}
+          path: artifacts/vndrly/dist/public
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy-web:
+    name: Deploy web to GoDaddy VPS
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      DEST_DIR: /var/www/vndrly/artifacts/vndrly/dist/public
+    steps:
+      - name: Download verified web build
+        uses: actions/download-artifact@v4
+        with:
+          name: vndrly-web-${{ github.sha }}
+          path: web-dist
+
+      - name: Verify deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_PASSWORD VPS_PORT; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing deployment secret::$name is not configured"
+              exit 1
+            fi
+          done
+          test -f web-dist/index.html
+
+      - name: Install SSH deployment tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends sshpass rsync
+
+      - name: Verify VPS destination
+        shell: bash
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          sshpass -e ssh \
+            -p "$VPS_PORT" \
+            -o ConnectTimeout=20 \
+            -o PreferredAuthentications=password \
+            -o PubkeyAuthentication=no \
+            -o StrictHostKeyChecking=accept-new \
+            "$VPS_USER@$VPS_HOST" \
+            'DEST_DIR=/var/www/vndrly/artifacts/vndrly/dist/public; test -d "$DEST_DIR" && test -w "$DEST_DIR"'
+
+      - name: Publish web files
+        shell: bash
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          sshpass -e rsync \
+            --archive \
+            --compress \
+            --delete \
+            --delay-updates \
+            -e "ssh -p $VPS_PORT -o ConnectTimeout=20 -o PreferredAuthentications=password -o PubkeyAuthentication=no -o StrictHostKeyChecking=yes" \
+            web-dist/ \
+            "$VPS_USER@$VPS_HOST:$DEST_DIR/"
+
+      - name: Verify public site
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 https://vndrly.ai/gate >/dev/null

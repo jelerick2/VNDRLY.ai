@@ -6,6 +6,57 @@ VNDRLY is a full-stack web application designed to streamline oil & gas field op
 ## User Preferences
 I prefer clear, concise explanations and an iterative development approach. Please ask before making any major architectural changes or introducing new external dependencies. I value well-documented code and a focus on maintainability.
 
+### STANDING RULE — RELEASE COMMAND IS END-TO-END AUTHORIZATION
+For this repository, the user's imperative instruction **"commit, push, deploy,
+and ship"** (or an unambiguous equivalent) is one complete release command. It
+remains in effect through troubleshooting and safe retries until the requested
+change is live. Do not pause to request approval again between these stages.
+**"full ship"** is the same one-task authorization as **"commit, push, deploy,
+and ship"**.
+
+1. Commit the scoped, verified changes.
+2. Push the working branch.
+3. Integrate into `main` with a non-force fast-forward or merge.
+4. Run or allow the configured production web deployment and any
+   fingerprint-compatible Expo OTA workflow.
+5. Monitor the release and verify the live web/Expo result.
+
+This standing authorization never permits a force push/history rewrite,
+destructive database action, credential rotation, or a new native App Store
+binary/submission. Those operations retain their specific approval rules.
+
+#### RELEASE FAST PATH — 10-MINUTE TARGET, 15-MINUTE ESCALATION
+Once the exact release tree has passed its required verification, the
+commit/push/web-deploy clock starts. The target is a verified public web
+release within **10 minutes**; at **15 minutes** the release is considered
+blocked and the agent must already be inspecting the failing job or boundary.
+
+Follow this path without adding approval or duplicate-validation delays:
+
+1. Reuse fresh verification evidence for the exact unchanged tree. Do not run
+   the same full suite again after commit when no files changed; run only a
+   relevant contract check if the release mechanism itself changed.
+2. Use the configured GitHub integration as the primary publication path.
+   Do not first attempt a Git CLI push from an environment already known to
+   lack interactive credentials.
+3. Publish the working branch and advance `main` in the same non-force pass
+   after confirming the current remote `main` parent. Avoid intermediate
+   release-only commits unless they fix a demonstrated failure.
+4. Start monitoring the GitHub web deployment and any eligible Expo OTA run
+   concurrently. Verify the public route from the deployed commit as soon as
+   the web job succeeds.
+5. TestFlight is a separate track and never blocks web completion. Report the
+   web release when it is live, then continue an explicitly authorized native
+   build/submission independently.
+6. On failure, retrieve the exact job logs, fix the root cause, and retry under
+   the standing release authorization. Do not pause to ask permission again
+   for a safe retry already covered by the release command.
+7. The release handoff must include the commit, workflow result, public
+   verification, and elapsed commit-to-live time.
+
+The detailed checklist and measured baseline are in
+`docs/release-fast-path.md`.
+
 ### HARD RULE — NEVER TAKE ACTION WHEN ASKED A QUESTION
 A question is not a request for action. The agent must NEVER infer intent
 from a question and act on it — only answer it. The agent will follow

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Home } from "lucide-react";
+import { Home, Mic } from "lucide-react";
 
 const mockState = vi.hoisted(() => ({
   user: null as Record<string, unknown> | null,
@@ -75,7 +75,8 @@ vi.stubGlobal(
   (...args: Parameters<typeof fetch>) => mockState.fetchMock(...args),
 );
 
-import { FieldOpsPortalShell } from "./field-ops-portal-shell";
+import { FieldOpsPortalShell, type FieldOpsTabDef } from "./field-ops-portal-shell";
+import { setGateVoiceListening } from "@/lib/gate-voice-launch";
 
 const TABS = [
   {
@@ -87,14 +88,14 @@ const TABS = [
   },
 ];
 
-function renderShell() {
+function renderShell(tabs: FieldOpsTabDef[] = TABS) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
       <FieldOpsPortalShell
-        tabs={TABS}
+        tabs={tabs}
         portalLabelKey="foremanHome.portal"
         navAriaKey="foremanNav.aria"
       >
@@ -144,5 +145,36 @@ describe("FieldOpsPortalShell", () => {
     expect(screen.getByTestId("notifications-bell")).toBeTruthy();
     expect(screen.getByTestId("img-sidebar-logo")).toBeTruthy();
     expect(screen.queryByTestId("nav-field-portal-sign-out")).toBeNull();
+  });
+
+  it("renders Gate voice entry with branded circle artwork and an accessible button", () => {
+    renderShell([
+      {
+        href: "/gate",
+        icon: Mic,
+        labelKey: "gateNav.voice",
+        testId: "button-gate-voice",
+        voiceEntry: true,
+        match: () => false,
+      },
+    ]);
+
+    const button = screen.getByTestId("button-gate-voice");
+    expect(button.tagName).toBe("BUTTON");
+    expect(button.getAttribute("aria-label")).toBe("gateNav.voice");
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByTestId("gate-voice-brand-layer").style.backgroundColor).toBe(
+      "var(--brand-primary)",
+    );
+    expect(screen.getByTestId("gate-voice-overlay").getAttribute("src")).toContain(
+      "white-circle-voice-overlay.png",
+    );
+    expect(screen.getByTestId("gate-voice-circle").className).toContain(
+      "group-hover:scale-[1.04]",
+    );
+
+    act(() => setGateVoiceListening(true));
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(button.getAttribute("data-state")).toBe("listening");
   });
 });

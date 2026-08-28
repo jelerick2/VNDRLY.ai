@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ClipboardList, Map, Ticket, UserPlus, type LucideIcon } from "lucide-react";
 import {
   canViewGateLog,
   gateLogNavAnchorKey,
@@ -6,10 +7,10 @@ import {
   type NavItem,
 } from "./gate-ops-nav";
 
-const crew: NavItem = { href: "/crew-map", label: "Crew Map", key: "crew-map" };
-const site: NavItem = { href: "/site-map", label: "Site Map", key: "site-map" };
-const visitors: NavItem = { href: "/visitors", label: "Visitors", key: "visitors" };
-const tracking: NavItem = { href: "/tickets", label: "Tracking", key: "tracking" };
+const crew: NavItem<LucideIcon> = { href: "/crew-map", label: "Crew Map", key: "crew-map", icon: Map };
+const site: NavItem<LucideIcon> = { href: "/site-map", label: "Site Map", key: "site-map", icon: Map };
+const visitors: NavItem<LucideIcon> = { href: "/visitors", label: "Visitors", key: "visitors", icon: UserPlus };
+const tracking: NavItem<LucideIcon> = { href: "/tickets", label: "Tracking", key: "tracking", icon: Ticket };
 
 describe("canViewGateLog", () => {
   it("is for admin and partner office viewers, not field or booth operators", () => {
@@ -32,8 +33,11 @@ describe("withGateLogNav", () => {
       user: { role: "vendor", vendorRole: "office" },
       gatekeepingEnabled: true,
       label: "Gate Log",
+      icon: ClipboardList,
     });
+    const insertedIcon: LucideIcon = items[2].icon;
     expect(items.map((i) => i.key)).toEqual(["tracking", "crew-map", "gate-log", "visitors"]);
+    expect(insertedIcon).toBe(ClipboardList);
   });
 
   it("inserts Gate Log under Site Map for partners who have no Crew Map", () => {
@@ -42,6 +46,7 @@ describe("withGateLogNav", () => {
       user: { role: "partner" },
       gatekeepingEnabled: true,
       label: "Gate Log",
+      icon: ClipboardList,
     });
     expect(items.map((i) => i.key)).toEqual(["tracking", "site-map", "gate-log", "visitors"]);
   });
@@ -51,6 +56,7 @@ describe("withGateLogNav", () => {
       user: { role: "admin" },
       gatekeepingEnabled: false,
       label: "Gate Log",
+      icon: ClipboardList,
     });
     expect(items.map((i) => i.key)).toEqual(["tracking", "crew-map", "visitors"]);
   });

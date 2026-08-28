@@ -90,6 +90,11 @@ const {
   gatekeeperCheckOutMock,
   captureAndUploadImageMock,
   readGatePlateMock,
+  createPttRecorderMock,
+  recorderStartMock,
+  recorderStopMock,
+  recorderDisposeMock,
+  transcribeAskVRecordingMock,
 } = vi.hoisted(() => ({
   fetchSiteContextMock: vi.fn(),
   fetchGatekeeperVisitsMock: vi.fn(),
@@ -100,6 +105,11 @@ const {
   gatekeeperCheckOutMock: vi.fn(),
   captureAndUploadImageMock: vi.fn(),
   readGatePlateMock: vi.fn(),
+  createPttRecorderMock: vi.fn(),
+  recorderStartMock: vi.fn(),
+  recorderStopMock: vi.fn(),
+  recorderDisposeMock: vi.fn(),
+  transcribeAskVRecordingMock: vi.fn(),
 }));
 
 vi.mock("@/lib/guest", () => ({
@@ -121,6 +131,15 @@ vi.mock("@/lib/gatekeeper", () => ({
 
 vi.mock("@/lib/photos", () => ({
   captureAndUploadImage: (...a: unknown[]) => captureAndUploadImageMock(...a),
+}));
+
+vi.mock("@/lib/ptt", () => ({
+  createPttRecorder: (...a: unknown[]) => createPttRecorderMock(...a),
+  PttMicPermissionError: class PttMicPermissionError extends Error {},
+}));
+
+vi.mock("@/lib/askv-transcribe", () => ({
+  transcribeAskVRecording: (...a: unknown[]) => transcribeAskVRecordingMock(...a),
 }));
 
 vi.mock("@/hooks/use-brand", () => ({
@@ -197,6 +216,7 @@ import { Alert } from "react-native";
 
 import GatekeeperScreen from "../(tabs)/gate";
 import type { SiteContext } from "@/lib/guest";
+import { requestGateVoiceEntry } from "@/lib/gate-voice-launch";
 
 afterEach(() => {
   cleanup();
@@ -219,6 +239,17 @@ beforeEach(() => {
   fetchGatekeeperVisitsMock.mockResolvedValue([]);
   fetchGatekeeperRecentVisitsMock.mockResolvedValue([]);
   readGatePlateMock.mockResolvedValue(null);
+  recorderStartMock.mockResolvedValue(undefined);
+  recorderStopMock.mockResolvedValue({ uri: "file:///gate-command.m4a", durationSeconds: 3 });
+  recorderDisposeMock.mockResolvedValue(undefined);
+  createPttRecorderMock.mockResolvedValue({
+    start: recorderStartMock,
+    stop: recorderStopMock,
+    dispose: recorderDisposeMock,
+  });
+  transcribeAskVRecordingMock.mockResolvedValue(
+    "check in Bob Villa from NewCo plate ABC123 for equipment delivery",
+  );
   fetchAssignedGateSitesMock.mockResolvedValue({
     sites: [FLYWHEEL_SITE],
     defaultSite: FLYWHEEL_SITE,
@@ -306,6 +337,100 @@ describe("GatekeeperScreen", () => {
     await waitFor(() =>
       expect(view.container.textContent).toContain("TX • ABC123"),
     );
+  });
+
+  it("records until the mic is pressed again, then fills the record for confirmation", async () => {
+    fetchSiteContextMock.mockResolvedValue(SITE_CTX);
+    renderScreen();
+    await findFirstByTestId("gate-first-name");
+
+    requestGateVoiceEntry();
+    await waitFor(() => expect(recorderStartMock).toHaveBeenCalledTimes(1));
+    expect(recorderStopMock).not.toHaveBeenCalled();
+    expect(screen.getByText("gatekeeper.voiceListening")).toBeTruthy();
+
+    requestGateVoiceEntry();
+    await waitFor(() => expect(recorderStopMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(transcribeAskVRecordingMock).toHaveBeenCalledWith("file:///gate-command.m4a"));
+    expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Bob");
+    expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Villa");
+    expect((firstByTestId("gate-company") as HTMLInputElement).value).toBe("NewCo");
+    expect(
+      (firstByTestId("gate-vehicle-plate") as HTMLInputElement).value,
+    ).toBe("ABC123");
+    expect((firstByTestId("purpose-input") as HTMLInputElement).value).toBe("equipment delivery");
+    expect(screen.getByText("gatekeeper.voiceConfirmCheckIn")).toBeTruthy();
+  });
+
+  it("replaces the last plate driver using exact-company first-name suggestions", async () => {
+    const baseVisit = {
+      siteLocationId: 309,
+      siteName: "Flywheel Energy Spur",
+      siteAddress: "34.63951, -97.66194",
+      hostType: "partner",
+      hostPartnerName: "Flywheel Energy",
+      hostVendorName: null,
+      purpose: "Delivery",
+      platePhotoUrl: null,
+      vehiclePhotoUrl: null,
+      expectedDurationMinutes: 60,
+      plateState: "TX",
+      checkOutTime: "2026-08-26T11:00:00Z",
+      expiresAt: null,
+    };
+    fetchGatekeeperRecentVisitsMock.mockResolvedValue([
+      {
+        ...baseVisit,
+        id: 101,
+        firstName: "Bob",
+        lastName: "Villa",
+        company: "Peak Energy",
+        vehiclePlate: "51D4A1",
+        checkInTime: "2026-08-26T10:00:00Z",
+      },
+      {
+        ...baseVisit,
+        id: 100,
+        firstName: "Bonnie",
+        lastName: "West",
+        company: "Peak Energy",
+        vehiclePlate: "TX9911",
+        checkInTime: "2026-08-25T10:00:00Z",
+      },
+      {
+        ...baseVisit,
+        id: 99,
+        firstName: "Bonnie",
+        lastName: "Smith",
+        company: "Peak Energy Services",
+        vehiclePlate: "TX2288",
+        checkInTime: "2026-08-24T10:00:00Z",
+      },
+    ]);
+
+    renderScreen();
+    const plate = await findFirstByTestId("gate-vehicle-plate");
+    fireEvent.change(plate, { target: { value: "51D-4A1" } });
+    tap(screen.getByRole("button", { name: "Select plate state" }));
+    tap(screen.getByRole("button", { name: "Texas (TX), state option" }));
+
+    await waitFor(() => {
+      expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Bob");
+      expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("Villa");
+      expect((firstByTestId("gate-company") as HTMLInputElement).value).toBe("Peak Energy");
+    });
+
+    fireEvent.change(firstByTestId("gate-first-name"), { target: { value: "Bon" } });
+    expect(await screen.findByText("Bonnie West")).toBeTruthy();
+    expect(screen.queryByText("Bonnie Smith")).toBeNull();
+    tap(firstByTestId("gate-driver-suggestion-100"));
+
+    expect((firstByTestId("gate-first-name") as HTMLInputElement).value).toBe("Bonnie");
+    expect((firstByTestId("gate-last-name") as HTMLInputElement).value).toBe("West");
+    expect((firstByTestId("gate-company") as HTMLInputElement).value).toBe("Peak Energy");
+    expect(
+      (firstByTestId("gate-vehicle-plate") as HTMLInputElement).value,
+    ).toBe("51D-4A1");
   });
 
   it("shows the branded vendor logo in front of Gate Portal", async () => {
