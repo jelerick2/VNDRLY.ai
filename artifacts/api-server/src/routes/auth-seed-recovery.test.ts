@@ -305,4 +305,152 @@ describe.runIf(haveRealDb)("POST /api/auth/seed demo password recovery", () => {
     expect(row.sessionVersion).toBe(73);
     expect(bcrypt.compareSync("vndrly123", row.passwordHash)).toBe(true);
   });
+
+  it("recovers an existing Joe Boggs hash without replacing his row or memberships and is idempotent", async () => {
+    const identity = "joe.boggs@winchester.com";
+    const bogusHash = bcrypt.hashSync("not-the-canonical-joe-password", 10);
+    const [existingJoe] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        sql`lower(coalesce(${usersTable.email}, ${usersTable.username})) = ${identity}`,
+      );
+
+    let userId: number;
+    if (existingJoe) {
+      userId = existingJoe.id;
+      await db
+        .update(usersTable)
+        .set({ passwordHash: bogusHash, mustChangePassword: true })
+        .where(sql`${usersTable.id} = ${userId}`);
+    } else {
+      const [created] = await db
+        .insert(usersTable)
+        .values({
+          username: identity,
+          email: null,
+          passwordHash: bogusHash,
+          role: "field_employee",
+          displayName: "Joe Boggs",
+          preferredLanguage: "en",
+          mustChangePassword: true,
+          sessionVersion: 84,
+        })
+        .returning({ id: usersTable.id });
+      userId = created.id;
+    }
+
+    const [winchester] = await db
+      .select({ id: vendorsTable.id })
+      .from(vendorsTable)
+      .where(sql`lower(btrim(${vendorsTable.name})) = 'winchester'`);
+    if (!winchester) throw new Error("Expected the natural-key Winchester vendor");
+
+    const [existingMembership] = await db
+      .select({ id: userOrgMembershipsTable.id })
+      .from(userOrgMembershipsTable)
+      .where(
+        sql`${userOrgMembershipsTable.userId} = ${userId} AND ${userOrgMembershipsTable.vendorId} = ${winchester.id}`,
+      );
+    if (!existingMembership) {
+      await db.insert(userOrgMembershipsTable).values({
+        userId,
+        orgType: "vendor",
+        partnerId: null,
+        vendorId: winchester.id,
+        role: "field_employee",
+      });
+    }
+
+    const [userBefore] = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        email: usersTable.email,
+        role: usersTable.role,
+        displayName: usersTable.displayName,
+        preferredLanguage: usersTable.preferredLanguage,
+        activeMembershipId: usersTable.activeMembershipId,
+        sessionVersion: usersTable.sessionVersion,
+      })
+      .from(usersTable)
+      .where(sql`${usersTable.id} = ${userId}`);
+    const membershipsBefore = (
+      await db
+        .select({
+          id: userOrgMembershipsTable.id,
+          userId: userOrgMembershipsTable.userId,
+          orgType: userOrgMembershipsTable.orgType,
+          partnerId: userOrgMembershipsTable.partnerId,
+          vendorId: userOrgMembershipsTable.vendorId,
+          role: userOrgMembershipsTable.role,
+        })
+        .from(userOrgMembershipsTable)
+        .where(sql`${userOrgMembershipsTable.userId} = ${userId}`)
+    ).sort((left, right) => left.id - right.id);
+
+    const recovered = await request(app).post("/api/auth/seed");
+    expectStatus(recovered, 200);
+    expect(recovered.body.passwordReset).toContain(identity);
+
+    const [userAfter] = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        email: usersTable.email,
+        role: usersTable.role,
+        displayName: usersTable.displayName,
+        preferredLanguage: usersTable.preferredLanguage,
+        activeMembershipId: usersTable.activeMembershipId,
+        sessionVersion: usersTable.sessionVersion,
+        passwordHash: usersTable.passwordHash,
+        mustChangePassword: usersTable.mustChangePassword,
+      })
+      .from(usersTable)
+      .where(sql`${usersTable.id} = ${userId}`);
+    const {
+      passwordHash: recoveredHash,
+      mustChangePassword: recoveredMustChangePassword,
+      ...preservedUserAfter
+    } = userAfter;
+    expect(preservedUserAfter).toEqual(userBefore);
+    expect(recoveredMustChangePassword).toBe(false);
+    expect(bcrypt.compareSync("winchester2", recoveredHash)).toBe(true);
+
+    const membershipsAfter = (
+      await db
+        .select({
+          id: userOrgMembershipsTable.id,
+          userId: userOrgMembershipsTable.userId,
+          orgType: userOrgMembershipsTable.orgType,
+          partnerId: userOrgMembershipsTable.partnerId,
+          vendorId: userOrgMembershipsTable.vendorId,
+          role: userOrgMembershipsTable.role,
+        })
+        .from(userOrgMembershipsTable)
+        .where(sql`${userOrgMembershipsTable.userId} = ${userId}`)
+    ).sort((left, right) => left.id - right.id);
+    expect(membershipsAfter).toEqual(membershipsBefore);
+
+    const rerun = await request(app).post("/api/auth/seed");
+    expectStatus(rerun, 200);
+    expect(rerun.body.passwordReset).not.toContain(identity);
+
+    const [userAfterRerun] = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        email: usersTable.email,
+        role: usersTable.role,
+        displayName: usersTable.displayName,
+        preferredLanguage: usersTable.preferredLanguage,
+        activeMembershipId: usersTable.activeMembershipId,
+        sessionVersion: usersTable.sessionVersion,
+        passwordHash: usersTable.passwordHash,
+        mustChangePassword: usersTable.mustChangePassword,
+      })
+      .from(usersTable)
+      .where(sql`${usersTable.id} = ${userId}`);
+    expect(userAfterRerun).toEqual(userAfter);
+  });
 });

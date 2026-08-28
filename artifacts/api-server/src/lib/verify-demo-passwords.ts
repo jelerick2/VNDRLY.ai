@@ -1,14 +1,17 @@
 import bcrypt from "bcryptjs";
 import { db, usersTable } from "@workspace/db";
 import { inArray, sql } from "drizzle-orm";
-import { DEMO_USERS } from "./demo-users";
-import { demoIdentityAliases, demoUserNaturalIdentity } from "./demo-user-seed";
+import {
+  demoPasswordRecoverySpecs,
+  demoUserNaturalIdentity,
+} from "./demo-user-seed";
 import { logger } from "./logger";
 
 /**
  * Dev-only startup self-check: warn if any seeded demo username exists
- * with a bcrypt hash that does NOT verify against the canonical password
- * declared in `DEMO_USERS`. This catches the failure mode from Task #739
+ * with a bcrypt hash that does NOT verify against its documented canonical
+ * password. This includes recovery-only identities such as Joe Boggs without
+ * creating those accounts. The check catches the failure mode from Task #739
  * where a SQL import (or a manual change) leaves a stale hash behind, so
  * `admin/vndrly123`, `exxon/exxon123`, etc. silently 401 on every login
  * attempt and there is no in-product signal of why.
@@ -20,8 +23,11 @@ import { logger } from "./logger";
  */
 export async function verifyDemoPasswords(): Promise<void> {
   try {
+    const recoveries = demoPasswordRecoverySpecs();
     const identities = [
-      ...new Set(DEMO_USERS.flatMap((demo) => demoIdentityAliases(demo))),
+      ...new Set(
+        recoveries.flatMap((recovery) => recovery.naturalIdentities),
+      ),
     ];
     if (identities.length === 0) return;
 
@@ -41,18 +47,19 @@ export async function verifyDemoPasswords(): Promise<void> {
       );
 
     const drifted: string[] = [];
-    for (const demo of DEMO_USERS) {
-      const aliases = new Set(demoIdentityAliases(demo));
+    for (const recovery of recoveries) {
+      const aliases = new Set(recovery.naturalIdentities);
       const matches = rows.filter((row) =>
         aliases.has(demoUserNaturalIdentity(row)),
       );
       if (matches.length === 0) continue; // not seeded yet
       if (
         matches.some(
-          (row) => !bcrypt.compareSync(demo.password, row.passwordHash),
+          (row) =>
+            !bcrypt.compareSync(recovery.password, row.passwordHash),
         )
       ) {
-        drifted.push(demo.username);
+        drifted.push(recovery.name);
       }
     }
 

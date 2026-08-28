@@ -26,9 +26,14 @@ import {
   vendorPeopleTable,
   userOrgMembershipsTable,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { DEMO_USERS } from "../lib/demo-users";
+import {
+  CANONICAL_DEMO_IDENTITIES,
+  demoIdentityAliases,
+  demoUserNaturalIdentity,
+} from "../lib/demo-user-seed";
 import { logger } from "../lib/logger";
 import {
   DEMO_TICKETS,
@@ -50,12 +55,14 @@ const SEED_TOKEN = "vndrly-demo-2026-04-30-prod-seed-once-9F2X";
 // (which is the partner/vendor-admin login set). They are seeded here
 // so they can be added on top of an existing prod DB without polluting
 // the dev seed contract. Updates only target accounts created for the
-// demo; any other user with the same username would be untouched
-// because we resolve by exact username match.
+// demo. Existing accounts are resolved by the canonical
+// LOWER(COALESCE(email, username)) identity, never by database id.
 const FIELD_DEMO_LOGINS = [
   {
     username: "joe.boggs@winchester.com",
-    password: "joe123",
+    password: "winchester2",
+    naturalIdentities:
+      CANONICAL_DEMO_IDENTITIES["joe.boggs@winchester.com"],
     displayName: "Joe Boggs",
     vendorId: 3,
     preferredLanguage: "en" as const,
@@ -63,6 +70,7 @@ const FIELD_DEMO_LOGINS = [
   {
     username: "matt@elerick.com",
     password: "matt123",
+    naturalIdentities: ["matt@elerick.com"],
     displayName: "Matt Elerick",
     vendorId: 3,
     preferredLanguage: null,
@@ -70,6 +78,7 @@ const FIELD_DEMO_LOGINS = [
   {
     username: "daniel",
     password: "daniel123",
+    naturalIdentities: ["daniel"],
     displayName: "Daniel Ortiz",
     vendorId: 2,
     preferredLanguage: "en" as const,
@@ -89,6 +98,7 @@ interface ExtraAdminLogin {
   username: string;
   email: string;
   password: string;
+  naturalIdentities: readonly string[];
   displayName: string;
   role: "admin" | "partner" | "vendor";
   orgType: "partner" | "vendor";
@@ -99,7 +109,8 @@ const EXTRA_ADMIN_LOGINS: ExtraAdminLogin[] = [
   {
     username: "baker@vndrly.com",
     email: "baker@vndrly.com",
-    password: "baker1",
+    password: "baker123",
+    naturalIdentities: CANONICAL_DEMO_IDENTITIES.baker,
     displayName: "Baker Hughes Field Svcs Admin",
     role: "vendor",
     orgType: "vendor",
@@ -126,11 +137,12 @@ router.post("/demo/seed-prod-demo", async (req, res) => {
       const passwordsRecovered: string[] = [];
 
       const existingAll = await tx
-        .select({ id: usersTable.id, username: usersTable.username })
+        .select({
+          id: usersTable.id,
+          username: usersTable.username,
+          email: usersTable.email,
+        })
         .from(usersTable);
-      const existingByName = new Map(
-        existingAll.map((u) => [u.username.toLowerCase(), u.id] as const),
-      );
 
       for (const demo of DEMO_USERS) {
         const derivedRole: "admin" | "field_employee" =
@@ -156,7 +168,11 @@ router.post("/demo/seed-prod-demo", async (req, res) => {
                   ]
                 : [];
 
-        let userId = existingByName.get(demo.username.toLowerCase()) ?? null;
+        const aliases = new Set(demoIdentityAliases(demo));
+        let userId =
+          existingAll.find((user) =>
+            aliases.has(demoUserNaturalIdentity(user)),
+          )?.id ?? null;
         let userActiveMembershipId: number | null = null;
 
         if (userId === null) {
@@ -194,7 +210,6 @@ router.post("/demo/seed-prod-demo", async (req, res) => {
               .set({
                 passwordHash: hash(demo.password),
                 mustChangePassword: false,
-                sessionVersion: sql`${usersTable.sessionVersion} + 1`,
               })
               .where(eq(usersTable.id, userId));
             passwordsRecovered.push(demo.username);
@@ -260,7 +275,12 @@ router.post("/demo/seed-prod-demo", async (req, res) => {
             mustChangePassword: usersTable.mustChangePassword,
           })
           .from(usersTable)
-          .where(eq(usersTable.username, f.username));
+          .where(
+            inArray(
+              sql`lower(coalesce(${usersTable.email}, ${usersTable.username}))`,
+              f.naturalIdentities,
+            ),
+          );
 
         let userId: number;
         if (!existing) {
@@ -285,7 +305,6 @@ router.post("/demo/seed-prod-demo", async (req, res) => {
               .set({
                 passwordHash: hash(f.password),
                 mustChangePassword: false,
-                sessionVersion: sql`${usersTable.sessionVersion} + 1`,
               })
               .where(eq(usersTable.id, userId));
             fieldUsersPasswordReset.push(f.username);
@@ -352,7 +371,12 @@ router.post("/demo/seed-prod-demo", async (req, res) => {
             activeMembershipId: usersTable.activeMembershipId,
           })
           .from(usersTable)
-          .where(sql`lower(${usersTable.username}) = lower(${a.username})`);
+          .where(
+            inArray(
+              sql`lower(coalesce(${usersTable.email}, ${usersTable.username}))`,
+              a.naturalIdentities,
+            ),
+          );
 
         let userId: number;
         let activeMembershipId: number | null = null;
@@ -381,7 +405,6 @@ router.post("/demo/seed-prod-demo", async (req, res) => {
               .set({
                 passwordHash: hash(a.password),
                 mustChangePassword: false,
-                sessionVersion: sql`${usersTable.sessionVersion} + 1`,
               })
               .where(eq(usersTable.id, userId));
             extraAdminsPasswordReset.push(a.username);

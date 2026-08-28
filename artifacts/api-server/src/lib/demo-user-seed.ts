@@ -82,6 +82,12 @@ export interface DemoSeedResult {
   existingUserCount: number;
 }
 
+export interface ExistingDemoAccountRecovery {
+  name: string;
+  password: string;
+  naturalIdentities: readonly string[];
+}
+
 /**
  * Canonical identities from docs/canonical-credentials.md. Matching is done
  * against LOWER(COALESCE(email, username)); these aliases intentionally stay
@@ -91,9 +97,25 @@ export const CANONICAL_DEMO_IDENTITIES = {
   admin: ["admin@vndrly.com", "admin"],
   baker: ["baker@vndrly.com", "baker"],
   winchester: ["winchester@vndrly.com", "winchester"],
+  "joe.boggs@winchester.com": ["joe.boggs@winchester.com"],
   mach: ["mach@vndrly.com", "mach"],
   exxon: ["exxon@vndrly.com", "exxon"],
 } as const;
+
+/**
+ * Canonical credentials that recover an account only when that natural
+ * identity already exists. Joe Boggs belongs to the production/demo field
+ * roster, not the dev account picker, so a clean `/auth/seed` must not invent
+ * his user, organization, or membership rows.
+ */
+export const EXISTING_DEMO_ACCOUNT_RECOVERIES = [
+  {
+    name: "joe.boggs@winchester.com",
+    password: "winchester2",
+    naturalIdentities:
+      CANONICAL_DEMO_IDENTITIES["joe.boggs@winchester.com"],
+  },
+] as const satisfies readonly ExistingDemoAccountRecovery[];
 
 /**
  * Only organization rows required by DEMO_USERS memberships are represented.
@@ -209,6 +231,19 @@ export function demoIdentityAliases(
       demo.username as keyof typeof CANONICAL_DEMO_IDENTITIES
     ];
   return documented ? [...documented] : [demo.username.toLowerCase()];
+}
+
+export function demoPasswordRecoverySpecs(
+  demoUsers: readonly DemoUser[] = DEMO_USERS,
+): ExistingDemoAccountRecovery[] {
+  return [
+    ...demoUsers.map((demo) => ({
+      name: demo.username,
+      password: demo.password,
+      naturalIdentities: demoIdentityAliases(demo),
+    })),
+    ...EXISTING_DEMO_ACCOUNT_RECOVERIES,
+  ];
 }
 
 export function findDemoOrganization(
@@ -353,8 +388,9 @@ export async function syncDemoUsers(
   passwords: DemoSeedPasswordCodec,
   demoUsers: readonly DemoUser[] = DEMO_USERS,
 ): Promise<DemoSeedResult> {
+  const recoverySpecs = demoPasswordRecoverySpecs(demoUsers);
   const naturalIdentities = [
-    ...new Set(demoUsers.flatMap((demo) => demoIdentityAliases(demo))),
+    ...new Set(recoverySpecs.flatMap((recovery) => recovery.naturalIdentities)),
   ];
   const initialUsers = await store.listUsers(naturalIdentities);
   let knownUsers = [...initialUsers];
@@ -428,6 +464,28 @@ export async function syncDemoUsers(
         await store.clearMustChangePassword(user.id);
       }
       await ensureMemberships(store, user, demo, resolvedOrgIds);
+    }
+  }
+
+  // Recovery-only identities are intentionally processed after the seeded
+  // demo accounts. Never create a missing row, infer a membership, rewrite an
+  // active context, or bump sessionVersion; only restore the documented hash
+  // on an existing natural-identity match.
+  for (const recovery of EXISTING_DEMO_ACCOUNT_RECOVERIES) {
+    const aliases = new Set<string>(recovery.naturalIdentities);
+    const matches = knownUsers.filter((row) =>
+      aliases.has(demoUserNaturalIdentity(row)),
+    );
+    for (const user of matches) {
+      if (!passwords.compare(recovery.password, user.passwordHash)) {
+        await store.updateUserPassword(
+          user.id,
+          passwords.hash(recovery.password),
+        );
+        passwordReset.add(recovery.name);
+      } else if (user.mustChangePassword) {
+        await store.clearMustChangePassword(user.id);
+      }
     }
   }
 

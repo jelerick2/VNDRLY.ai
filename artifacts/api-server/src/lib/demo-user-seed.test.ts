@@ -157,6 +157,13 @@ describe("syncDemoUsers", () => {
     expect(result.passwordReset).toEqual([]);
     expect(store.organizations).toHaveLength(DEMO_SEED_ORGANIZATIONS.length);
     expect(store.users).toHaveLength(DEMO_USERS.length);
+    expect(
+      store.users.some(
+        (user) =>
+          (user.email ?? user.username).toLowerCase() ===
+          "joe.boggs@winchester.com",
+      ),
+    ).toBe(false);
     expect(store.memberships).toHaveLength(14);
     expect(store.organizations.every((row) => row.id >= 101)).toBe(true);
     expect(
@@ -232,6 +239,87 @@ describe("syncDemoUsers", () => {
       expect.arrayContaining(canonicalCases.map(([name]) => name)),
     );
     expect(store.sessions).toEqual(sessionsBefore);
+  });
+
+  it("recovers an existing Joe Boggs account by natural identity without recreating it or disturbing its state", async () => {
+    const store = new MemoryDemoSeedStore();
+    const joe = addExistingUser(store, {
+      id: 90,
+      username: "legacy-joe-login",
+      email: "JOE.BOGGS@WINCHESTER.COM",
+      passwordHash: "bcrypt10:drifted",
+      role: "field_employee",
+      displayName: "Preserved Joe Boggs",
+      preferredLanguage: "es",
+      activeMembershipId: 190,
+      mustChangePassword: true,
+      sessionVersion: 84,
+      untouchedNote: "existing recovery identity",
+    });
+    store.memberships.push({
+      id: 190,
+      userId: joe.id,
+      orgType: "vendor",
+      partnerId: null,
+      vendorId: 290,
+      role: "field_employee",
+    });
+    store.sessions.push({
+      id: "joe-session",
+      userId: joe.id,
+      payload: "preserve this session",
+    });
+    const preservedBefore = {
+      username: joe.username,
+      email: joe.email,
+      role: joe.role,
+      displayName: joe.displayName,
+      preferredLanguage: joe.preferredLanguage,
+      activeMembershipId: joe.activeMembershipId,
+      sessionVersion: joe.sessionVersion,
+      untouchedNote: joe.untouchedNote,
+      memberships: structuredClone(store.memberships),
+      sessions: structuredClone(store.sessions),
+    };
+
+    const recovered = await syncDemoUsers(store, passwordCodec);
+
+    expect(recovered.passwordReset).toContain("joe.boggs@winchester.com");
+    expect(
+      store.users.filter(
+        (user) =>
+          (user.email ?? user.username).toLowerCase() ===
+          "joe.boggs@winchester.com",
+      ),
+    ).toHaveLength(1);
+    expect(joe.passwordHash).toBe("bcrypt10:winchester2");
+    expect(joe.mustChangePassword).toBe(false);
+    expect({
+      username: joe.username,
+      email: joe.email,
+      role: joe.role,
+      displayName: joe.displayName,
+      preferredLanguage: joe.preferredLanguage,
+      activeMembershipId: joe.activeMembershipId,
+      sessionVersion: joe.sessionVersion,
+      untouchedNote: joe.untouchedNote,
+      memberships: store.memberships.filter((row) => row.userId === joe.id),
+      sessions: store.sessions.filter((row) => row.userId === joe.id),
+    }).toEqual(preservedBefore);
+
+    const stateAfterRecovery = structuredClone({
+      user: joe,
+      memberships: store.memberships,
+      sessions: store.sessions,
+    });
+    const rerun = await syncDemoUsers(store, passwordCodec);
+
+    expect(rerun.passwordReset).not.toContain("joe.boggs@winchester.com");
+    expect({
+      user: joe,
+      memberships: store.memberships,
+      sessions: store.sessions,
+    }).toEqual(stateAfterRecovery);
   });
 
   it("reuses natural-name and contact-email organization matches without altering existing rows", async () => {

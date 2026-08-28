@@ -314,6 +314,28 @@ test("Playwright pins its isolated API server and web proxy to a dedicated local
   );
 });
 
+test("production demo recovery uses canonical Joe and Baker credentials with natural identities", async () => {
+  const source = await readFile(
+    new URL("artifacts/api-server/src/routes/demoProdSeed.ts", repoRoot),
+    "utf8",
+  );
+
+  assert.doesNotMatch(source, /\b(?:joe123|baker1)\b/);
+  assert.match(
+    source,
+    /username:\s*"joe\.boggs@winchester\.com",\s*password:\s*"winchester2"/s,
+  );
+  assert.match(
+    source,
+    /username:\s*"baker@vndrly\.com",\s*email:\s*"baker@vndrly\.com",\s*password:\s*"baker123"/s,
+  );
+  assert.ok(
+    [...source.matchAll(/lower\(coalesce\(\$\{usersTable\.email\}, \$\{usersTable\.username\}\)\)/g)]
+      .length >= 2,
+    "Joe and Baker recovery queries must match LOWER(COALESCE(email, username))",
+  );
+});
+
 test("strict sanitizer canonicalizes the documented Supabase direct and pooler URL shapes", () => {
   const sanitize = e2eIsolation.sanitizePostgresConnectionUrl;
   const direct = sanitize?.(
