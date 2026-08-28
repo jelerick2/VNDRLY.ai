@@ -8,8 +8,11 @@ the shared development or production database.
 
 - No API or web workflow may already own ports 8080 or 23539. Playwright
   deliberately refuses to reuse servers whose database provenance is unknown.
-- Set `TEST_DATABASE_URL` to a database dedicated to tests, or provide a base
-  `DATABASE_URL` from which the wrapper can derive a separate `_test` database.
+- Set `TEST_DATABASE_URL` to a database dedicated to tests whose database name
+  ends in `_test` and whose normalized host/port/database differs from
+  `DATABASE_URL`, or omit it so the wrapper derives a separate `_test` database
+  on the same server. Credentials and connection options do not make the same
+  physical database a distinct target.
 - Chromium has been installed for Playwright:
 
   ```
@@ -27,10 +30,17 @@ The root command is the only supported entry point. It starts
 normalized target in `DATABASE_URL` and `TEST_DATABASE_URL` together with
 `VNDRLY_ISOLATED_TEST_DB=1`. Playwright configuration, global setup, local API
 startup, and destructive fixture routes all fail closed without that
-provenance. Running the Playwright package directly is expected to refuse.
+provenance and an `_test` database name. The wrapper validates the target before
+opening a connection or creating/resetting a schema. Running the Playwright
+package directly is expected to refuse.
 
-Override the web base URL with `E2E_BASE_URL` if the web workflow is
-exposed on a different host/port (e.g. behind a reverse proxy).
+The browser base URL is fixed at `http://localhost:23539`. `E2E_BASE_URL` may be
+unset or spell that exact local origin; external hosts, alternate loopback
+addresses, ports, paths, credentials, query strings, and fragments are
+rejected. Playwright also refuses to reuse either server, so global setup's
+development-only `POST /api/auth/seed` can reach only the wrapper-owned local
+web/API pair. The manual development seed route itself remains available for
+intentional local recovery and still uses the canonical credentials verbatim.
 
 ## What is covered
 

@@ -4,14 +4,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { requireIsolatedFixtureContext } from "./isolated-fixture-guard";
 
-const originalMarker = process.env.VNDRLY_ISOLATED_TEST_DB;
+const originalEnvironment = {
+  DATABASE_URL: process.env.DATABASE_URL,
+  TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
+  VNDRLY_ISOLATED_TEST_DB: process.env.VNDRLY_ISOLATED_TEST_DB,
+};
+
+function restoreEnvironment(key: keyof typeof originalEnvironment): void {
+  const original = originalEnvironment[key];
+  if (original === undefined) {
+    delete process.env[key];
+  } else {
+    process.env[key] = original;
+  }
+}
 
 afterEach(() => {
-  if (originalMarker === undefined) {
-    delete process.env.VNDRLY_ISOLATED_TEST_DB;
-  } else {
-    process.env.VNDRLY_ISOLATED_TEST_DB = originalMarker;
-  }
+  restoreEnvironment("DATABASE_URL");
+  restoreEnvironment("TEST_DATABASE_URL");
+  restoreEnvironment("VNDRLY_ISOLATED_TEST_DB");
 });
 
 function fixtureApp(databaseAction: () => void) {
@@ -25,6 +36,8 @@ function fixtureApp(databaseAction: () => void) {
 
 describe("requireIsolatedFixtureContext", () => {
   it("refuses before any database action when the isolated marker is absent", async () => {
+    delete process.env.DATABASE_URL;
+    delete process.env.TEST_DATABASE_URL;
     delete process.env.VNDRLY_ISOLATED_TEST_DB;
     const databaseAction = vi.fn();
 
@@ -35,8 +48,49 @@ describe("requireIsolatedFixtureContext", () => {
     expect(databaseAction).not.toHaveBeenCalled();
   });
 
-  it("permits the database action only inside the isolated test wrapper", async () => {
+  it("refuses before any database action when only the marker is present", async () => {
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
+    const databaseAction = vi.fn();
+
+    const response = await request(fixtureApp(databaseAction)).post("/fixture");
+
+    expect(response.status).toBe(503);
+    expect(databaseAction).not.toHaveBeenCalled();
+  });
+
+  it("refuses before any database action when the matching target lacks _test", async () => {
+    process.env.VNDRLY_ISOLATED_TEST_DB = "1";
+    process.env.DATABASE_URL =
+      "postgresql://runner:secret@isolated.example.test/vndrly";
+    process.env.TEST_DATABASE_URL = process.env.DATABASE_URL;
+    const databaseAction = vi.fn();
+
+    const response = await request(fixtureApp(databaseAction)).post("/fixture");
+
+    expect(response.status).toBe(503);
+    expect(databaseAction).not.toHaveBeenCalled();
+  });
+
+  it("refuses before any database action when normalized targets differ", async () => {
+    process.env.VNDRLY_ISOLATED_TEST_DB = "1";
+    process.env.DATABASE_URL =
+      "postgresql://runner:secret@one.example.test/vndrly_test";
+    process.env.TEST_DATABASE_URL =
+      "postgresql://runner:secret@two.example.test/vndrly_test";
+    const databaseAction = vi.fn();
+
+    const response = await request(fixtureApp(databaseAction)).post("/fixture");
+
+    expect(response.status).toBe(503);
+    expect(databaseAction).not.toHaveBeenCalled();
+  });
+
+  it("permits the database action only for the exact isolated _test target", async () => {
+    process.env.VNDRLY_ISOLATED_TEST_DB = "1";
+    process.env.DATABASE_URL =
+      "postgresql://runner:first@ISOLATED.EXAMPLE.TEST/vndrly_test?sslmode=require";
+    process.env.TEST_DATABASE_URL =
+      "postgresql://runner:second@isolated.example.test:5432/vndrly_test?application_name=fixture";
     const databaseAction = vi.fn();
 
     const response = await request(fixtureApp(databaseAction)).post("/fixture");

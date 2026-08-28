@@ -14,16 +14,30 @@ deployment paths were tested statically only and were not executed.
 ## P0 — isolated E2E only
 
 - Root `test:e2e` now enters `run-with-test-db.ts` before Playwright starts.
+- Before any connection, database creation, or schema reset, the wrapper now
+  rejects an explicit `TEST_DATABASE_URL` unless its database ends in `_test`
+  and its normalized physical host/port/database differs from the original
+  `DATABASE_URL`. Derived targets are also required to end in `_test` and retain
+  the source URL's host, credentials, port, and connection options.
 - `scripts/run-api-local.mjs` does not load `.env.local` when
   `VNDRLY_ISOLATED_TEST_DB=1`, so the wrapper-owned `DATABASE_URL` survives
   into the API child.
 - Playwright configuration and global setup require the isolation marker and
   require `DATABASE_URL` and `TEST_DATABASE_URL` to identify the exact same
-  normalized Postgres host, port, user, and database. Password and query-string
-  differences are ignored for comparison. Both web servers refuse reuse.
+  normalized Postgres host, port, and database ending in `_test`. Credentials
+  and connection options are ignored because they do not change the physical
+  database target. Both web servers refuse reuse.
+- E2E web requests are pinned to `http://localhost:23539`; every external,
+  alternate loopback, port, path, credential, query, or fragment override is
+  rejected before Playwright/global setup can issue a request.
 - The two destructive fixture routes are wired through
   `requireIsolatedFixtureContext` before any route body/database action. The
-  guard returns 503 unless the isolated marker is exactly `1`.
+  guard returns 503 unless the marker, exact normalized URL equality, and
+  `_test` suffix all validate. Marker-only requests are rejected before any
+  database action.
+- `/auth/seed` remains intentionally available in development for manual demo
+  recovery. E2E global setup can call it only through the fixed wrapper-owned
+  localhost web/API pair, after database and origin validation.
 - The E2E README names the root wrapper as the sole supported entry point and
   refers to `docs/canonical-credentials.md` as the credential source of truth.
 
@@ -35,9 +49,11 @@ Files:
 - `scripts/run-api-local-config.mjs`
 - `scripts/run-api-local.mjs`
 - `scripts/final-hardening.test.mjs`
+- `artifacts/api-server/scripts/run-with-test-db.ts`
 - `lib/e2e/playwright.config.ts`
 - `lib/e2e/global-setup.ts`
 - `lib/e2e/README.md`
+- `lib/e2e/tests/crew-employee-deactivate-refresh.spec.ts`
 - `artifacts/api-server/src/lib/isolated-fixture-guard.ts`
 - `artifacts/api-server/src/lib/isolated-fixture-guard.test.ts`
 - `artifacts/api-server/src/routes/auth.ts`
@@ -162,8 +178,11 @@ Files:
 
 Green:
 
-- `node --test scripts/final-hardening.test.mjs` — 8 passed.
-- API guard/limiter focused Vitest — 2 files, 5 passed.
+- `node --test scripts/final-hardening.test.mjs` — 14 passed, including pure
+  explicit/derived target validation, physical-target normalization, external
+  E2E origin rejection, wrapper ordering, and static Playwright wiring.
+- Isolated fixture guard focused Vitest — 1 file, 5 passed; marker-only,
+  suffixless, and mismatched targets all return 503 before the route action.
 - API visit-route mocked focus — 63 passed, 27 skipped by test-name filter.
 - Shared plate-state Vitest — 12 passed.
 - Web gate/public focused Vitest — 2 files, 17 passed.
@@ -171,27 +190,32 @@ Green:
 - `pnpm lint:i18n` — mobile 1,689/1,689 and web 4,232/4,232 locale keys in parity.
 - `pnpm run typecheck` — all library, artifact, and scripts projects passed.
 - `pnpm run test:web` — 101 files passed; 772 passed, 1 skipped.
+- `pnpm run test:mobile` — 78 files passed; 536 passed.
 - `git diff --check` — passed (only expected Windows LF/CRLF notices).
+
+The first typecheck/web/mobile invocation was unable to read installed package
+junctions under the filesystem sandbox. The same DB-free commands were rerun
+with dependency-read access and passed as reported above.
 
 Not run by design:
 
 - Playwright and root `pnpm test` are explicitly forbidden until final review.
 - Migration and deployment commands were never executed.
-- `pnpm run test:api` was attempted only through its normal isolated wrapper.
-  The sandbox denied its network connection, and the elevated request was then
-  rejected because the wrapper resets the isolated database schema while this
-  task explicitly forbids database access. No connection or schema action
-  occurred. This gate remains for a reviewer with explicit database authority.
+- `pnpm run test:api` was not run during the final P0 follow-up. An earlier
+  hardening-pass attempt was stopped before connection/schema work, and this
+  follow-up made no API-wrapper or database attempt. The gate remains for a
+  reviewer with explicit isolated-database authority.
 
 ## Remaining concerns / reviewer follow-up
 
-1. Review the isolation code before explicitly authorizing Playwright or the
-   isolated API database reset. Do not point `TEST_DATABASE_URL` at shared data.
+1. Playwright and the isolated API wrapper still need an explicitly authorized
+   run against an operationally dedicated `_test` database. The code rejects a
+   same/suffixless target, but naming alone cannot prove database ownership.
 2. Keep `VNDRLY_REQUIRE_PLATE_STATE` unset until installed mobile adoption is
    confirmed, then enable it as documented.
 3. The global/dedicated limiter uses the existing shared `BucketStore`: a
    single API process is protected in memory; multi-replica deployment must set
    the existing Redis rate-limit URL so the ceiling is atomic across replicas.
-4. The repository formatter normalized several touched legacy compact files,
-   so parts of the diff are formatting-only. Typecheck and focused/full web
-   tests are green after normalization.
+4. The earlier hardening commit normalized several touched legacy compact
+   files, so parts of the whole-branch diff are formatting-only. This P0
+   follow-up keeps its E2E spec change narrow.

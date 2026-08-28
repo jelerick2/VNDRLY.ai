@@ -4,7 +4,20 @@ export interface IsolatedDatabaseEnvironment {
   VNDRLY_ISOLATED_TEST_DB?: string;
 }
 
+export interface ResolvedIsolatedTestDatabaseTarget {
+  testUrl: string;
+  maintenanceUrl: string;
+  testDbName: string;
+  source: "TEST_DATABASE_URL" | "derived-from-DATABASE_URL";
+}
+
+export const LOCAL_E2E_BASE_URL: "http://localhost:23539";
+
 export function normalizeDatabaseTarget(rawUrl: string): string;
+export function resolveIsolatedTestDatabaseTarget(
+  env: IsolatedDatabaseEnvironment,
+): ResolvedIsolatedTestDatabaseTarget;
 export function assertIsolatedTestDatabaseEnvironment(
   env: IsolatedDatabaseEnvironment,
 ): { databaseUrl: string; testDatabaseUrl: string };
+export function assertLocalE2EBaseUrl(rawUrl?: string): string;

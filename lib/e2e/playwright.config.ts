@@ -2,11 +2,14 @@ import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 import "../../scripts/dev-local-defaults.mjs";
-import { assertIsolatedTestDatabaseEnvironment } from "../../scripts/e2e-isolation.mjs";
+import {
+  assertIsolatedTestDatabaseEnvironment,
+  assertLocalE2EBaseUrl,
+} from "../../scripts/e2e-isolation.mjs";
 
 const isolation = assertIsolatedTestDatabaseEnvironment(process.env);
 
-const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:23539";
+const baseURL = assertLocalE2EBaseUrl(process.env.E2E_BASE_URL);
 
 // Resolve a chromium binary so the spec is runnable from the root
 // `pnpm test` chain without the caller having to set PLAYWRIGHT_CHROMIUM

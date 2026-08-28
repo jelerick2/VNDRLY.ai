@@ -1,5 +1,6 @@
 import { test, expect, request as pwRequest, type APIRequestContext } from "@playwright/test";
 import type pg from "pg";
+import { LOCAL_E2E_BASE_URL } from "../../../scripts/e2e-isolation.mjs";
 import { createPool, hashPassword, makeStamp } from "../helpers/db";
 import {
   createPartner,
@@ -233,8 +234,7 @@ test.describe.serial(
       pool = createPool();
       seed = await seedFixture();
 
-      const baseURL =
-        process.env.E2E_BASE_URL ?? "http://localhost:23539";
+      const baseURL = LOCAL_E2E_BASE_URL;
       officeApi = await loginAndBuildContext(
         baseURL,
         seed.vendorAdminUsername,

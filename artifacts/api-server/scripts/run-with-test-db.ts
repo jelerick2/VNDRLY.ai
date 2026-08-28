@@ -21,7 +21,8 @@
  * What it does
  * ------------
  *   1. Resolves a test DB URL.
- *      - Honors `TEST_DATABASE_URL` verbatim if set.
+ *      - Honors `TEST_DATABASE_URL` only when it names a distinct `_test`
+ *        target.
  *      - Otherwise derives `<dev-db>_test` on the same Postgres server
  *        as `DATABASE_URL`.
  *   2. Ensures that DB exists (creates it via the maintenance `postgres`
@@ -50,6 +51,7 @@ import type { PgDatabase } from "drizzle-orm/pg-core";
 import { pushSchema } from "drizzle-kit/api";
 import pg from "pg";
 import * as schema from "@workspace/db/schema";
+import { resolveIsolatedTestDatabaseTarget } from "../../../scripts/e2e-isolation.mjs";
 
 interface ResolvedUrls {
   testUrl: string;
@@ -59,50 +61,7 @@ interface ResolvedUrls {
 }
 
 function resolveTestDbUrl(): ResolvedUrls {
-  const explicit = process.env.TEST_DATABASE_URL?.trim();
-  const base = process.env.DATABASE_URL?.trim();
-
-  if (!explicit && !base) {
-    throw new Error(
-      "Neither TEST_DATABASE_URL nor DATABASE_URL is set; cannot bootstrap an isolated test database.",
-    );
-  }
-
-  // Refuse to derive a test DB from the placeholder fallback used by
-  // `src/test/setup.ts` for offline unit-only runs — there is no
-  // server there to create a database on.
-  if (!explicit && base!.includes("test:test@localhost")) {
-    throw new Error(
-      "DATABASE_URL points at the offline placeholder (test:test@localhost). Set TEST_DATABASE_URL or a real DATABASE_URL to run integration tests.",
-    );
-  }
-
-  const url = new URL(explicit ?? base!);
-  if (!explicit) {
-    const baseName = url.pathname.replace(/^\//, "") || "postgres";
-    if (!baseName.endsWith("_test")) {
-      url.pathname = `/${baseName}_test`;
-    }
-  }
-  const testDbName = decodeURIComponent(url.pathname.replace(/^\//, ""));
-  if (!testDbName) {
-    throw new Error(
-      "Resolved test DB URL has no database name; refusing to proceed.",
-    );
-  }
-
-  // Maintenance connection points at the well-known `postgres` DB on
-  // the same server so we can issue CREATE DATABASE without being
-  // connected to the target.
-  const maintenance = new URL(url.toString());
-  maintenance.pathname = "/postgres";
-
-  return {
-    testUrl: url.toString(),
-    maintenanceUrl: maintenance.toString(),
-    testDbName,
-    source: explicit ? "TEST_DATABASE_URL" : "derived-from-DATABASE_URL",
-  };
+  return resolveIsolatedTestDatabaseTarget(process.env);
 }
 
 async function ensureDatabaseExists(
