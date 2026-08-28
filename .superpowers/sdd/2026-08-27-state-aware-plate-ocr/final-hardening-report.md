@@ -19,6 +19,16 @@ deployment paths were tested statically only and were not executed.
   and its normalized physical host/port/database differs from the original
   `DATABASE_URL`. Derived targets are also required to end in `_test` and retain
   the source URL's host, credentials, port, and connection options.
+- The shared PostgreSQL parser now rejects query options before normalization.
+  `host`, `hostaddr`, `port`, `dbname`, `database`, `user`, `username`,
+  `password`, `service`, and `servicefile` are explicitly target-changing and
+  rejected case-insensitively; every other unknown option also fails closed.
+  Only `sslmode` and `application_name` are allowed. Repeated/percent-encoded
+  keys and all URL fragments are covered. Query-like text that is percent-
+  encoded inside userinfo remains credential data and cannot alter the target.
+- `LISTEN_NOTIFY_DATABASE_URL` now passes through the same parser and is
+  rewritten to the resolved `_test` database during the initial pure target
+  resolution, before any connection/create/reset work.
 - `scripts/run-api-local.mjs` does not load `.env.local` when
   `VNDRLY_ISOLATED_TEST_DB=1`, so the wrapper-owned `DATABASE_URL` survives
   into the API child.
@@ -178,11 +188,13 @@ Files:
 
 Green:
 
-- `node --test scripts/final-hardening.test.mjs` — 14 passed, including pure
+- `node --test scripts/final-hardening.test.mjs` — 17 passed, including pure
   explicit/derived target validation, physical-target normalization, external
-  E2E origin rejection, wrapper ordering, and static Playwright wiring.
-- Isolated fixture guard focused Vitest — 1 file, 5 passed; marker-only,
-  suffixless, and mismatched targets all return 503 before the route action.
+  E2E origin rejection, query-override/fragment rejection, wrapper ordering,
+  and static Playwright wiring.
+- Isolated fixture guard focused Vitest — 1 file, 6 passed; marker-only,
+  suffixless, mismatched, and query-override targets all return 503 before the
+  route action.
 - API visit-route mocked focus — 63 passed, 27 skipped by test-name filter.
 - Shared plate-state Vitest — 12 passed.
 - Web gate/public focused Vitest — 2 files, 17 passed.
@@ -219,3 +231,6 @@ Not run by design:
 4. The earlier hardening commit normalized several touched legacy compact
    files, so parts of the whole-branch diff are formatting-only. This P0
    follow-up keeps its E2E spec change narrow.
+5. Any future PostgreSQL connection option beyond `sslmode` or
+   `application_name` will now fail closed and must receive a target-safety
+   review plus regression coverage before being allowlisted.

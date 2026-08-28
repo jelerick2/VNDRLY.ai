@@ -85,6 +85,19 @@ describe("requireIsolatedFixtureContext", () => {
     expect(databaseAction).not.toHaveBeenCalled();
   });
 
+  it("refuses query-parameter target overrides before any database action", async () => {
+    process.env.VNDRLY_ISOLATED_TEST_DB = "1";
+    process.env.DATABASE_URL =
+      "postgresql://runner:secret@isolated.example.test/vndrly_test?sslmode=require&HoSt=shared.example.test&host=other.example.test";
+    process.env.TEST_DATABASE_URL = process.env.DATABASE_URL;
+    const databaseAction = vi.fn();
+
+    const response = await request(fixtureApp(databaseAction)).post("/fixture");
+
+    expect(response.status).toBe(503);
+    expect(databaseAction).not.toHaveBeenCalled();
+  });
+
   it("permits the database action only for the exact isolated _test target", async () => {
     process.env.VNDRLY_ISOLATED_TEST_DB = "1";
     process.env.DATABASE_URL =

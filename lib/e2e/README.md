@@ -13,6 +13,12 @@ the shared development or production database.
   `DATABASE_URL`, or omit it so the wrapper derives a separate `_test` database
   on the same server. Credentials and connection options do not make the same
   physical database a distinct target.
+- PostgreSQL URL query parameters are fail-closed across `DATABASE_URL`,
+  `TEST_DATABASE_URL`, and `LISTEN_NOTIFY_DATABASE_URL`. Only `sslmode` and
+  `application_name` are allowed (case-insensitively); target-changing options,
+  unknown options, repeated target overrides, and URL fragments are rejected
+  before any connection or schema work. Future connection options require an
+  explicit safety review and regression coverage before joining the allowlist.
 - Chromium has been installed for Playwright:
 
   ```

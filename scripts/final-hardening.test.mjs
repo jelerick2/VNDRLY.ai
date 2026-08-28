@@ -130,7 +130,11 @@ test("test database resolution preserves safe derived and explicit _test targets
   const resolve = e2eIsolation.resolveIsolatedTestDatabaseTarget;
   const base =
     "postgresql://runner:secret@db.example.test:6543/vndrly?sslmode=require";
-  const derived = resolve({ DATABASE_URL: base });
+  const derived = resolve({
+    DATABASE_URL: base,
+    LISTEN_NOTIFY_DATABASE_URL:
+      "postgresql://listener:notify@direct.example.test/postgres?SSLMODE=require&application_name=listen",
+  });
 
   assert.equal(derived.testDbName, "vndrly_test");
   assert.equal(derived.source, "derived-from-DATABASE_URL");
@@ -139,6 +143,10 @@ test("test database resolution preserves safe derived and explicit _test targets
   assert.equal(new URL(derived.testUrl).username, "runner");
   assert.equal(new URL(derived.testUrl).password, "secret");
   assert.equal(new URL(derived.testUrl).search, "?sslmode=require");
+  assert.equal(
+    derived.listenNotifyTestUrl,
+    "postgresql://listener:notify@direct.example.test/vndrly_test?SSLMODE=require&application_name=listen",
+  );
 
   const explicit = resolve({
     DATABASE_URL: "postgresql://runner:secret@shared.example.test/vndrly_test",
@@ -148,6 +156,38 @@ test("test database resolution preserves safe derived and explicit _test targets
   assert.equal(explicit.testDbName, "vndrly_test");
   assert.equal(explicit.source, "TEST_DATABASE_URL");
   assert.equal(new URL(explicit.testUrl).hostname, "isolated.example.test");
+});
+
+test("the wrapper rejects target-changing options on every database URL before setup", () => {
+  const resolve = e2eIsolation.resolveIsolatedTestDatabaseTarget;
+  const base = "postgresql://runner:secret@shared.example.test/vndrly";
+
+  assert.throws(
+    () =>
+      resolve({
+        DATABASE_URL:
+          "postgresql://runner:secret@isolated.example.test/vndrly?host=shared.example.test",
+      }),
+    /target-changing PostgreSQL URL query parameter/i,
+  );
+  assert.throws(
+    () =>
+      resolve({
+        DATABASE_URL: base,
+        TEST_DATABASE_URL:
+          "postgresql://runner:secret@isolated.example.test/vndrly_test?PORT=5432",
+      }),
+    /target-changing PostgreSQL URL query parameter/i,
+  );
+  assert.throws(
+    () =>
+      resolve({
+        DATABASE_URL: base,
+        LISTEN_NOTIFY_DATABASE_URL:
+          "postgresql://runner:secret@isolated.example.test/vndrly?sslmode=require&host=shared.example.test",
+      }),
+    /target-changing PostgreSQL URL query parameter/i,
+  );
 });
 
 test("same _test database name on a different host is a distinct explicit target", () => {
@@ -208,15 +248,15 @@ test("Playwright config and global setup validate the local origin before use", 
   );
 });
 
-test("database target normalization ignores credentials and connection options, not physical identity", () => {
+test("database target normalization allows only benign options and ignores credentials", () => {
   const left = normalizeDatabaseTarget(
-    "postgresql://runner:secret@DB.EXAMPLE.test/e2e?sslmode=require",
+    "postgresql://runner:secret@DB.EXAMPLE.test/e2e?SSLMODE=require&application_name=first&sslmode=verify-full",
   );
   const sameTarget = normalizeDatabaseTarget(
-    "postgresql://runner:other@db.example.test:5432/e2e?application_name=test",
+    "postgresql://runner:other@db.example.test:5432/e2e?Application_Name=test&application_name=second",
   );
   const sameTargetOtherUser = normalizeDatabaseTarget(
-    "postgresql://different:secret@db.example.test:5432/e2e",
+    "postgresql://different%3Fhost%3Dshared:secret%23dbname%3Dprod%40value@db.example.test:5432/e2e",
   );
   const otherDatabase = normalizeDatabaseTarget(
     "postgresql://runner:secret@db.example.test:5432/other_test",
@@ -225,6 +265,75 @@ test("database target normalization ignores credentials and connection options, 
   assert.equal(left, sameTarget);
   assert.equal(left, sameTargetOtherUser);
   assert.notEqual(left, otherDatabase);
+});
+
+test("database target normalization rejects the reviewer query-override exploit and variants", () => {
+  const target = "postgresql://runner:secret@isolated.example.test/safe_test";
+  const targetChangingParameters = [
+    "host",
+    "hostaddr",
+    "port",
+    "dbname",
+    "database",
+    "user",
+    "username",
+    "password",
+    "service",
+    "servicefile",
+  ];
+
+  assert.throws(
+    () =>
+      normalizeDatabaseTarget(
+        `${target}?host=shared.supabase.test&dbname=postgres&port=5432`,
+      ),
+    /target-changing PostgreSQL URL query parameter "host"/i,
+  );
+
+  for (const parameter of targetChangingParameters) {
+    const mixedCase = parameter
+      .split("")
+      .map((character, index) =>
+        index % 2 === 0 ? character.toUpperCase() : character,
+      )
+      .join("");
+    assert.throws(
+      () => normalizeDatabaseTarget(`${target}?${mixedCase}=override`),
+      /target-changing PostgreSQL URL query parameter/i,
+      `${parameter} must be rejected case-insensitively`,
+    );
+  }
+
+  for (const query of [
+    "sslmode=require&host=one.example.test&HOST=two.example.test",
+    "h%6Fst=shared.example.test",
+    "application_name=e2e&PoRt=6543&port=5432",
+  ]) {
+    assert.throws(
+      () => normalizeDatabaseTarget(`${target}?${query}`),
+      /target-changing PostgreSQL URL query parameter/i,
+    );
+  }
+});
+
+test("database target normalization rejects unknown options and URL fragments", () => {
+  const target = "postgresql://runner:secret@isolated.example.test/safe_test";
+
+  assert.throws(
+    () => normalizeDatabaseTarget(`${target}?connect_timeout=10`),
+    /unsupported PostgreSQL URL query parameter "connect_timeout"/i,
+  );
+  assert.throws(
+    () =>
+      normalizeDatabaseTarget(
+        `${target}?sslmode=require#?host=shared.example.test&dbname=postgres`,
+      ),
+    /PostgreSQL URL fragments are forbidden/i,
+  );
+  assert.throws(
+    () => normalizeDatabaseTarget(`${target}#`),
+    /PostgreSQL URL fragments are forbidden/i,
+  );
 });
 
 test("the local API launcher never loads .env.local inside the isolated wrapper", () => {

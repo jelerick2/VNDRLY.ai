@@ -1,6 +1,7 @@
 export interface IsolatedDatabaseEnvironment {
   DATABASE_URL?: string;
   TEST_DATABASE_URL?: string;
+  LISTEN_NOTIFY_DATABASE_URL?: string;
   VNDRLY_ISOLATED_TEST_DB?: string;
 }
 
@@ -8,6 +9,7 @@ export interface ResolvedIsolatedTestDatabaseTarget {
   testUrl: string;
   maintenanceUrl: string;
   testDbName: string;
+  listenNotifyTestUrl?: string;
   source: "TEST_DATABASE_URL" | "derived-from-DATABASE_URL";
 }
 

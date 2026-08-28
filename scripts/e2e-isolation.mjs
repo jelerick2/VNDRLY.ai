@@ -1,5 +1,45 @@
 export const LOCAL_E2E_BASE_URL = "http://localhost:23539";
 
+const TARGET_CHANGING_POSTGRES_QUERY_PARAMETERS = new Set([
+  "host",
+  "hostaddr",
+  "port",
+  "dbname",
+  "database",
+  "user",
+  "username",
+  "password",
+  "service",
+  "servicefile",
+]);
+
+const ALLOWED_POSTGRES_QUERY_PARAMETERS = new Set([
+  "sslmode",
+  "application_name",
+]);
+
+function assertSafePostgresUrlOptions(url) {
+  if (url.href.includes("#")) {
+    throw new Error(
+      "PostgreSQL URL fragments are forbidden for isolated test database targets",
+    );
+  }
+
+  for (const [rawName] of url.searchParams) {
+    const name = rawName.toLowerCase();
+    if (TARGET_CHANGING_POSTGRES_QUERY_PARAMETERS.has(name)) {
+      throw new Error(
+        `Refusing target-changing PostgreSQL URL query parameter "${rawName}"`,
+      );
+    }
+    if (!ALLOWED_POSTGRES_QUERY_PARAMETERS.has(name)) {
+      throw new Error(
+        `Refusing unsupported PostgreSQL URL query parameter "${rawName}"; only sslmode and application_name are allowed`,
+      );
+    }
+  }
+}
+
 function parsePostgresUrl(rawUrl) {
   if (typeof rawUrl !== "string" || !rawUrl.trim()) {
     throw new Error("DATABASE_URL and TEST_DATABASE_URL must both be set");
@@ -9,6 +49,7 @@ function parsePostgresUrl(rawUrl) {
   if (protocol !== "postgres:" && protocol !== "postgresql:") {
     throw new Error("E2E database URLs must use postgres or postgresql");
   }
+  assertSafePostgresUrlOptions(url);
   return url;
 }
 
@@ -24,6 +65,13 @@ function assertTestDatabaseName(rawUrl, label) {
     );
   }
   return name;
+}
+
+function resolveListenNotifyTestUrl(rawUrl, testDbName) {
+  if (!rawUrl) return undefined;
+  const url = parsePostgresUrl(rawUrl);
+  url.pathname = `/${testDbName}`;
+  return url.toString();
 }
 
 export function normalizeDatabaseTarget(rawUrl) {
@@ -80,11 +128,16 @@ export function resolveIsolatedTestDatabaseTarget(env) {
   const testDbName = assertTestDatabaseName(testUrl, "Resolved test database");
   const maintenance = new URL(testUrl);
   maintenance.pathname = "/postgres";
+  const listenNotifyTestUrl = resolveListenNotifyTestUrl(
+    env.LISTEN_NOTIFY_DATABASE_URL?.trim(),
+    testDbName,
+  );
 
   return {
     testUrl,
     maintenanceUrl: maintenance.toString(),
     testDbName,
+    listenNotifyTestUrl,
     source: explicit ? "TEST_DATABASE_URL" : "derived-from-DATABASE_URL",
   };
 }

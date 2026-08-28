@@ -25,6 +25,8 @@
  *        target.
  *      - Otherwise derives `<dev-db>_test` on the same Postgres server
  *        as `DATABASE_URL`.
+ *      - Allows only `sslmode` and `application_name` URL options and rejects
+ *        target-changing/unknown options or fragments before any connection.
  *   2. Ensures that DB exists (creates it via the maintenance `postgres`
  *      DB on the same server if necessary).
  *   3. Drops + recreates the `public` schema in the test DB so it
@@ -57,6 +59,7 @@ interface ResolvedUrls {
   testUrl: string;
   maintenanceUrl: string;
   testDbName: string;
+  listenNotifyTestUrl?: string;
   source: "TEST_DATABASE_URL" | "derived-from-DATABASE_URL";
 }
 
@@ -145,14 +148,6 @@ function redactPassword(url: string): string {
   }
 }
 
-function resolveListenNotifyTestUrl(resolved: ResolvedUrls): string | undefined {
-  const raw = process.env.LISTEN_NOTIFY_DATABASE_URL?.trim();
-  if (!raw) return undefined;
-  const url = new URL(raw);
-  url.pathname = `/${resolved.testDbName}`;
-  return url.toString();
-}
-
 function parseChildArgs(argv: string[]): string[] {
   const sep = argv.indexOf("--");
   return sep >= 0 ? argv.slice(sep + 1) : argv;
@@ -198,7 +193,7 @@ async function main(): Promise<void> {
     TEST_DATABASE_URL: resolved.testUrl,
     VNDRLY_ISOLATED_TEST_DB: "1",
   };
-  const listenNotifyTestUrl = resolveListenNotifyTestUrl(resolved);
+  const listenNotifyTestUrl = resolved.listenNotifyTestUrl;
   if (listenNotifyTestUrl) {
     env.LISTEN_NOTIFY_DATABASE_URL = listenNotifyTestUrl;
     process.stdout.write(
