@@ -17,11 +17,13 @@ and ship"**.
 1. Commit the scoped, verified changes.
 2. Push the working branch.
 3. Integrate into `main` with a non-force fast-forward or merge.
-4. Run or allow the configured production web deployment
-   (`.github/workflows/publish.yml`), the API deployment
-   (`.github/workflows/deploy-api.yml` when API or additive SQL
-   changed), and any fingerprint-compatible Expo OTA workflow.
-5. Monitor the release and verify the live web/Expo result.
+4. Run or allow **all three** production tracks that apply: web
+   (`.github/workflows/publish.yml`), **API**
+   (`.github/workflows/deploy-api.yml` — always part of **full
+   ship**; `workflow_dispatch` it if the path filter did not fire),
+   and any fingerprint-compatible Expo OTA workflow.
+5. Monitor the release and verify the live web, API healthz, and
+   Expo result.
 
 This standing authorization never permits a force push/history rewrite,
 destructive database action, credential rotation, or a new native App Store
@@ -44,9 +46,10 @@ Follow this path without adding approval or duplicate-validation delays:
 3. Publish the working branch and advance `main` in the same non-force pass
    after confirming the current remote `main` parent. Avoid intermediate
    release-only commits unless they fix a demonstrated failure.
-4. Start monitoring the GitHub web deployment and any eligible Expo OTA run
-   concurrently. Verify the public route from the deployed commit as soon as
-   the web job succeeds.
+4. Start monitoring the GitHub web deployment, the API deployment,
+   and any eligible Expo OTA run concurrently. Verify the public
+   route and `https://vndrly.ai/api/healthz` from the deployed
+   commit as soon as those jobs succeed.
 5. TestFlight is a separate track and never blocks web completion. Report the
    web release when it is live, then continue an explicitly authorized native
    build/submission independently.
