@@ -17,17 +17,21 @@ and ship"**.
 1. Commit the scoped, verified changes.
 2. Push the working branch.
 3. Integrate into `main` with a non-force fast-forward or merge.
-4. Run or allow **all three** production tracks that apply: web
+4. Run or allow **all production tracks**: web
    (`.github/workflows/publish.yml`), **API**
-   (`.github/workflows/deploy-api.yml` — always part of **full
-   ship**; `workflow_dispatch` it if the path filter did not fire),
-   and any fingerprint-compatible Expo OTA workflow.
-5. Monitor the release and verify the live web, API healthz, and
-   Expo result.
+   (`.github/workflows/deploy-api.yml` — dispatch if the path
+   filter did not fire), fingerprint-compatible Expo OTA, **and
+   TestFlight**. VNDRLY is an **app-driven database** — the iOS
+   app is the most important ship surface. TestFlight is not
+   optional and is not a follow-up track.
+5. Monitor the release and verify live web, API healthz, Expo OTA,
+   and the TestFlight build/submit.
 
 This standing authorization never permits a force push/history rewrite,
-destructive database action, credential rotation, or a new native App Store
-binary/submission. Those operations retain their specific approval rules.
+destructive database action, or credential rotation. Those operations
+retain their specific approval rules. **Full ship includes TestFlight
+build and submit.** App Store "Ready for Sale" / production App Store
+release still needs an explicit ask.
 
 #### RELEASE FAST PATH — 10-MINUTE TARGET, 15-MINUTE ESCALATION
 Once the exact release tree has passed its required verification, the
@@ -46,18 +50,20 @@ Follow this path without adding approval or duplicate-validation delays:
 3. Publish the working branch and advance `main` in the same non-force pass
    after confirming the current remote `main` parent. Avoid intermediate
    release-only commits unless they fix a demonstrated failure.
-4. Start monitoring the GitHub web deployment, the API deployment,
-   and any eligible Expo OTA run concurrently. Verify the public
-   route and `https://vndrly.ai/api/healthz` from the deployed
-   commit as soon as those jobs succeed.
-5. TestFlight is a separate track and never blocks web completion. Report the
-   web release when it is live, then continue an explicitly authorized native
-   build/submission independently.
+4. Start monitoring web Publish, API Deploy, Expo OTA, and the
+   TestFlight build/submit concurrently. Verify
+   `https://vndrly.ai` / `/gate`, `https://vndrly.ai/api/healthz`,
+   the Expo update group, and the TestFlight build.
+5. TestFlight is the primary native track of a full ship. Do not
+   report a full ship complete until the TestFlight build is
+   submitted (or a demonstrated native blocker is being fixed
+   under the same release command). Web going live first does not
+   finish the ship.
 6. On failure, retrieve the exact job logs, fix the root cause, and retry under
    the standing release authorization. Do not pause to ask permission again
    for a safe retry already covered by the release command.
-7. The release handoff must include the commit, workflow result, public
-   verification, and elapsed commit-to-live time.
+7. The release handoff must include the commit, workflow results, public
+   verification, TestFlight status, and elapsed commit-to-live time.
 
 The detailed checklist and measured baseline are in
 `docs/release-fast-path.md`.
