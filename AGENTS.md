@@ -17,8 +17,10 @@ and ship"**.
 1. Commit the scoped, verified changes.
 2. Push the working branch.
 3. Integrate into `main` with a non-force fast-forward or merge.
-4. Run or allow the configured production web deployment and any
-   fingerprint-compatible Expo OTA workflow.
+4. Run or allow the configured production web deployment
+   (`.github/workflows/publish.yml`), the API deployment
+   (`.github/workflows/deploy-api.yml` when API or additive SQL
+   changed), and any fingerprint-compatible Expo OTA workflow.
 5. Monitor the release and verify the live web/Expo result.
 
 This standing authorization never permits a force push/history rewrite,
