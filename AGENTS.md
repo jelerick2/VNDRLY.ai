@@ -49,11 +49,9 @@ Follow this path without adding approval or duplicate-validation delays:
    TestFlight build/submit concurrently. Verify
    `https://vndrly.ai` / `/gate`, `https://vndrly.ai/api/healthz`,
    the Expo update group, and the TestFlight build.
-5. TestFlight is the primary native track of a full ship. Do not
-   report a full ship complete until the TestFlight build is
-   submitted (or a demonstrated native blocker is being fixed
-   under the same release command). Web going live first does not
-   finish the ship.
+5. Full ship is not complete until TestFlight is submitted. Web
+   or API going live first does not finish the ship. Fix native
+   blockers under the same release command.
 6. On failure, retrieve the exact job logs, fix the root cause, and retry under
    the standing release authorization. Do not pause to ask permission again
    for a safe retry already covered by the release command.
