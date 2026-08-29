@@ -59,7 +59,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "lookup_user_progress",
     description:
-      "Returns the current onboarding progress for this user's org (current step, completed steps, skipped steps, and the partial payload). Always call this before suggesting onboarding actions if you don't already have fresh state.",
+      "Returns the current onboarding progress for this user's org (current step, completed steps, skipped steps, and the partial payload). Always call this before suggesting onboarding actions if you don't already have fresh state. Do not call this first when the user already provided an explicit write (e.g. set company name to X) — call set_onboarding_field instead.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -71,7 +71,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "set_onboarding_field",
     description:
-      "Writes a single field into the onboarding payload. Use dot.notation for nested keys (e.g. 'firstSite.address'). Only call after explicitly confirming the value with the user. Re-checks role permissions server-side.",
+      "Writes a single field into the onboarding payload. Use dot.notation for nested keys (e.g. 'firstSite.address'). When the user already provided the exact value (e.g. 'set my company name to Acme'), call this immediately and do not call lookup_user_progress first. Only pause to confirm when you inferred or guessed the value. Re-checks role permissions server-side.",
     input_schema: {
       type: "object",
       properties: {
@@ -110,7 +110,8 @@ export const TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "lookup_open_tickets",
-    description: "Returns up to 10 in-flight tickets (status not closed) visible to this user, with site, vendor, and status.",
+    description:
+      "Returns up to 10 in-flight tickets (status not closed) visible to this user, with site, vendor, and status. Use this — not query_tickets — when the user asks which tickets are still in flight, still open, or open right now with no extra filters.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   // ─────────────────────────────────────────────────────────────
@@ -122,7 +123,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "query_tickets",
     description:
-      "Lists or counts tickets in the caller's scope. Optional filters: status (e.g. 'in_progress', 'kicked_back', 'completed'), vendorId, siteId, sinceDays (default 30, max 365), limit (default 10, max 50), countOnly (true to return just a count). Use this when the user asks 'how many', 'show me my', 'list open' tickets, or wants a fresh look at recent activity.",
+      "Lists or counts tickets in the caller's scope with optional filters: status (e.g. 'in_progress', 'kicked_back', 'completed'), vendorId, siteId, sinceDays (default 30, max 365), limit (default 10, max 50), countOnly (true to return just a count). Use this for 'how many tickets', a status filter, a date window, or a filtered list. Do not use this for 'which tickets are still in flight / still open right now' with no extra filters — call lookup_open_tickets instead.",
     input_schema: {
       type: "object",
       properties: {
@@ -832,7 +833,7 @@ export const TOOLS: Anthropic.Tool[] = [
   {
     name: "deep_link_to",
     description:
-      "Returns a URL the user can navigate to in this web app for a given screen. Use this instead of describing 'click X then Y' when a single link will do. Detail screens (ticket-detail, vendor-detail, partner-detail, invoice-detail, vendor-analytics, partner-analytics, crew-replay) require `id`. Field-employee onboarding requires the invite `token`. For Reports, pass reportCard (e.g. salesTaxByState) and optional reportPreset (ytd, this_year, …) plus highlightState (e.g. TX) to open the matching card scrolled into view.",
+      "Returns a URL the user can navigate to in this web app for a given screen. When the user says 'take me to', 'just take me', 'open the X list', or 'go to' a screen, you MUST call this tool this turn. Do not reply with only a hand-written markdown path. Use this instead of describing 'click X then Y' when a single link will do. Detail screens (ticket-detail, vendor-detail, partner-detail, invoice-detail, vendor-analytics, partner-analytics, crew-replay) require `id`. Field-employee onboarding requires the invite `token`. For Reports, pass reportCard (e.g. salesTaxByState) and optional reportPreset (ytd, this_year, …) plus highlightState (e.g. TX) to open the matching card scrolled into view.",
     input_schema: {
       type: "object",
       properties: {

@@ -112,7 +112,7 @@ export const KNOWLEDGE_DOCS: KnowledgeDoc[] = [
   },
   {
     id: "hotlist",
-    title: "Hotlist (jobs in flight)",
+    title: "Hotlist (marketplace jobs)",
     roles: ["partner", "vendor", "admin"],
     body: `The Hotlist is a live jobs panel on the Dashboard (/) — not a separate sidebar link. Partners and admins use it to watch open Hotlist marketplace jobs and in-flight work across sites. Vendors see matching jobs they can bid on (filtered by service area and catalog work types). Click a row to open the job or underlying ticket.`,
   },
