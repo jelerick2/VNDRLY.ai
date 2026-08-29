@@ -6,32 +6,27 @@ VNDRLY is a full-stack web application designed to streamline oil & gas field op
 ## User Preferences
 I prefer clear, concise explanations and an iterative development approach. Please ask before making any major architectural changes or introducing new external dependencies. I value well-documented code and a focus on maintainability.
 
-### STANDING RULE — RELEASE COMMAND IS END-TO-END AUTHORIZATION
-For this repository, the user's imperative instruction **"commit, push, deploy,
-and ship"** (or an unambiguous equivalent) is one complete release command. It
-remains in effect through troubleshooting and safe retries until the requested
-change is live. Do not pause to request approval again between these stages.
-**"full ship"** is the same one-task authorization as **"commit, push, deploy,
-and ship"**.
+### STANDING RULE — FULL SHIP UPDATES EVERYTHING ONLINE
+**"full ship"** (also **"commit, push, deploy, and ship"**) means
+**update everything online**. Do not ask whether a track is included.
+Do not treat any of these as optional, later, or "separate":
 
-1. Commit the scoped, verified changes.
-2. Push the working branch.
-3. Integrate into `main` with a non-force fast-forward or merge.
-4. Run or allow **all production tracks**: web
-   (`.github/workflows/publish.yml`), **API**
-   (`.github/workflows/deploy-api.yml` — dispatch if the path
-   filter did not fire), fingerprint-compatible Expo OTA, **and
-   TestFlight**. VNDRLY is an **app-driven database** — the iOS
-   app is the most important ship surface. TestFlight is not
-   optional and is not a follow-up track.
-5. Monitor the release and verify live web, API healthz, Expo OTA,
-   and the TestFlight build/submit.
+1. **Commit** the changes.
+2. **Push** and advance `main` (non-force) so the GitHub repo is current.
+3. **VPS / web** — `.github/workflows/publish.yml` (live site).
+4. **API** — `.github/workflows/deploy-api.yml` (dispatch if the path
+   filter did not fire). Verify `https://vndrly.ai/api/healthz`.
+5. **iOS OTA** — `.github/workflows/mobile-ota.yml`.
+6. **TestFlight** — native build and submit. This is the most
+   important track. VNDRLY is an **app-driven database**. A full
+   ship is not done until TestFlight is submitted.
+
+Stay on it through troubleshooting until all six are live. Do not
+pause to re-ask permission between stages.
 
 This standing authorization never permits a force push/history rewrite,
-destructive database action, or credential rotation. Those operations
-retain their specific approval rules. **Full ship includes TestFlight
-build and submit.** App Store "Ready for Sale" / production App Store
-release still needs an explicit ask.
+destructive database action, or credential rotation. App Store
+"Ready for Sale" still needs an explicit ask. TestFlight does not.
 
 #### RELEASE FAST PATH — 10-MINUTE TARGET, 15-MINUTE ESCALATION
 Once the exact release tree has passed its required verification, the
