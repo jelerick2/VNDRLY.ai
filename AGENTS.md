@@ -51,10 +51,11 @@ Follow this path without adding approval or duplicate-validation delays:
 3. Publish the working branch and advance `main` in the same non-force pass
    after confirming the current remote `main` parent. Avoid intermediate
    release-only commits unless they fix a demonstrated failure.
-4. Start monitoring web Publish, API Deploy, Expo OTA, and the
-   TestFlight build/submit concurrently. Verify
-   `https://vndrly.ai` / `/gate`, `https://vndrly.ai/api/healthz`,
-   the Expo update group, and the TestFlight build.
+4. Start monitoring web Publish, API Deploy (including guarded
+   Supabase migrations), Expo OTA, and the TestFlight build/submit
+   concurrently. Verify `https://vndrly.ai` / `/gate`,
+   `https://vndrly.ai/api/healthz`, the Expo update group, and the
+   TestFlight build.
 5. Full ship is not complete until TestFlight is submitted. Web
    or API going live first does not finish the ship. Fix native
    blockers under the same release command.
