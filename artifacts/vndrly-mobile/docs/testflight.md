@@ -128,7 +128,16 @@ See also `docs/database.md` for local DB + API setup.
 | Remote iOS `buildNumber` | **5** (EAS auto-increment; next build uses this) |
 | Non-interactive build | **Blocked** — distribution cert must be validated once interactively |
 
-### Your next step (required — cannot be done from Cursor agent)
+### Full ship from GitHub Actions
+
+`workflow_dispatch` `.github/workflows/mobile-testflight.yml` with
+repo secret `EXPO_TOKEN`. That is the Linux/agent TestFlight path.
+Apple signing must already live on the EAS account (`vndrlyadmin`).
+If EAS says the distribution cert is not validated, run one
+interactive `eas build --platform ios --profile production` on a
+human machine, then re-dispatch the workflow.
+
+### Repeat local builds (Windows)
 
 Open a normal PowerShell terminal (not agent/non-interactive) and run:
 

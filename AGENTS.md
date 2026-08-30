@@ -17,7 +17,8 @@ Do not treat any of these as optional, later, or "separate":
 4. **API** — `.github/workflows/deploy-api.yml` (dispatch if the path
    filter did not fire). Verify `https://vndrly.ai/api/healthz`.
 5. **iOS OTA** — `.github/workflows/mobile-ota.yml`.
-6. **TestFlight** — native build and submit. This is the most
+6. **TestFlight** — `.github/workflows/mobile-testflight.yml`
+   (`workflow_dispatch`). Native build and submit. This is the most
    important track. VNDRLY is an **app-driven database**. A full
    ship is not done until TestFlight is submitted.
 
