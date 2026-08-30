@@ -16,13 +16,18 @@ Do not treat any of these as optional, later, or "separate":
 3. **VPS / web** — `.github/workflows/publish.yml` (live site).
 4. **API** — `.github/workflows/deploy-api.yml` (dispatch if the path
    filter did not fire). Verify `https://vndrly.ai/api/healthz`.
-5. **iOS OTA** — `.github/workflows/mobile-ota.yml`.
-6. **TestFlight** — `.github/workflows/mobile-testflight.yml`
+5. **Supabase** — production Postgres + Storage behind that API.
+   Run every new guarded `migrate:*` (additive `ADD COLUMN IF NOT
+   EXISTS` only) as part of API deploy. Apply storage/bucket
+   provision only when the ship includes storage changes. Never
+   drizzle-push, DROP, TRUNCATE, or restore-over-live.
+6. **iOS OTA** — `.github/workflows/mobile-ota.yml`.
+7. **TestFlight** — `.github/workflows/mobile-testflight.yml`
    (`workflow_dispatch`). Native build and submit. This is the most
    important track. VNDRLY is an **app-driven database**. A full
    ship is not done until TestFlight is submitted.
 
-Stay on it through troubleshooting until all six are live. Do not
+Stay on it through troubleshooting until all seven are live. Do not
 pause to re-ask permission between stages.
 
 This standing authorization never permits a force push/history rewrite,
