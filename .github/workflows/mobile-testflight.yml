@@ -56,7 +56,7 @@ jobs:
           --profile production
           --non-interactive
           --wait
-          --message "${{ inputs.message }}"
+          --message "${{ inputs.message }} (${{ github.sha }})"
 
       - name: Submit latest iOS build to TestFlight
         working-directory: artifacts/vndrly-mobile

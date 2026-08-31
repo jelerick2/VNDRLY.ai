@@ -16,6 +16,7 @@ test("TestFlight is a dispatchable GitHub Actions job using Expo, not PowerShell
     workflow,
     /eas build[\s\S]*--platform ios[\s\S]*--profile production[\s\S]*--non-interactive/,
   );
+  assert.match(workflow, /--message "\$\{\{ inputs\.message \}\} \(\$\{\{ github\.sha \}\}\)"/);
   assert.match(workflow, /eas submit[\s\S]*--platform ios[\s\S]*--non-interactive/);
   assert.doesNotMatch(workflow, /testflight-build\.ps1|ship-it\.ps1/);
 });

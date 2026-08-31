@@ -21,6 +21,7 @@ test("mobile OTA is a manual, guarded iOS production release", () => {
   assert.doesNotMatch(workflow, /^\s*push:\s*$/m);
   assert.match(workflow, /secrets\.EXPO_TOKEN/);
   assert.match(workflow, /eas build:list/);
+  assert.match(workflow, /node scripts\/eas-production-runtime-commit\.mjs/);
   assert.match(workflow, /node scripts\/mobile-release-impact\.mjs/);
   assert.match(workflow, /--base-ref/);
   assert.match(
