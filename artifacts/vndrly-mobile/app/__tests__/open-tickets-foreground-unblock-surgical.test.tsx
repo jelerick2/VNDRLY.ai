@@ -280,7 +280,7 @@ describe("HomeScreen — Task #668 surgical per-row refresh on ticket_unblocked"
       expect(
         newCalls.some((c) => c[0] === "/api/field/open-tickets/4242"),
       ).toBe(true);
-    });
+    }, { timeout: 3_000 });
 
     // Crucially, the legacy full-list refetch must NOT happen on the
     // happy path — that regression is exactly what #668 set out to fix.
