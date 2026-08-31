@@ -1,4 +1,4 @@
-type FetchInput = Parameters<typeof fetch>[0];
+type FetchInput = Parameters<typeof fetch>[0] | URL;
 type FetchHeadersInit = NonNullable<RequestInit["headers"]>;
 
 export type CustomFetchOptions = RequestInit & {
