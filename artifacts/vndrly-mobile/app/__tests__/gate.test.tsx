@@ -59,12 +59,14 @@ const { requestForegroundPermissionsAsyncMock, getCurrentPositionAsyncMock } =
     requestForegroundPermissionsAsyncMock: vi.fn(),
     getCurrentPositionAsyncMock: vi.fn(),
   }));
+const watchPositionAsyncMock = vi.hoisted(() => vi.fn());
 vi.mock("expo-location", () => ({
   Accuracy: { High: 4, Balanced: 3 },
   requestForegroundPermissionsAsync: (...a: unknown[]) =>
     requestForegroundPermissionsAsyncMock(...a),
   getCurrentPositionAsync: (...a: unknown[]) =>
     getCurrentPositionAsyncMock(...a),
+  watchPositionAsync: (...a: unknown[]) => watchPositionAsyncMock(...a),
 }));
 
 vi.mock("expo-secure-store", () => ({
@@ -126,6 +128,7 @@ vi.mock("@/lib/gatekeeper", () => ({
     fetchPreferredPlateStatesMock(...a),
   submitGatekeeperVisit: (...a: unknown[]) => submitGatekeeperVisitMock(...a),
   gatekeeperCheckOut: (...a: unknown[]) => gatekeeperCheckOutMock(...a),
+  gateAdmit: vi.fn(),
   readGatePlate: (...a: unknown[]) => readGatePlateMock(...a),
 }));
 
@@ -258,6 +261,14 @@ beforeEach(() => {
     preferred: ["CA", "TX", "NY", "FL", "OH"],
   });
   vi.spyOn(Alert, "alert").mockImplementation(() => {});
+  requestForegroundPermissionsAsyncMock.mockResolvedValue({ status: "granted" });
+  getCurrentPositionAsyncMock.mockResolvedValue({
+    coords: { latitude: 37.7, longitude: -122.4 },
+  });
+  watchPositionAsyncMock.mockImplementation(async (_opts, cb) => {
+    cb({ coords: { latitude: 37.7, longitude: -122.4 } });
+    return { remove: vi.fn() };
+  });
 });
 
 const SITE_CTX: SiteContext = {
@@ -475,9 +486,7 @@ describe("GatekeeperScreen", () => {
     expect(screen.getAllByText("Flywheel Energy Spur").length).toBeGreaterThan(
       0,
     );
-    expect((firstByTestId("gate-site-code") as HTMLInputElement).value).toBe(
-      "SITE-B40D77D2",
-    );
+    expect(screen.queryByTestId("gate-site-code")).toBeNull();
     await waitFor(() => {
       expect(fetchSiteContextMock).toHaveBeenCalledWith("SITE-B40D77D2");
     });
@@ -708,7 +717,7 @@ describe("GatekeeperScreen", () => {
     });
   });
 
-  it("blocks a missing plate state before starting check-in work and exposes an accessible error", async () => {
+  it("allows a plate-only check-in when state is unknown", async () => {
     fetchSiteContextMock.mockResolvedValue(SITE_CTX);
     submitGatekeeperVisitMock.mockResolvedValue({ ok: true, visitId: 88 });
     renderScreen();
@@ -722,17 +731,16 @@ describe("GatekeeperScreen", () => {
     fireEvent.change(firstByTestId("gate-vehicle-plate"), {
       target: { value: "4412" },
     });
-    fireEvent.change(firstByTestId("gate-site-code"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("gate-site-lookup"));
     tap(await findFirstByTestId("host-option-partner:7"));
     tap(firstByTestId("check-in-btn"));
 
-    expect(submitGatekeeperVisitMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe(
-      "gatekeeper.plateStateRequired",
+    await waitFor(() =>
+      expect(submitGatekeeperVisitMock).toHaveBeenCalledTimes(1),
     );
+    expect(submitGatekeeperVisitMock.mock.calls[0][0]).toMatchObject({
+      vehiclePlate: "4412",
+      plateState: null,
+    });
   });
 
   it("applies the OCR threshold, keeps manual correction, sends state, and clears it after success", async () => {
@@ -795,10 +803,6 @@ describe("GatekeeperScreen", () => {
     fireEvent.change(firstByTestId("gate-last-name"), {
       target: { value: "Hale" },
     });
-    fireEvent.change(firstByTestId("gate-site-code"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("gate-site-lookup"));
     tap(await findFirstByTestId("host-option-partner:7"));
     tap(firstByTestId("check-in-btn"));
 
@@ -873,11 +877,6 @@ describe("GatekeeperScreen", () => {
     fireEvent.change(firstByTestId("gate-last-name"), {
       target: { value: "Doe" },
     });
-    tap(firstByTestId("check-in-btn"));
-    expect(submitGatekeeperVisitMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe(
-      "gatekeeper.plateStateRequired",
-    );
 
     tap(firstByTestId("gate-capture-tag-photo"));
     await waitFor(() => {
@@ -924,10 +923,6 @@ describe("GatekeeperScreen", () => {
       expect(isDisabled(firstByTestId("gate-capture-tag-photo"))).toBe(false);
     });
 
-    fireEvent.change(firstByTestId("gate-site-code"), {
-      target: { value: "ACME-HQ" },
-    });
-    tap(firstByTestId("gate-site-lookup"));
     tap(await findFirstByTestId("host-option-partner:7"));
     tap(firstByTestId("check-in-btn"));
 

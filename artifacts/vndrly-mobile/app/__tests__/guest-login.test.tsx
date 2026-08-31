@@ -237,7 +237,7 @@ describe("GuestLoginScreen — sign-up form", () => {
     ]);
   });
 
-  it("blocks a nonblank plate without state and exposes an accessible error", () => {
+  it("allows a nonblank plate without state", async () => {
     render(<GuestLoginScreen />);
     setText("guest-first-name", "Jane");
     setText("guest-last-name", "Doe");
@@ -246,8 +246,11 @@ describe("GuestLoginScreen — sign-up form", () => {
 
     fireEvent.click(firstByTestId("guest-submit-btn"));
 
-    expect(startGuestSessionMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe("Estado obligatorio");
+    await waitFor(() => expect(startGuestSessionMock).toHaveBeenCalledTimes(1));
+    expect(startGuestSessionMock.mock.calls[0][0]).toMatchObject({
+      vehiclePlate: "ABC123",
+    });
+    expect(startGuestSessionMock.mock.calls[0][0].plateState).toBeUndefined();
   });
 
   it("sends a normalized state separately from the plate number", async () => {

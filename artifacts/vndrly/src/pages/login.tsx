@@ -54,8 +54,8 @@ export default function Login() {
   const [location, navigate] = useLocation();
 
   useEffect(() => {
-    if (user && (location === "/login" || location === "/login/")) {
-      navigate("/", { replace: true });
+    if (user && (location === "/login" || location === "/login/" || location === "/gate")) {
+      navigate(user.vendorRole === "gatekeeper" ? "/gate" : "/", { replace: true });
     }
   }, [user, location, navigate]);
 
@@ -125,7 +125,7 @@ export default function Login() {
     setIsSubmitting(true);
     try {
       await login(account.username, account.password);
-      navigate("/", { replace: true });
+      navigate(location.startsWith("/gate") ? "/gate" : "/", { replace: true });
     } catch (err) {
       toast({
         title: translateApiError(err, t, t("login.loginFailed")),
@@ -196,7 +196,7 @@ export default function Login() {
     setIsSubmitting(true);
     try {
       await login(username, password);
-      navigate("/", { replace: true });
+      navigate(location.startsWith("/gate") ? "/gate" : "/", { replace: true });
     } catch (err) {
       toast({
         title: translateApiError(err, t, t("login.loginFailed")),
@@ -346,11 +346,11 @@ export default function Login() {
             })()}
             <div className="flex-1 min-w-0">
               <h1 className={cn("text-2xl font-bold tracking-tight leading-none", isDark ? "text-white" : "text-gray-900")}>{branded && brand.name ? brand.name : "VNDRLY"}</h1>
-              <p className={cn("text-sm font-semibold leading-tight mt-1", isDark ? "text-gray-200" : "text-gray-700")}>{t("login.title")}</p>
+              <p className={cn("text-sm font-semibold leading-tight mt-1", isDark ? "text-gray-200" : "text-gray-700")}>{location.startsWith("/gate") ? t("login.gateTitle") : t("login.title")}</p>
             </div>
           </div>
           <div className="mb-8">
-            <p className={cn("text-xs", isDark ? "text-gray-300" : "text-gray-500")}>{t("login.subtitle")}</p>
+            <p className={cn("text-xs", isDark ? "text-gray-300" : "text-gray-500")}>{location.startsWith("/gate") ? t("login.gateSubtitle") : t("login.subtitle")}</p>
           </div>
 
           <div
@@ -398,7 +398,7 @@ export default function Login() {
               </div>
               <div className="pt-2">
                 <button type="submit" className="sr-only" tabIndex={-1} disabled={!formReady || isSubmitting}>
-                  {t("login.signIn")}
+                  {location.startsWith("/gate") ? t("login.gateSignIn") : t("login.signIn")}
                 </button>
                 <SidebarButton
                   isActive={false}
@@ -412,7 +412,7 @@ export default function Login() {
                   }}
                 >
                   <LogIn className="w-4 h-4" />
-                  {isSubmitting ? t("login.signingIn") : t("login.signIn")}
+                  {isSubmitting ? t("login.signingIn") : location.startsWith("/gate") ? t("login.gateSignIn") : t("login.signIn")}
                 </SidebarButton>
               </div>
             </form>

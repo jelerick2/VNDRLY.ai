@@ -6,24 +6,33 @@ VNDRLY is a full-stack web application designed to streamline oil & gas field op
 ## User Preferences
 I prefer clear, concise explanations and an iterative development approach. Please ask before making any major architectural changes or introducing new external dependencies. I value well-documented code and a focus on maintainability.
 
-### STANDING RULE — RELEASE COMMAND IS END-TO-END AUTHORIZATION
-For this repository, the user's imperative instruction **"commit, push, deploy,
-and ship"** (or an unambiguous equivalent) is one complete release command. It
-remains in effect through troubleshooting and safe retries until the requested
-change is live. Do not pause to request approval again between these stages.
-**"full ship"** is the same one-task authorization as **"commit, push, deploy,
-and ship"**.
+### STANDING RULE — FULL SHIP UPDATES EVERYTHING ONLINE
+**"full ship"** (also **"commit, push, deploy, and ship"**) means
+**update everything online**. Do not ask whether a track is included.
+Do not treat any of these as optional, later, or "separate":
 
-1. Commit the scoped, verified changes.
-2. Push the working branch.
-3. Integrate into `main` with a non-force fast-forward or merge.
-4. Run or allow the configured production web deployment and any
-   fingerprint-compatible Expo OTA workflow.
-5. Monitor the release and verify the live web/Expo result.
+1. **Commit** the changes.
+2. **Push** and advance `main` (non-force) so the GitHub repo is current.
+3. **VPS / web** — `.github/workflows/publish.yml` (live site).
+4. **API** — `.github/workflows/deploy-api.yml` (dispatch if the path
+   filter did not fire). Verify `https://vndrly.ai/api/healthz`.
+5. **Supabase** — production Postgres + Storage behind that API.
+   Run every new guarded `migrate:*` (additive `ADD COLUMN IF NOT
+   EXISTS` only) as part of API deploy. Apply storage/bucket
+   provision only when the ship includes storage changes. Never
+   drizzle-push, DROP, TRUNCATE, or restore-over-live.
+6. **iOS OTA** — `.github/workflows/mobile-ota.yml`.
+7. **TestFlight** — `.github/workflows/mobile-testflight.yml`
+   (`workflow_dispatch`). Native build and submit. This is the most
+   important track. VNDRLY is an **app-driven database**. A full
+   ship is not done until TestFlight is submitted.
+
+Stay on it through troubleshooting until all seven are live. Do not
+pause to re-ask permission between stages.
 
 This standing authorization never permits a force push/history rewrite,
-destructive database action, credential rotation, or a new native App Store
-binary/submission. Those operations retain their specific approval rules.
+destructive database action, or credential rotation. App Store
+"Ready for Sale" still needs an explicit ask. TestFlight does not.
 
 #### RELEASE FAST PATH — 10-MINUTE TARGET, 15-MINUTE ESCALATION
 Once the exact release tree has passed its required verification, the
@@ -42,17 +51,19 @@ Follow this path without adding approval or duplicate-validation delays:
 3. Publish the working branch and advance `main` in the same non-force pass
    after confirming the current remote `main` parent. Avoid intermediate
    release-only commits unless they fix a demonstrated failure.
-4. Start monitoring the GitHub web deployment and any eligible Expo OTA run
-   concurrently. Verify the public route from the deployed commit as soon as
-   the web job succeeds.
-5. TestFlight is a separate track and never blocks web completion. Report the
-   web release when it is live, then continue an explicitly authorized native
-   build/submission independently.
+4. Start monitoring web Publish, API Deploy (including guarded
+   Supabase migrations), Expo OTA, and the TestFlight build/submit
+   concurrently. Verify `https://vndrly.ai` / `/gate`,
+   `https://vndrly.ai/api/healthz`, the Expo update group, and the
+   TestFlight build.
+5. Full ship is not complete until TestFlight is submitted. Web
+   or API going live first does not finish the ship. Fix native
+   blockers under the same release command.
 6. On failure, retrieve the exact job logs, fix the root cause, and retry under
    the standing release authorization. Do not pause to ask permission again
    for a safe retry already covered by the release command.
-7. The release handoff must include the commit, workflow result, public
-   verification, and elapsed commit-to-live time.
+7. The release handoff must include the commit, workflow results, public
+   verification, TestFlight status, and elapsed commit-to-live time.
 
 The detailed checklist and measured baseline are in
 `docs/release-fast-path.md`.

@@ -112,6 +112,9 @@ const tables = {
     "platePhotoUrl",
     "vehiclePhotoUrl",
     "purpose",
+    "notes",
+    "checkOutNotes",
+    "admissionStatus",
     "expectedDurationMinutes",
     "hostType",
     "hostPartnerId",
@@ -2527,5 +2530,57 @@ describe("guest visit flow (e2e via route layer)", () => {
       .set("Authorization", `Bearer ${guest.token}`);
     expectStatus(after, 200);
     expect(after.body).toBeNull();
+  });
+});
+
+describe("visit notes, optional plate state, and self-check-in admission", () => {
+  it("accepts a plate without state when the rollout flag is off", async () => {
+    const { site } = seedScenario();
+    const guest = await startGuest({ vehiclePlate: "DIRTY1", plateState: undefined });
+    const checkIn = await request(app)
+      .post("/api/visits/check-in")
+      .set("Authorization", `Bearer ${guest.token}`)
+      .send({
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: 1,
+        vehiclePlate: "DIRTY1",
+        notes: " specialty tag, no state ",
+        latitude: 40.0,
+        longitude: -74.0,
+      });
+    expectStatus(checkIn, 201);
+    expect(checkIn.body).toMatchObject({
+      vehiclePlate: "DIRTY1",
+      plateState: null,
+      notes: "specialty tag, no state",
+      admissionStatus: "pending",
+    });
+  });
+
+  it("stores check-out notes on a self-checked-in visit", async () => {
+    const { site } = seedScenario();
+    const guest = await startGuest();
+    const checkIn = await request(app)
+      .post("/api/visits/check-in")
+      .set("Authorization", `Bearer ${guest.token}`)
+      .send({
+        siteLocationId: site.id,
+        hostType: "partner",
+        hostPartnerId: 1,
+        latitude: 40.0,
+        longitude: -74.0,
+      });
+    expectStatus(checkIn, 201);
+    const checkOut = await request(app)
+      .post(`/api/visits/${checkIn.body.id}/check-out`)
+      .set("Authorization", `Bearer ${guest.token}`)
+      .send({
+        latitude: 40.0,
+        longitude: -74.0,
+        notes: "left through the south gate",
+      });
+    expectStatus(checkOut, 200);
+    expect(checkOut.body.checkOutNotes).toBe("left through the south gate");
   });
 });

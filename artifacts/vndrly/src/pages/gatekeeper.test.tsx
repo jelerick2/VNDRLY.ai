@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   listAssignedGateSites: vi.fn(),
   listPreferredPlateStates: vi.fn(),
   readPlate: vi.fn(),
+  gateAdmit: vi.fn(),
 }));
 const liveMonitor = vi.hoisted(() => ({
   flash: null as Record<string, unknown> | null,
@@ -194,12 +195,23 @@ beforeEach(() => {
         coords: { latitude: number; longitude: number };
       }) => void,
     ) => {
-      success({ coords: { latitude: 35.4, longitude: -97.5 } });
+      success({ coords: { latitude: 37.7, longitude: -122.4 } });
     },
   );
   Object.defineProperty(navigator, "geolocation", {
     configurable: true,
-    value: { getCurrentPosition: geolocationMock },
+    value: {
+      getCurrentPosition: geolocationMock,
+      watchPosition: (
+        success: (position: {
+          coords: { latitude: number; longitude: number };
+        }) => void,
+      ) => {
+        success({ coords: { latitude: 37.7, longitude: -122.4 } });
+        return 1;
+      },
+      clearWatch: vi.fn(),
+    },
   });
 });
 
@@ -258,7 +270,7 @@ describe("GatekeeperPage plate state", () => {
     const trigger = screen.getByRole("button", { name: "Select plate state" });
     const plateInput = screen.getByTestId("input-gate-plate");
     expect(
-      trigger.compareDocumentPosition(plateInput) &
+      plateInput.compareDocumentPosition(trigger) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
@@ -289,7 +301,7 @@ describe("GatekeeperPage plate state", () => {
     ).toEqual(["California (CA)", "Texas (TX)", "New York (NY)"]);
   });
 
-  it("blocks a missing state before geolocation or check-in and exposes an accessible error", async () => {
+  it("allows a plate-only check-in when state is unknown and GPS is inside the fence", async () => {
     renderPage();
     await screen.findByTestId("input-gate-plate");
     fireEvent.change(screen.getByTestId("input-gate-first-name"), {
@@ -315,11 +327,11 @@ describe("GatekeeperPage plate state", () => {
       screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }),
     );
 
-    expect(geolocationMock).not.toHaveBeenCalled();
-    expect(api.gateCheckIn).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert").textContent).toBe(
-      "gatekeeper.plateStateRequired",
-    );
+    await waitFor(() => expect(api.gateCheckIn).toHaveBeenCalledTimes(1));
+    expect(api.gateCheckIn.mock.calls[0][0]).toMatchObject({
+      vehiclePlate: "4412",
+    });
+    expect(api.gateCheckIn.mock.calls[0][0].plateState).toBeUndefined();
   });
 
   it("uses the OCR confidence threshold, preserves manual correction, sends state, and resets it", async () => {
@@ -472,10 +484,7 @@ describe("GatekeeperPage plate state", () => {
       fireEvent.click(
         screen.getByRole("button", { name: "gatekeeper.checkInVisitor" }),
       );
-      expect(api.gateCheckIn).not.toHaveBeenCalled();
-      expect(screen.getByRole("alert").textContent).toBe(
-        "gatekeeper.plateStateRequired",
-      );
+      await waitFor(() => expect(api.gateCheckIn).toHaveBeenCalled());
 
       await speak("state TX plate FINAL 9 driver Jane Doe");
       await waitFor(() => {

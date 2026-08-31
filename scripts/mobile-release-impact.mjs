@@ -53,9 +53,17 @@ const nativeExact = new Set([
   "artifacts/vndrly-mobile/eas.json",
   "artifacts/vndrly-mobile/metro.config.js",
   "artifacts/vndrly-mobile/babel.config.js",
-  "pnpm-lock.yaml",
   "eas.json",
 ]);
+
+const packageJsonFiles = [
+  "package.json",
+  "artifacts/vndrly-mobile/package.json",
+];
+
+function isWorkspaceProtocol(value) {
+  return typeof value === "string" && value.startsWith("workspace:");
+}
 
 const nativePrefixes = [
   "artifacts/vndrly-mobile/plugins/",
@@ -89,27 +97,79 @@ function readWorkingJson(file) {
   }
 }
 
-function packageDependencyChanged(file, baseRef = null) {
+const dependencyKeys = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+  "resolutions",
+  "overrides",
+  "packageManager",
+];
+
+function collectDependencyEntries(pkg) {
+  const entries = new Map();
+  if (!pkg || typeof pkg !== "object") return entries;
+  for (const key of dependencyKeys) {
+    const block = pkg[key];
+    if (key === "packageManager") {
+      if (typeof block === "string") entries.set(key, block);
+      continue;
+    }
+    if (!block || typeof block !== "object") continue;
+    for (const [name, version] of Object.entries(block)) {
+      entries.set(`${key}:${name}`, version);
+    }
+  }
+  return entries;
+}
+
+function classifyPackageDependencyChange(file, baseRef = null) {
   const before = readJsonAtRef(baseRef ?? "HEAD", file);
   const after = readWorkingJson(file);
-  if (!before || !after) return true;
+  if (!before && !after) return "none";
+  if (!before || !after) return "native";
 
-  const keys = [
-    "dependencies",
-    "devDependencies",
-    "peerDependencies",
-    "optionalDependencies",
-    "resolutions",
-    "overrides",
-    "packageManager",
-  ];
+  const beforeMap = collectDependencyEntries(before);
+  const afterMap = collectDependencyEntries(after);
+  const names = new Set([...beforeMap.keys(), ...afterMap.keys()]);
+  let sawWorkspace = false;
 
-  return keys.some((key) => JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null));
+  for (const name of names) {
+    const previous = beforeMap.get(name);
+    const next = afterMap.get(name);
+    if (JSON.stringify(previous ?? null) === JSON.stringify(next ?? null)) {
+      continue;
+    }
+    if (
+      (previous === undefined && isWorkspaceProtocol(next)) ||
+      (next === undefined && isWorkspaceProtocol(previous)) ||
+      (isWorkspaceProtocol(previous) && isWorkspaceProtocol(next))
+    ) {
+      sawWorkspace = true;
+      continue;
+    }
+    return "native";
+  }
+
+  return sawWorkspace ? "workspace-only" : "none";
+}
+
+function lockfileRequiresNativeBuild(baseRef = null) {
+  const classes = packageJsonFiles.map((file) =>
+    classifyPackageDependencyChange(file, baseRef),
+  );
+  if (classes.includes("native")) return true;
+  if (classes.includes("workspace-only")) return false;
+  return true;
 }
 
 function isNativeImpact(file, baseRef = null) {
-  if (file === "package.json" || file === "artifacts/vndrly-mobile/package.json") {
-    return packageDependencyChanged(file, baseRef);
+  if (packageJsonFiles.includes(file)) {
+    return classifyPackageDependencyChange(file, baseRef) === "native";
+  }
+  if (file === "pnpm-lock.yaml") {
+    return lockfileRequiresNativeBuild(baseRef);
   }
   if (nativeExact.has(file)) return true;
   if (nativePrefixes.some((prefix) => file.startsWith(prefix))) return true;

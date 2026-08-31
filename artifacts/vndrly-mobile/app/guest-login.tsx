@@ -56,15 +56,13 @@ export default function GuestLoginScreen() {
   const firstNameMissing = firstName.trim().length === 0;
   const lastNameMissing = lastName.trim().length === 0;
   const safetyMissing = !safety;
-  const plateStateMissing = vehiclePlate.trim().length > 0 && !plateState;
-  const isValid = !firstNameMissing && !lastNameMissing && !safetyMissing && !plateStateMissing;
+  const isValid = !firstNameMissing && !lastNameMissing && !safetyMissing;
 
   const showFirstNameHint =
     firstNameMissing && (firstNameTouched || attemptedSubmit);
   const showLastNameHint =
     lastNameMissing && (lastNameTouched || attemptedSubmit);
   const showSafetyHint = safetyMissing && attemptedSubmit;
-  const showPlateStateHint = plateStateMissing && attemptedSubmit;
 
   const onSubmit = async () => {
     if (!isValid) {
@@ -171,12 +169,11 @@ export default function GuestLoginScreen() {
           <Text style={labelStyle}>{t("visitor.company")}</Text>
           <TextInput testID="guest-company" value={company} onChangeText={setCompany} style={inputStyle} placeholderTextColor={colors.mutedForeground} />
 
-          <Text style={labelStyle}>{t("visitor.plateState")}</Text>
+          <Text style={labelStyle}>{t("visitor.plateStateOptional")}</Text>
           <PlateStatePicker
             value={plateState}
             onChange={setPlateState}
             preferredStates={NATIONAL_PLATE_STATE_FALLBACK}
-            error={showPlateStateHint ? t("visitor.plateStateRequired") : undefined}
           />
 
           <Text style={labelStyle}>{t("visitor.vehiclePlate")}</Text>

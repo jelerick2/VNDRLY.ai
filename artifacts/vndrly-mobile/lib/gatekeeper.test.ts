@@ -89,7 +89,7 @@ describe("submitGatekeeperVisit", () => {
     expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
   });
 
-  it("requires a plate state before requesting location", async () => {
+  it("allows a plate-only check-in when state is unknown", async () => {
     const { submitGatekeeperVisit } = await import("./gatekeeper");
     const result = await submitGatekeeperVisit({
       ctx: baseCtx,
@@ -100,11 +100,15 @@ describe("submitGatekeeperVisit", () => {
       vehiclePlate: "4412",
       plateState: null,
       purpose: "Water haul",
+      notes: "  muddy specialty tag  ",
       durationStr: "45",
     });
-    expect(result).toEqual({ ok: false, reason: "missing-state" });
-    expect(requestForegroundPermissionsAsyncMock).not.toHaveBeenCalled();
-    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, visitId: 88 });
+    const [, options] = apiFetchMock.mock.calls[0] as [string, { body: string }];
+    const body = JSON.parse(options.body) as Record<string, unknown>;
+    expect(body.vehiclePlate).toBe("4412");
+    expect(body.plateState).toBeUndefined();
+    expect(body.notes).toBe("muddy specialty tag");
   });
 
   it("posts tag and vehicle photo URLs and omits phone and email", async () => {

@@ -58,6 +58,7 @@ if [ -z "$database_url" ]; then
   exit 1
 fi
 sudo -u vndrly env HOME=/home/vndrly DATABASE_URL="$database_url" pnpm --filter @workspace/api-server run migrate:plate-state
+sudo -u vndrly env HOME=/home/vndrly DATABASE_URL="$database_url" pnpm --filter @workspace/api-server run migrate:notes-admission
 unset database_url
 sudo systemctl daemon-reload
 sudo systemctl enable vndrly-api 2>/dev/null || true

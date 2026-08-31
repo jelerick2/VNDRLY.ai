@@ -22,6 +22,9 @@ function visit(overrides: Partial<VisitorRow> = {}): VisitorRow {
     platePhotoUrl: null,
     vehiclePhotoUrl: null,
     purpose: "Water haul",
+    notes: null,
+    checkOutNotes: null,
+    admissionStatus: "admitted",
     expectedDurationMinutes: 45,
     hostType: "partner",
     hostPartnerId: 566,
@@ -48,6 +51,7 @@ function draft(overrides: Partial<GateEntryDraft> = {}): GateEntryDraft {
     vehiclePlate: "",
     plateState: null,
     purpose: "",
+    notes: "",
     expectedDuration: "60",
     ...overrides,
   };
@@ -134,15 +138,64 @@ describe("evaluateGateMemory", () => {
     expect(result.suggestions).toEqual([]);
   });
 
-  it("waits for a state before returning plate-number memory", () => {
+  it("fills last driver and company from a known plate even without a state", () => {
     const result = evaluateGateMemory({
       visits: [visit({ vehiclePlate: "4412", plateState: "OK" })],
       draft: draft({ vehiclePlate: "4412", plateState: null }),
       activeField: "vehiclePlate",
     });
 
-    expect(result.fill).toBeNull();
-    expect(result.suggestions).toEqual([]);
+    expect(result.fill).toMatchObject({
+      firstName: "Jordan",
+      lastName: "Hale",
+      company: "Peak Energy",
+    });
+    expect(result.suggestions).toHaveLength(1);
+  });
+
+  it("suggests company drivers without auto-guessing when replacing the last driver", () => {
+    const other = visit({
+      id: 41,
+      firstName: "Riley",
+      lastName: "Cho",
+      vehiclePlate: "4412",
+      plateState: "OK",
+      checkInTime: "2026-08-21T10:00:00Z",
+    });
+    const result = evaluateGateMemory({
+      visits: [visit({ vehiclePlate: "4412", plateState: "OK" }), other],
+      draft: draft({
+        vehiclePlate: "4412",
+        plateState: null,
+        company: "Peak Energy",
+        firstName: "Ri",
+      }),
+      activeField: "firstName",
+    });
+
+    expect(result.suggestions.map((row) => row.visit.firstName)).toEqual(["Riley"]);
+    expect(result.fill).toMatchObject({ firstName: "Riley", lastName: "Cho" });
+  });
+
+  it("does not auto-guess a driver when a company prefix matches multiple people", () => {
+    const other = visit({
+      id: 42,
+      firstName: "Riley",
+      lastName: "Cho",
+      vehiclePlate: "TX-8801",
+      plateState: "TX",
+      checkInTime: "2026-08-21T10:00:00Z",
+    });
+    const result = evaluateGateMemory({
+      visits: [visit(), other],
+      draft: draft({ company: "Peak" }),
+      activeField: "company",
+    });
+
+    expect(result.suggestions).toHaveLength(1);
+    expect(result.fill?.firstName).toBeUndefined();
+    expect(result.fill?.lastName).toBeUndefined();
+    expect(result.fill).toMatchObject({ company: "Peak Energy" });
   });
 
   it("prioritizes an exact state and number match over newer legacy and different-state rows", () => {

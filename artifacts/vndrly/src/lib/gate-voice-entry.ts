@@ -14,12 +14,20 @@ export type GateCheckoutVisit = {
 
 const CHECK_OUT = /\b(?:check\s*out|checking\s*out)\b/i;
 const CHECK_IN = /\b(?:check\s*in|checking\s*in)\b/i;
-const FIELD_LABELS = "license plate|plate|tag|driver name|driver|name|company|from|with|truck|vehicle|purpose|reason|here for|for|here to|duration|time|checking in|check in|checking out|check out";
+const FIELD_LABELS = "license plate|plate|tag|driver name|driver|name|company|from|with|truck|vehicle|purpose|reason|here for|for|here to|notes|note|remark|comment|duration|time|checking in|check in|checking out|check out";
 
 function valueAfter(text: string, labels: string[]): string | undefined {
   const label = labels.join("|");
   return new RegExp(`(?:${label})\\s*(?:is|number|name)?\\s*[:,-]?\\s*(.+?)(?=\\s+(?:${FIELD_LABELS})\\b|$)`, "i")
     .exec(text)?.[1]?.trim().replace(/[.,;]+$/g, "");
+}
+
+function valueAfterToEnd(text: string, labels: string[]): string | undefined {
+  const label = labels.join("|");
+  return new RegExp(`(?:${label})\\s*(?:is|:)?\\s*(.+)$`, "i")
+    .exec(text)?.[1]?.trim()
+    .replace(/\s+(?:checking\s+out|check\s+out|checking\s+in|check\s+in)\b.*$/i, "")
+    .replace(/[.,;]+$/g, "") || undefined;
 }
 
 function applyName(result: Partial<GateEntryDraft>, driver: string | undefined): void {
@@ -32,7 +40,7 @@ function applyName(result: Partial<GateEntryDraft>, driver: string | undefined):
 function implicitDriver(text: string): string | undefined {
   const withoutAction = text.replace(CHECK_OUT, " ").replace(CHECK_IN, " ").trim();
   const withoutLead = withoutAction.replace(/^(?:please\s+)?(?:the\s+)?(?:visitor\s+)?/i, "");
-  const cutoff = withoutLead.search(/\b(?:from|with|company|license\s+plate|plate|tag|truck|vehicle|purpose|reason|here\s+for|for|here\s+to|duration|time)\b/i);
+  const cutoff = withoutLead.search(/\b(?:from|with|company|license\s+plate|plate|tag|truck|vehicle|purpose|reason|here\s+for|for|here\s+to|notes|note|remark|comment|duration|time)\b/i);
   const candidate = (cutoff >= 0 ? withoutLead.slice(0, cutoff) : withoutLead)
     .replace(/^(?:driver|name)\s+/i, "")
     .trim()
@@ -47,6 +55,7 @@ export function parseGateVoiceEntry(transcript: string): Partial<GateEntryDraft>
   const driver = valueAfter(text, ["driver name", "driver", "name"]);
   const company = valueAfter(text, ["company", "from", "with"]);
   const purpose = valueAfter(text, ["purpose", "reason", "here for", "for", "here to"]);
+  const notes = valueAfterToEnd(text, ["notes", "note", "remark", "comment"]);
   const duration = valueAfter(text, ["duration", "time"]);
   const result: Partial<GateEntryDraft> = {};
   const plateState = parseSpokenPlateState(text);
@@ -55,6 +64,7 @@ export function parseGateVoiceEntry(transcript: string): Partial<GateEntryDraft>
   applyName(result, driver);
   if (company) result.company = company;
   if (purpose) result.purpose = purpose;
+  if (notes) result.notes = notes.replace(/\s+(?:checking\s+out|check\s+out|checking\s+in|check\s+in)\b.*$/i, "").trim();
   const minutes = duration?.match(/\d+/)?.[0];
   if (minutes) result.expectedDuration = minutes;
   return result;

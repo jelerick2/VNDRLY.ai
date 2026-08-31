@@ -1,0 +1,68 @@
+name: Publish Mobile TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: Message attached to the EAS production iOS build.
+        required: false
+        default: Full ship TestFlight
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vndrly-production-testflight
+  cancel-in-progress: false
+
+jobs:
+  build-and-submit-ios:
+    name: Build iOS and submit to TestFlight
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify Expo authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::error title=Missing Expo secret::EXPO_TOKEN is not configured"
+            exit 1
+          fi
+          pnpm --filter @workspace/vndrly-mobile exec eas whoami --non-interactive
+
+      - name: Build iOS production
+        working-directory: artifacts/vndrly-mobile
+        env:
+          EAS_NO_VCS: 1
+        run: >-
+          pnpm exec eas build
+          --platform ios
+          --profile production
+          --non-interactive
+          --wait
+          --message "${{ inputs.message }} (${{ github.sha }})"
+
+      - name: Submit latest iOS build to TestFlight
+        working-directory: artifacts/vndrly-mobile
+        run: >-
+          pnpm exec eas submit
+          --platform ios
+          --latest
+          --non-interactive
+          --wait

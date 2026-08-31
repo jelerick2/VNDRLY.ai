@@ -1,0 +1,94 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/api-server/**"
+      - "lib/db/drizzle/**"
+      - "scripts/plate-state-migration.mjs"
+      - "scripts/notes-admission-migration.mjs"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vndrly-production-api
+  cancel-in-progress: false
+
+jobs:
+  deploy-api:
+    name: Deploy API to GoDaddy VPS
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      EXPECTED_SHA: ${{ github.sha }}
+    steps:
+      - name: Verify deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in VPS_HOST VPS_USER VPS_PASSWORD VPS_PORT; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error title=Missing deployment secret::$name is not configured"
+              exit 1
+            fi
+          done
+
+      - name: Install SSH deployment tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends sshpass
+
+      - name: Fetch, build, migrate, and restart API
+        shell: bash
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          sshpass -e ssh \
+            -p "$VPS_PORT" \
+            -o ConnectTimeout=20 \
+            -o PreferredAuthentications=password \
+            -o PubkeyAuthentication=no \
+            -o StrictHostKeyChecking=accept-new \
+            "$VPS_USER@$VPS_HOST" \
+            "EXPECTED_SHA=$(printf '%s' "$EXPECTED_SHA") bash -s" <<'REMOTE'
+          set -euo pipefail
+          APP_DIR=/var/www/vndrly
+          cd "$APP_DIR"
+          sudo -u vndrly git remote set-url origin https://github.com/vndrly/VNDRLY.ai.git
+          sudo -u vndrly git fetch origin main
+          sudo -u vndrly git reset --hard "$EXPECTED_SHA"
+          actual="$(sudo -u vndrly git rev-parse HEAD)"
+          if [ "$actual" != "$EXPECTED_SHA" ]; then
+            echo "VPS HEAD $actual does not match $EXPECTED_SHA" >&2
+            exit 1
+          fi
+          export CI=true
+          sudo -u vndrly env HOME=/home/vndrly pnpm install --frozen-lockfile
+          sudo -u vndrly env HOME=/home/vndrly pnpm --filter @workspace/api-server run build
+          database_url="$(sudo sed -n 's/^DATABASE_URL=//p' .env.production | head -n 1)"
+          if [ -z "$database_url" ]; then
+            echo "DATABASE_URL missing from .env.production; refusing API restart" >&2
+            exit 1
+          fi
+          sudo -u vndrly env HOME=/home/vndrly DATABASE_URL="$database_url" pnpm --filter @workspace/api-server run migrate:plate-state
+          sudo -u vndrly env HOME=/home/vndrly DATABASE_URL="$database_url" pnpm --filter @workspace/api-server run migrate:notes-admission
+          unset database_url
+          sudo systemctl daemon-reload
+          sudo systemctl enable vndrly-api 2>/dev/null || true
+          sudo systemctl restart vndrly-api
+          REMOTE
+
+      - name: Verify API health
+        run: curl --fail --silent --show-error --retry 8 --retry-delay 3 https://vndrly.ai/api/healthz

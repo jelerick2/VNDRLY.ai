@@ -129,6 +129,14 @@ function LoginRedirect() {
   return null;
 }
 
+function GatekeeperRootRedirect() {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate("/gate", { replace: true });
+  }, [navigate]);
+  return null;
+}
+
 function AdminRoutes() {
   return (
     <Layout>
@@ -225,6 +233,9 @@ function AuthenticatedRouter() {
             <Switch>
               <Route path="/gate/history" component={GateHistoryPage} />
               <Route path="/gate" component={GatekeeperPage} />
+              <Route path="/">
+                <GatekeeperRootRedirect />
+              </Route>
               <Route path="/*splat" component={GatekeeperPage} />
             </Switch>
           </GatePortalLayout>

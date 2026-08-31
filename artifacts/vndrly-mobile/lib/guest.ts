@@ -91,6 +91,21 @@ export async function fetchPreferredPlateStates(
   );
 }
 
+export type PublicSite = {
+  id: number;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  siteRadiusMeters: number;
+  siteCode: string;
+  partnerName?: string | null;
+};
+
+export async function fetchPublicSites(): Promise<PublicSite[]> {
+  return apiFetch<PublicSite[]>("/api/visits/public-sites");
+}
+
 export type ActiveVisit = {
   id: number;
   firstName?: string | null;
@@ -103,6 +118,9 @@ export type ActiveVisit = {
   hostPartnerName: string | null;
   hostVendorName: string | null;
   purpose: string | null;
+  notes?: string | null;
+  checkOutNotes?: string | null;
+  admissionStatus?: "pending" | "admitted" | null;
   vehiclePlate: string | null;
   plateState: PlateStateCode | null;
   platePhotoUrl: string | null;
@@ -123,6 +141,7 @@ export async function visitorCheckIn(input: {
   hostPartnerId?: number;
   hostVendorId?: number;
   purpose?: string;
+  notes?: string;
   expectedDurationMinutes?: number;
   vehiclePlate?: string;
   plateState?: string;
@@ -141,10 +160,11 @@ export async function visitorCheckOut(
   visitId: number,
   latitude?: number,
   longitude?: number,
+  notes?: string,
 ): Promise<void> {
   await apiFetch(`/api/visits/${visitId}/check-out`, {
     method: "POST",
-    body: JSON.stringify({ latitude, longitude }),
+    body: JSON.stringify({ latitude, longitude, notes }),
   });
 }
 

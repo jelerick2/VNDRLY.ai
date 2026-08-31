@@ -1,6 +1,7 @@
+import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PILL_ACTION } from "@/lib/pill-palette-assets";
 
@@ -8,31 +9,28 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock("@/hooks/use-auth", () => ({
-  useAuth: () => ({ user: { userId: 1, vendorId: 42 } }),
-}));
-
-vi.mock("@/hooks/use-brand", () => ({
-  useBrand: () => ({ isOrgBranded: true, primary: "#159fb2" }),
-}));
-
-vi.mock("@/hooks/use-gate-live-monitor", () => ({
-  useGateLiveMonitor: () => ({ flash: null, liveStatus: "live" }),
-}));
-
 vi.mock("@/lib/visits-api", () => ({
-  listAllVisits: vi.fn(async () => []),
-  visitsApi: {
-    list: vi.fn(async () => []),
-    listAssignedGateSites: vi.fn(async () => ({ sites: [], defaultSite: null })),
-    getSiteContext: vi.fn(),
-    readPlate: vi.fn(),
-    gateCheckIn: vi.fn(),
-    gateCheckOut: vi.fn(),
-  },
+  listAllVisits: vi.fn(async () => [
+    {
+      id: 1,
+      firstName: "Jordan",
+      lastName: "Hale",
+      vehiclePlate: "4412",
+      plateState: "OK",
+      checkInTime: "2026-08-23T10:00:00Z",
+      checkOutTime: null,
+    },
+  ]),
 }));
 
-import GatekeeperPage from "./gatekeeper";
+vi.mock("wouter", () => ({
+  Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
+    <a href={href}>{children}</a>
+  ),
+  useLocation: () => ["/gate/history", vi.fn()],
+}));
+
+import GateHistoryPage from "./gate-history";
 
 function renderPage() {
   const client = new QueryClient({
@@ -40,7 +38,7 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <GatekeeperPage />
+      <GateHistoryPage />
     </QueryClientProvider>,
   );
 }
@@ -49,18 +47,11 @@ function pillSrcs(el: HTMLElement): string[] {
   return Array.from(el.querySelectorAll("img")).map((img) => img.getAttribute("src") ?? "");
 }
 
-beforeEach(() => {
-  Object.defineProperty(navigator, "mediaDevices", {
-    configurable: true,
-    value: { getUserMedia: vi.fn() },
-  });
-});
-
 afterEach(() => {
   cleanup();
 });
 
-describe("GatekeeperPage Gate log export pills", () => {
+describe("Gate history export pills", () => {
   it("uses the red palette pill for PDF and the green palette pill for Excel", async () => {
     renderPage();
     const pdf = await screen.findByTestId("button-gate-export-pdf");

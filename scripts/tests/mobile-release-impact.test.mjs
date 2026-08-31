@@ -110,3 +110,38 @@ test("base-ref rejects committed native dependency changes", async () => {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("workspace TypeScript package links are OTA-safe even when the lockfile changes", async () => {
+  const root = await createRepo();
+  try {
+    await writeFile(
+      path.join(root, "artifacts/vndrly-mobile/package.json"),
+      JSON.stringify({
+        dependencies: {
+          expo: "54.0.0",
+          "@workspace/gate-booth": "workspace:*",
+        },
+      }) + "\n",
+    );
+    await writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    await writeFile(
+      path.join(root, "artifacts/vndrly-mobile/app/gate.tsx"),
+      "export const gate = 2;\n",
+    );
+    git(root, "add", ".");
+    git(root, "commit", "--quiet", "-m", "js workspace helper");
+
+    const result = inspect(root, "HEAD^");
+    assert.equal(result.status, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.deepEqual(report.mobileFiles.sort(), [
+      "artifacts/vndrly-mobile/app/gate.tsx",
+      "artifacts/vndrly-mobile/package.json",
+      "pnpm-lock.yaml",
+    ]);
+    assert.deepEqual(report.nativeImpactFiles, []);
+    assert.equal(report.requiresNativeBuild, false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

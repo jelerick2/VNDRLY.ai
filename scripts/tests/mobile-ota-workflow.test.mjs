@@ -21,13 +21,17 @@ test("mobile OTA is a manual, guarded iOS production release", () => {
   assert.doesNotMatch(workflow, /^\s*push:\s*$/m);
   assert.match(workflow, /secrets\.EXPO_TOKEN/);
   assert.match(workflow, /eas build:list/);
+  assert.match(workflow, /node scripts\/eas-production-runtime-commit\.mjs/);
   assert.match(workflow, /node scripts\/mobile-release-impact\.mjs/);
   assert.match(workflow, /--base-ref/);
   assert.match(
     workflow,
     /pnpm --filter @workspace\/vndrly-mobile run typecheck/,
   );
-  assert.match(workflow, /pnpm --filter @workspace\/vndrly-mobile run test/);
+  assert.match(
+    workflow,
+    /pnpm --filter @workspace\/vndrly-mobile exec vitest run --maxWorkers=2 --retry=1/,
+  );
   assert.match(
     workflow,
     /eas update[\s\S]*--channel production[\s\S]*--environment production[\s\S]*--platform ios/,
@@ -79,5 +83,12 @@ test("EAS validates and publishes with the production Node runtime", () => {
   assert.match(
     easWorkflow,
     /defaults:\s*\n\s+tools:\s*\n\s+node:\s*22\.14\.0/,
+  );
+});
+
+test("mobile OTA records the 2026-08-28 full-ship release-path verification", () => {
+  assert.match(
+    workflow,
+    /Full-ship release-path verification: 2026-08-28T15:50Z/,
   );
 });
