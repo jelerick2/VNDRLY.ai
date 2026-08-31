@@ -93,7 +93,13 @@ describe("PlateStatePicker", () => {
     await user.click(screen.getByRole("button", { name: "Select plate state" }));
 
     expect(screen.getByRole("dialog", { name: "Plate state" })).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "Search states" })).toBeTruthy();
+    const search = screen.getByRole("combobox", { name: "Search states" });
+    expect(search.className).toContain("text-popover-foreground");
+    expect(search.className).toContain("placeholder:text-popover-foreground/60");
+
+    for (const option of screen.getAllByRole("option")) {
+      expect(option.className).toContain("text-popover-foreground");
+    }
   });
 
   it("selects the highlighted command option with Arrow Down and Enter", async () => {

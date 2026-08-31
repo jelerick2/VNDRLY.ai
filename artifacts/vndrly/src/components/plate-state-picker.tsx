@@ -120,6 +120,7 @@ export function PlateStatePicker({
           <Command label={t("plateStatePicker.search")} loop shouldFilter={false}>
             <CommandInput
               aria-label={t("plateStatePicker.search")}
+              className="text-popover-foreground placeholder:text-popover-foreground/60"
               onValueChange={setQuery}
               placeholder={t("plateStatePicker.search")}
               value={query}
@@ -133,6 +134,7 @@ export function PlateStatePicker({
                     return (
                       <CommandItem
                         aria-selected={isSelected}
+                        className="text-popover-foreground"
                         key={state.code}
                         onSelect={() => selectState(state.code)}
                         role="option"
@@ -155,6 +157,7 @@ export function PlateStatePicker({
                     return (
                       <CommandItem
                         aria-selected={isSelected}
+                        className="text-popover-foreground"
                         key={state.code}
                         onSelect={() => selectState(state.code)}
                         role="option"
