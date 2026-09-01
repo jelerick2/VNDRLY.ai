@@ -79,6 +79,7 @@ import {
   type GateSpeechRecognition,
 } from "@/lib/gate-speech-session";
 import {
+  consumePendingGateVoiceEntry,
   setGateVoiceListening,
   subscribeGateVoiceEntry,
 } from "@/lib/gate-voice-launch";
@@ -530,8 +531,7 @@ export default function GatekeeperPage() {
       void session.toggle();
     };
     const unsubscribe = subscribeGateVoiceEntry(launch);
-    if (sessionStorage.getItem("vndrly:gate-voice-pending") === "1") {
-      sessionStorage.removeItem("vndrly:gate-voice-pending");
+    if (consumePendingGateVoiceEntry()) {
       window.setTimeout(launch, 50);
     }
     return () => {

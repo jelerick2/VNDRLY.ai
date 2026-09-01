@@ -85,6 +85,7 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  sessionStorage.clear();
   FakeMediaRecorder.instances = [];
   vi.stubGlobal(
     "ResizeObserver",
@@ -118,6 +119,17 @@ afterEach(() => {
 });
 
 describe("GatekeeperPage voice entry", () => {
+  it("does not replay a persisted microphone request after a page refresh", async () => {
+    sessionStorage.setItem("vndrly:gate-voice-pending", "1");
+
+    renderPage();
+    await screen.findByTestId("input-gate-first-name");
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(FakeMediaRecorder.instances).toHaveLength(0);
+  });
+
   it("records until the second press, transcribes, fills the draft, and asks for confirmation", async () => {
     renderPage();
     await screen.findByTestId("input-gate-first-name");

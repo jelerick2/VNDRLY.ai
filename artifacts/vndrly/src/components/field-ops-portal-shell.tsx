@@ -20,7 +20,11 @@ import {
   portalDisplayLogo,
   shouldUseLayeredPortalLogo,
 } from "@/lib/portal-branding";
-import { requestGateVoiceEntry, subscribeGateVoiceListening } from "@/lib/gate-voice-launch";
+import {
+  queueGateVoiceEntry,
+  requestGateVoiceEntry,
+  subscribeGateVoiceListening,
+} from "@/lib/gate-voice-launch";
 import { VNDRLY_LOGO_SQUARE as vndrlyLogo } from "@/lib/vndrly-brand-assets";
 import {
   useGetVendor,
@@ -245,7 +249,7 @@ export function FieldOpsPortalShell({
                     onClick={() => {
                       const launch = () => requestGateVoiceEntry();
                       if (!location.startsWith("/gate") || location.startsWith("/gate/history")) {
-                        sessionStorage.setItem("vndrly:gate-voice-pending", "1");
+                        queueGateVoiceEntry();
                         setLocation("/gate");
                       } else launch();
                       setSidebarOpen(false);

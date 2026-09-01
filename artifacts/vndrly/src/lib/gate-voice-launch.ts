@@ -4,9 +4,20 @@ type GateVoiceListeningListener = (listening: boolean) => void;
 const REQUEST_EVENT = "vndrly:gate-voice";
 const LISTENING_EVENT = "vndrly:gate-voice-listening";
 let listening = false;
+let pending = false;
 
 export function requestGateVoiceEntry(): void {
   window.dispatchEvent(new Event(REQUEST_EVENT));
+}
+
+export function queueGateVoiceEntry(): void {
+  pending = true;
+}
+
+export function consumePendingGateVoiceEntry(): boolean {
+  const requested = pending;
+  pending = false;
+  return requested;
 }
 
 export function subscribeGateVoiceEntry(listener: GateVoiceListener): () => void {
