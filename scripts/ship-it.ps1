@@ -95,7 +95,7 @@ if ($iosText -match "builds/([a-f0-9-]{36})") {
 }
 
 Write-ShipStep "Restarting local dev servers"
-& (Join-Path $PSScriptRoot "ensure-local-dev.ps1") -RefreshApi -Strict
+& (Join-Path $PSScriptRoot "ensure-local-dev.ps1") -Recover -Strict
 if ($LASTEXITCODE -ne 0) {
   Fail-Ship "Local dev" "Dev servers did not start (ensure-local-dev exit $LASTEXITCODE)."
 }
