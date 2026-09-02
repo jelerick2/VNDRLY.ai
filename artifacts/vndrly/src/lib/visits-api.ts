@@ -41,6 +41,8 @@ export type AssignedGateSite = {
   latitude: number;
   longitude: number;
   assignmentId: number;
+  partnerId: number;
+  partnerName: string;
 };
 
 export type AssignedGateSitesResponse = {

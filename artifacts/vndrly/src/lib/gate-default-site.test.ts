@@ -6,6 +6,22 @@ import {
   resolveAssignedGateSites,
   shouldApplyDefaultGateSite,
 } from "./gate-default-site";
+import * as gateSites from "./gate-default-site";
+
+const assignedSites = [
+  { id: 1, name: "North Pad", address: "", siteCode: "NORTH", latitude: 35, longitude: -97, assignmentId: 1, partnerId: 10, partnerName: "Warwick" },
+  { id: 2, name: "South Pad", address: "", siteCode: "SOUTH", latitude: 30, longitude: -99, assignmentId: 2, partnerId: 20, partnerName: "Flywheel" },
+];
+
+describe("assigned gate site selection", () => {
+  it("chooses the assigned site closest to the gate device", () => {
+    expect(gateSites.pickNearestAssignedGateSite(assignedSites, { latitude: 30.01, longitude: -99.01 })?.siteCode).toBe("SOUTH");
+  });
+
+  it("groups assigned sites by partner for the two-stage selector", () => {
+    expect(gateSites.groupAssignedGateSitesByPartner(assignedSites).map((group) => group.partnerName)).toEqual(["Flywheel", "Warwick"]);
+  });
+});
 
 describe("shouldApplyDefaultGateSite", () => {
   it("applies the assigned site when the gate is still empty", () => {
@@ -82,8 +98,8 @@ describe("resolveAssignedGateSites", () => {
 
   it("uses the assigned-sites API when it is available", async () => {
     const listed = {
-      sites: [{ ...spurContext.site, assignmentId: 14819 }],
-      defaultSite: { ...spurContext.site, assignmentId: 14819 },
+      sites: [{ ...spurContext.site, assignmentId: 14819, partnerId: 566, partnerName: "Flywheel" }],
+      defaultSite: { ...spurContext.site, assignmentId: 14819, partnerId: 566, partnerName: "Flywheel" },
     };
     const getSiteContext = vi.fn();
     const result = await resolveAssignedGateSites({

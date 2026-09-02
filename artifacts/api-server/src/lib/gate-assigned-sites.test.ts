@@ -12,6 +12,8 @@ const spur = {
   siteCode: "SITE-B40D77D2",
   latitude: 34.63951,
   longitude: -97.66194,
+  partnerId: 566,
+  partnerName: "Flywheel Energy",
 };
 
 const older = {
@@ -21,6 +23,8 @@ const older = {
   siteCode: "SITE-OLD",
   latitude: 35,
   longitude: -97,
+  partnerId: 607,
+  partnerName: "Warwick Energy Group",
 };
 
 describe("assembleAssignedGateSites", () => {
@@ -41,6 +45,8 @@ describe("assembleAssignedGateSites", () => {
     expect(sites.map((site) => site.siteCode)).toEqual(["SITE-B40D77D2", "SITE-OLD"]);
     expect(sites[0]?.assignmentId).toBe(8);
     expect(sites[1]?.assignmentId).toBe(3);
+    expect(sites[0]).toMatchObject({ partnerId: 566, partnerName: "Flywheel Energy" });
+    expect(sites[1]).toMatchObject({ partnerId: 607, partnerName: "Warwick Energy Group" });
   });
 
   it("returns an empty list when the vendor has no assignments", () => {

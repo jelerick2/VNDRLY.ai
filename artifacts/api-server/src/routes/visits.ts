@@ -811,10 +811,13 @@ router.get("/visits/gate/assigned-sites", async (req, res): Promise<void> => {
       siteCode: siteLocationsTable.siteCode,
       latitude: siteLocationsTable.latitude,
       longitude: siteLocationsTable.longitude,
+      partnerId: siteLocationsTable.partnerId,
+      partnerName: partnersTable.name,
       hidden: siteLocationsTable.hidden,
       isActive: siteLocationsTable.isActive,
     })
     .from(siteLocationsTable)
+    .innerJoin(partnersTable, eq(partnersTable.id, siteLocationsTable.partnerId))
     .where(inArray(siteLocationsTable.id, siteIds));
   const assembled = assembleAssignedGateSites(assignments, sites);
   res.json({

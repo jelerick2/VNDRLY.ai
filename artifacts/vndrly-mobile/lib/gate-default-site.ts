@@ -6,6 +6,8 @@ export type AssignedGateSite = {
   latitude: number;
   longitude: number;
   assignmentId: number;
+  partnerId: number;
+  partnerName: string;
 };
 
 export type AssignedGateSitesResponse = {
@@ -49,6 +51,49 @@ export function pickPreferredGateDefaultSite(
   apiDefault: AssignedGateSite | null,
 ): AssignedGateSite | null {
   return apiDefault && sites.some((site) => site.id === apiDefault.id) ? apiDefault : sites[0] ?? null;
+}
+
+export type GateCoordinates = { latitude: number; longitude: number };
+
+function distanceSquared(a: GateCoordinates, b: GateCoordinates): number {
+  const latitudeScale = Math.cos(((a.latitude + b.latitude) / 2) * Math.PI / 180);
+  const latitudeDelta = a.latitude - b.latitude;
+  const longitudeDelta = (a.longitude - b.longitude) * latitudeScale;
+  return latitudeDelta ** 2 + longitudeDelta ** 2;
+}
+
+export function pickNearestAssignedGateSite(
+  sites: AssignedGateSite[],
+  origin: GateCoordinates | null,
+): AssignedGateSite | null {
+  if (!origin || sites.length === 0) return null;
+  return sites.reduce((nearest, site) =>
+    distanceSquared(origin, site) < distanceSquared(origin, nearest) ? site : nearest,
+  );
+}
+
+export type AssignedGatePartnerGroup = {
+  partnerId: number;
+  partnerName: string;
+  sites: AssignedGateSite[];
+};
+
+export function groupAssignedGateSitesByPartner(
+  sites: AssignedGateSite[],
+): AssignedGatePartnerGroup[] {
+  const groups = new Map<number, AssignedGatePartnerGroup>();
+  for (const site of sites) {
+    const group = groups.get(site.partnerId) ?? {
+      partnerId: site.partnerId,
+      partnerName: site.partnerName,
+      sites: [],
+    };
+    group.sites.push(site);
+    groups.set(site.partnerId, group);
+  }
+  return [...groups.values()]
+    .map((group) => ({ ...group, sites: [...group.sites].sort((a, b) => a.name.localeCompare(b.name)) }))
+    .sort((a, b) => a.partnerName.localeCompare(b.partnerName));
 }
 
 export async function resolveAssignedGateSites(input: {

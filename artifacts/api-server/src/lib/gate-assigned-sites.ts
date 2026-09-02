@@ -5,6 +5,8 @@ export type AssignedGateSiteInput = {
   siteCode: string;
   latitude: number;
   longitude: number;
+  partnerId: number;
+  partnerName: string;
   hidden?: boolean | null;
   isActive?: boolean | null;
 };
@@ -17,6 +19,8 @@ export type AssignedGateSite = {
   latitude: number;
   longitude: number;
   assignmentId: number;
+  partnerId: number;
+  partnerName: string;
 };
 
 export function assembleAssignedGateSites(
@@ -43,6 +47,8 @@ export function assembleAssignedGateSites(
       latitude: site.latitude,
       longitude: site.longitude,
       assignmentId: latestAssignment.get(site.id)!,
+      partnerId: site.partnerId,
+      partnerName: site.partnerName,
     }))
     .sort((a, b) => b.assignmentId - a.assignmentId);
 }

@@ -52,6 +52,8 @@ import {
 } from "@/lib/gatekeeper-log-export";
 import {
   pickDefaultGateHostKey,
+  groupAssignedGateSitesByPartner,
+  pickNearestAssignedGateSite,
   resolveAssignedGateSites,
   shouldApplyDefaultGateSite,
 } from "@/lib/gate-default-site";
@@ -564,7 +566,16 @@ export default function GatekeeperPage() {
     ];
   }, [site.data]);
   const assignedSites = assigned.data?.sites ?? [];
-  const defaultSiteCode = assigned.data?.defaultSite?.siteCode;
+  const assignedPartners = useMemo(() => groupAssignedGateSitesByPartner(assignedSites), [assignedSites]);
+  const nearestSite = useMemo(() => pickNearestAssignedGateSite(assignedSites, origin), [assignedSites, origin]);
+  const locationResolved = origin !== null || gps === "denied" || gps === "unavailable";
+  const defaultSiteCode = locationResolved ? (nearestSite ?? assigned.data?.defaultSite)?.siteCode : undefined;
+  const selectedAssignedSite = assignedSites.find((row) => row.siteCode === confirmedCode) ?? nearestSite ?? assigned.data?.defaultSite ?? null;
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string>("");
+  useEffect(() => {
+    if (selectedPartnerId || !selectedAssignedSite) return;
+    setSelectedPartnerId(String(selectedAssignedSite.partnerId));
+  }, [selectedAssignedSite, selectedPartnerId]);
   const showPreviousBanner = Boolean(
     previousPlateVisit &&
     (!firstName.trim() ||
@@ -1323,6 +1334,11 @@ export default function GatekeeperPage() {
                 {t("gatekeeper.selectedLocation")}
               </p>
               {assignedSites.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                <Select value={selectedPartnerId} onValueChange={(value) => { setSelectedPartnerId(value); setHostKey(""); }}>
+                  <SelectTrigger data-testid="select-gate-partner" className="h-14 text-lg font-bold"><SelectValue placeholder="Select company" /></SelectTrigger>
+                  <SelectContent>{assignedPartners.map((group) => <SelectItem key={group.partnerId} value={String(group.partnerId)}>{group.partnerName}</SelectItem>)}</SelectContent>
+                </Select>
                 <Select
                   value={
                     assignedSites.some((row) => row.siteCode === confirmedCode)
@@ -1339,13 +1355,14 @@ export default function GatekeeperPage() {
                     <SelectValue placeholder={t("gatekeeper.selectSite")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {assignedSites.map((row) => (
+                    {(assignedPartners.find((group) => String(group.partnerId) === selectedPartnerId)?.sites ?? []).map((row) => (
                       <SelectItem key={row.siteCode} value={row.siteCode}>
                         {siteDisplayName(row)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                </div>
               ) : null}
               {site.data && (
                 <p className="text-2xl font-black leading-tight text-foreground">

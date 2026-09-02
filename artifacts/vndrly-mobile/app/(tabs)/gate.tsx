@@ -26,6 +26,8 @@ import { useColors } from "@/hooks/useColors";
 import { translateApiError } from "@/lib/apiErrors";
 import {
   pickDefaultGateHostKey,
+  groupAssignedGateSitesByPartner,
+  pickNearestAssignedGateSite,
   pickPreferredGateDefaultSite,
   resolveAssignedGateSites,
   shouldApplyDefaultGateSite,
@@ -161,6 +163,9 @@ export default function GatekeeperScreen() {
   const [voiceTranscribing, setVoiceTranscribing] = useState(false);
   const [voiceCheckInPending, setVoiceCheckInPending] = useState(false);
   const [voiceCheckoutMatches, setVoiceCheckoutMatches] = useState<ActiveVisit[]>([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(null);
+  const [partnerMenuOpen, setPartnerMenuOpen] = useState(false);
+  const [siteMenuOpen, setSiteMenuOpen] = useState(false);
 
   const activeVisits = useQuery({
     queryKey: ["gatekeeper-visits"],
@@ -184,11 +189,16 @@ export default function GatekeeperScreen() {
     retry: false,
   });
   const assignedSites = assigned.data?.sites ?? [];
-  const preferredSite = pickPreferredGateDefaultSite(
-    assignedSites,
-    assigned.data?.defaultSite ?? null,
-  );
-  const defaultSiteCode = preferredSite?.siteCode;
+  const assignedPartners = useMemo(() => groupAssignedGateSitesByPartner(assignedSites), [assignedSites]);
+  const nearestSite = useMemo(() => pickNearestAssignedGateSite(assignedSites, origin), [assignedSites, origin]);
+  const locationResolved = origin !== null || gps === "denied" || gps === "unavailable";
+  const preferredSite = nearestSite ?? pickPreferredGateDefaultSite(assignedSites, assigned.data?.defaultSite ?? null);
+  const defaultSiteCode = locationResolved ? preferredSite?.siteCode : undefined;
+  const selectedAssignedSite = assignedSites.find((site) => site.siteCode === confirmedCode) ?? preferredSite;
+  useEffect(() => {
+    if (selectedPartnerId !== null || !selectedAssignedSite) return;
+    setSelectedPartnerId(selectedAssignedSite.partnerId);
+  }, [selectedAssignedSite, selectedPartnerId]);
   const ctxQuery = useQuery<SiteContext>({
     queryKey: ["gatekeeper-site-context", confirmedCode],
     queryFn: () => fetchSiteContext(confirmedCode!),
@@ -1109,7 +1119,20 @@ export default function GatekeeperScreen() {
             >
               {fenceSentence}
             </Text>
-            {assignedSites.map((site) => {
+            <TouchableOpacity testID="gate-partner-selector" onPress={() => setPartnerMenuOpen((open) => !open)} style={[styles.siteOption, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <Text style={[styles.siteOptionName, { color: colors.foreground }]}>{assignedPartners.find((group) => group.partnerId === selectedPartnerId)?.partnerName ?? "Select company"}</Text>
+            </TouchableOpacity>
+            {partnerMenuOpen && assignedPartners.map((group) => (
+              <TouchableOpacity key={group.partnerId} onPress={() => { setSelectedPartnerId(group.partnerId); setPartnerMenuOpen(false); setSiteMenuOpen(true); }} style={[styles.siteOption, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <Text style={[styles.siteOptionName, { color: colors.foreground }]}>{group.partnerName}</Text>
+              </TouchableOpacity>
+            ))}
+            <View testID={selectedAssignedSite ? `gate-site-option-${selectedAssignedSite.siteCode}` : undefined}>
+              <TouchableOpacity testID="gate-site-selector" onPress={() => setSiteMenuOpen((open) => !open)} style={[styles.siteOption, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                <Text style={[styles.siteOptionName, { color: colors.foreground }]}>{selectedAssignedSite?.name ?? "Select site"}</Text>
+              </TouchableOpacity>
+            </View>
+            {siteMenuOpen && (assignedPartners.find((group) => group.partnerId === selectedPartnerId)?.sites ?? []).map((site) => {
               const selected = confirmedCode === site.siteCode;
               return (
                 <TouchableOpacity
@@ -1120,6 +1143,7 @@ export default function GatekeeperScreen() {
                     setSiteCode(site.siteCode);
                     setConfirmedCode(site.siteCode);
                     setHostKey(null);
+                    setSiteMenuOpen(false);
                   }}
                   style={[
                     styles.siteOption,

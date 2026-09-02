@@ -8,6 +8,7 @@ import {
   shouldApplyDefaultGateSite,
   type AssignedGateSite,
 } from "./gate-default-site";
+import * as gateDefaultSite from "./gate-default-site";
 
 describe("shouldApplyDefaultGateSite", () => {
   it("applies the assigned site when the gate is still empty", () => {
@@ -50,6 +51,8 @@ describe("pickPreferredGateDefaultSite", () => {
     latitude: 34.63951,
     longitude: -97.66194,
     assignmentId: 1,
+    partnerId: 566,
+    partnerName: "Flywheel Energy",
   };
   const older: AssignedGateSite = {
     id: 10,
@@ -59,6 +62,8 @@ describe("pickPreferredGateDefaultSite", () => {
     latitude: 35,
     longitude: -97,
     assignmentId: 99,
+    partnerId: 565,
+    partnerName: "Warwick Energy Group",
   };
 
   it("uses the API-selected default rather than a hard-coded customer site", () => {
@@ -69,6 +74,69 @@ describe("pickPreferredGateDefaultSite", () => {
 
   it("uses the API default when Flywheel Spur is not assigned", () => {
     expect(pickPreferredGateDefaultSite([older], older)?.siteCode).toBe("SITE-OLD");
+  });
+});
+
+describe("location-aware gate site selection", () => {
+  const sites = [
+    {
+      id: 1,
+      name: "Far Warwick Pad",
+      address: "Wilson County, TX",
+      siteCode: "SITE-FAR",
+      latitude: 29.5,
+      longitude: -97.5,
+      assignmentId: 1,
+      partnerId: 607,
+      partnerName: "Warwick Energy Group",
+    },
+    {
+      id: 2,
+      name: "Near Warwick Pad",
+      address: "Wilson County, TX",
+      siteCode: "SITE-NEAR",
+      latitude: 29.001,
+      longitude: -98.001,
+      assignmentId: 2,
+      partnerId: 607,
+      partnerName: "Warwick Energy Group",
+    },
+    {
+      id: 3,
+      name: "Other Partner Pad",
+      address: "Grady County, OK",
+      siteCode: "SITE-OTHER",
+      latitude: 35,
+      longitude: -97.8,
+      assignmentId: 3,
+      partnerId: 566,
+      partnerName: "Flywheel Energy",
+    },
+  ];
+
+  it("chooses the physically closest authorized site instead of assignment order", () => {
+    const pickNearest = (gateDefaultSite as Record<string, unknown>)
+      .pickNearestAssignedGateSite as undefined | ((...args: unknown[]) => AssignedGateSite | null);
+
+    expect(pickNearest?.(sites, { latitude: 29, longitude: -98 })?.siteCode).toBe("SITE-NEAR");
+  });
+
+  it("groups authorized sites by partner for the two-stage picker", () => {
+    const groupSites = (gateDefaultSite as Record<string, unknown>)
+      .groupAssignedGateSitesByPartner as undefined | ((sites: unknown[]) => unknown);
+
+    expect(groupSites?.(sites)).toEqual([
+      {
+        partnerId: 566,
+        partnerName: "Flywheel Energy",
+        sites: [sites[2]],
+      },
+      {
+        partnerId: 607,
+        partnerName: "Warwick Energy Group",
+        sites: [sites[0], sites[1]],
+      },
+    ]);
   });
 });
 
