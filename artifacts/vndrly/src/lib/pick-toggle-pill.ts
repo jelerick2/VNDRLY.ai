@@ -7,6 +7,7 @@ import {
   pillAmber,
   pillBlue,
   pillGreen,
+  pillPurple,
   pillRed,
 } from "@/lib/pill-palette-assets";
 import { isWinchesterBrand } from "@/lib/portal-branding";
@@ -23,6 +24,7 @@ const TOGGLE_PILL_PALETTE: PaletteEntry[] = [
   { hex: "#F39C1A", src: pillAmber },
   { hex: "#149F3D", src: pillGreen },
   { hex: "#1E5BD0", src: pillBlue },
+  { hex: "#7C3AED", src: pillPurple },
 ];
 
 const NEUTRAL_TOGGLE_PILL_SRC = PILL_IDLE;
