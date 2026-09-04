@@ -2,8 +2,6 @@ name: Publish Mobile OTA
 # Full-ship release-path verification: 2026-08-28T15:50Z
 
 on:
-  push:
-    branches: [release/universal-ios-foundation]
   workflow_dispatch:
     inputs:
       message:
@@ -84,7 +82,7 @@ jobs:
       - name: Publish production iOS OTA update
         working-directory: artifacts/vndrly-mobile
         env:
-          EAS_UPDATE_MESSAGE: ${{ inputs.message || 'Universal iOS production update' }}
+          EAS_UPDATE_MESSAGE: ${{ inputs.message }}
         run: >-
           pnpm exec eas update
           --channel production
