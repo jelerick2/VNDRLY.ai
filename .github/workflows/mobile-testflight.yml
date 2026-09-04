@@ -1,6 +1,8 @@
 name: Publish Mobile TestFlight
 
 on:
+  push:
+    branches: [release/universal-ios-foundation]
   workflow_dispatch:
     inputs:
       message:
