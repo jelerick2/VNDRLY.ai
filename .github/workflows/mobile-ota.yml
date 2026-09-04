@@ -2,8 +2,6 @@ name: Publish Mobile OTA
 # Full-ship release-path verification: 2026-08-28T15:50Z
 
 on:
-  push:
-    branches: [release/universal-ios-foundation]
   workflow_dispatch:
     inputs:
       message:
