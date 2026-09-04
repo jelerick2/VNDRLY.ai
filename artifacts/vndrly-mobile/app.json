@@ -3,7 +3,7 @@
     "name": "VNDRLY Field Mobile",
     "slug": "vndrly-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icons/vndrly.png",
     "scheme": "vndrly-mobile",
     "userInterfaceStyle": "automatic",
@@ -22,7 +22,7 @@
       "backgroundColor": "#2a2d31"
     },
     "ios": {
-      "supportsTablet": false,
+      "supportsTablet": true,
       "bundleIdentifier": "com.vndrly.field",
       "infoPlist": {
         "NSCameraUsageDescription": "VNDRLY uses the camera to scan site QR codes and capture work-site photos.",
@@ -30,10 +30,7 @@
         "NSLocationWhenInUseUsageDescription": "VNDRLY records your GPS location at check-in and check-out to verify on-site work.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "VNDRLY shares your live location with your vendor while you are en route or on site, even when the app is in the background.",
         "NSLocationAlwaysUsageDescription": "VNDRLY shares your live location with your vendor while you are en route or on site, even when the app is in the background.",
-        "UIBackgroundModes": [
-          "location",
-          "fetch"
-        ],
+        "UIBackgroundModes": ["location", "fetch"],
         "NSFaceIDUsageDescription": "VNDRLY uses Face ID to sign you in quickly and securely.",
         "NSMicrophoneUsageDescription": "VNDRLY uses the microphone for AskV voice commands and crew push-to-talk voice messages on active tickets.",
         "ITSAppUsesNonExemptEncryption": false

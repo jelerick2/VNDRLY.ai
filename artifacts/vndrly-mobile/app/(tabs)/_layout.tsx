@@ -1,211 +1,97 @@
-import { Feather } from "@expo/vector-icons";
 import { router, Slot, usePathname } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 
+import AdaptiveNavigationShell from "@/components/AdaptiveNavigationShell";
 import { useAuth } from "@/hooks/use-auth";
-import { useColors } from "@/hooks/useColors";
-import { crewMapTabVisible, homeTabTitleKey, isForemanEmployeeUser, isGatekeeperUser } from "@/lib/mobile-viewer";
+import {
+  buildAppNavigation,
+  type AppNavigationItem,
+  type AppNavigationLabels,
+} from "@/lib/app-navigation";
+import {
+  requestGateVoiceEntry,
+  subscribeGateVoiceListening,
+} from "@/lib/gate-voice-launch";
+import { homeTabTitleKey } from "@/lib/mobile-viewer";
 import { useTabBadges } from "@/lib/tabBadges";
-import { requestGateVoiceEntry, subscribeGateVoiceListening } from "@/lib/gate-voice-launch";
-
-type TabItem = {
-  badge?: number;
-  href: string;
-  icon: keyof typeof Feather.glyphMap;
-  key: string;
-  label: string;
-  visible: boolean;
-  voiceEntry?: boolean;
-};
 
 export default function TabLayout() {
-  const colors = useColors();
   const { t } = useTranslation();
   const badges = useTabBadges();
   const { user } = useAuth();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const isForemanEmployee = isForemanEmployeeUser(user);
-  const isGatekeeper = isGatekeeperUser(user);
-  const showsCrewMap = crewMapTabVisible(user);
+  const { width } = useWindowDimensions();
   const [gateVoiceListening, setGateVoiceListening] = useState(false);
 
   useEffect(() => subscribeGateVoiceListening(setGateVoiceListening), []);
 
-  const tabs = ([
-    { key: "askv", href: "/(tabs)/askv", label: t("tabs.askv"), icon: "zap", visible: true },
-    {
-      key: "gate-voice",
-      href: "/(tabs)/gate",
-      label: t("gatekeeper.voiceEntry"),
-      icon: "mic",
-      visible: isGatekeeper,
-      voiceEntry: true,
-    },
-    {
-      key: "gate",
-      href: "/(tabs)/gate",
-      label: t("gatekeeper.tab"),
-      icon: "truck",
-      visible: isGatekeeper,
-    },
-    {
-      key: "gate-history",
-      href: "/(tabs)/gate-history",
-      label: t("tabs.history"),
-      icon: "clock",
-      visible: isGatekeeper,
-    },
-    {
-      key: "index",
-      href: "/(tabs)",
-      label: t(homeTabTitleKey(user)),
-      icon: "home",
-      visible: !isGatekeeper,
-      badge: badges.home,
-    },
-    {
-      key: "schedule",
-      href: "/(tabs)/schedule",
-      label: t("tabs.schedule"),
-      icon: "calendar",
-      visible: !isGatekeeper,
-      badge: badges.schedule,
-    },
-    {
-      key: "flagged",
-      href: "/(tabs)/flagged",
-      label: t("tabs.flagged"),
-      icon: "flag",
-      visible: !isGatekeeper,
-      badge: badges.flagged,
-    },
-    {
-      key: "crew-map",
-      href: "/(tabs)/crew-map",
-      label: t("tabs.crewMap"),
-      icon: "map-pin",
-      visible: showsCrewMap,
-    },
-    {
-      key: "crews",
-      href: "/(tabs)/crews",
-      label: t("tabs.crews"),
-      icon: "users",
-      visible: isForemanEmployee,
-    },
-    {
-      key: "comms",
-      href: "/(tabs)/comms",
-      label: t("tabs.comms"),
-      icon: "radio",
-      visible: isForemanEmployee,
-      badge: badges.comms,
-    },
-    { key: "scan", href: "/(tabs)/scan", label: t("tabs.scan"), icon: "maximize", visible: !isGatekeeper },
-    { key: "profile", href: "/(tabs)/profile", label: t("tabs.profile"), icon: "user", visible: true },
-  ] satisfies TabItem[]).filter((tab) => tab.visible);
+  const labels = useMemo<AppNavigationLabels>(
+    () => ({
+      askv: t("tabs.askv"),
+      comms: t("tabs.comms"),
+      crews: t("tabs.crews"),
+      flagged: t("tabs.flagged"),
+      gate: t("gatekeeper.tab"),
+      history: t("tabs.history"),
+      home: t(homeTabTitleKey(user)),
+      map: t("tabs.crewMap"),
+      profile: t("tabs.profile"),
+      scan: t("tabs.scan"),
+      schedule: t("tabs.schedule"),
+      voice: t("gatekeeper.voiceEntry"),
+    }),
+    [t, user],
+  );
+  const items = useMemo(
+    () => buildAppNavigation({ user, labels, badges }),
+    [badges, labels, user],
+  );
+  const activeKey = activeNavigationKey(pathname);
+
+  const activate = (item: AppNavigationItem) => {
+    if (item.kind === "gate-voice") {
+      if (!isGateScreen(pathname)) router.push(item.href as never);
+      requestGateVoiceEntry();
+      return;
+    }
+    router.push(item.href as never);
+  };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.page}>
-        <Slot />
-      </View>
-      <View style={[styles.tabBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-        {tabs.map((tab) => {
-          const active = tab.voiceEntry ? gateVoiceListening : isActiveTab(pathname, tab.key);
-          const color = active ? colors.primary : colors.mutedForeground;
-          const badgeLabel = tab.badge && tab.badge > 0 ? (tab.badge > 99 ? "99+" : String(tab.badge)) : null;
-          return (
-            <Pressable
-              key={tab.key}
-              accessibilityRole="button"
-              accessibilityState={active ? { selected: true } : undefined}
-              onPress={() => {
-                if (tab.voiceEntry) {
-                  if (!isGateScreen(pathname)) router.push(tab.href as never);
-                  requestGateVoiceEntry();
-                  return;
-                }
-                router.push(tab.href as never);
-              }}
-              style={styles.tabItem}
-            >
-              <View>
-                <Feather name={tab.icon} size={26} color={color} />
-                {badgeLabel ? (
-                  <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.badgeText}>{badgeLabel}</Text>
-                  </View>
-                ) : null}
-              </View>
-              <Text numberOfLines={1} style={[styles.tabLabel, { color }]}>
-                {tab.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
+    <AdaptiveNavigationShell
+      activeKey={activeKey}
+      bottomInset={insets.bottom}
+      gateVoiceActive={gateVoiceListening}
+      items={items}
+      onActivate={activate}
+      width={width}
+    >
+      <Slot />
+    </AdaptiveNavigationShell>
   );
 }
 
-function isActiveTab(pathname: string, key: string) {
-  if (key === "index") {
-    return pathname === "/" || pathname === "/index" || pathname === "/(tabs)" || pathname === "/(tabs)/index";
+export function activeNavigationKey(pathname: string): string {
+  if (
+    pathname === "/" ||
+    pathname === "/index" ||
+    pathname === "/(tabs)" ||
+    pathname === "/(tabs)/index"
+  ) {
+    return "index";
   }
-  return pathname.endsWith(`/${key}`) || pathname === `/(tabs)/${key}`;
+  const segment = pathname.split("/").filter(Boolean).at(-1);
+  return segment ?? "index";
 }
 
 function isGateScreen(pathname: string): boolean {
-  return pathname === "/gate" || pathname === "/(tabs)/gate" || pathname.endsWith("/gate");
+  return (
+    pathname === "/gate" ||
+    pathname === "/(tabs)/gate" ||
+    pathname.endsWith("/gate")
+  );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  page: {
-    flex: 1,
-  },
-  tabBar: {
-    alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    minHeight: 82,
-    paddingHorizontal: 4,
-    paddingTop: 8,
-  },
-  tabItem: {
-    alignItems: "center",
-    flex: 1,
-    gap: 3,
-    justifyContent: "center",
-    minHeight: 56,
-    minWidth: 0,
-  },
-  tabLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    maxWidth: 70,
-  },
-  badge: {
-    alignItems: "center",
-    borderRadius: 10,
-    justifyContent: "center",
-    minWidth: 20,
-    paddingHorizontal: 5,
-    position: "absolute",
-    right: -12,
-    top: -8,
-  },
-  badgeText: {
-    color: "#ffffff",
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-  },
-});
