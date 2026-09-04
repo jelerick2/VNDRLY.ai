@@ -137,6 +137,14 @@ afterEach(() => {
 });
 
 describe("fitImageIntoSquare", () => {
+  it("preserves animated GIF bytes for square-logo uploads", async () => {
+    const gif = new File(["GIF89a-animated-frames"], "logo.gif", { type: "image/gif" });
+    const result = await fitImageIntoSquare(gif);
+    expect(result).toBe(gif);
+    expect(result.type).toBe("image/gif");
+    expect(await result.text()).toBe("GIF89a-animated-frames");
+  });
+
   it("passes SVG inputs through unchanged", async () => {
     const svg = new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" });
     const result = await fitImageIntoSquare(svg);
@@ -221,6 +229,14 @@ describe("fitImageIntoSquare", () => {
 });
 
 describe("compressMainLogo", () => {
+  it("preserves animated GIF bytes for main-logo uploads", async () => {
+    const gif = new File(["GIF89a-animated-frames"], "logo.gif", { type: "image/gif" });
+    const result = await compressMainLogo(gif);
+    expect(result).toBe(gif);
+    expect(result.type).toBe("image/gif");
+    expect(await result.text()).toBe("GIF89a-animated-frames");
+  });
+
   it("passes SVG inputs through unchanged", async () => {
     const svg = new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" });
     const result = await compressMainLogo(svg);
@@ -286,6 +302,12 @@ describe("compressMainLogo", () => {
 });
 
 describe("cropToSquare", () => {
+  it("never flattens an animated GIF when called defensively", async () => {
+    const gif = new File(["GIF89a-animated-frames"], "logo.gif", { type: "image/gif" });
+    const result = await cropToSquare(gif, { x: 0, y: 0, width: 100, height: 100 });
+    expect(result).toBe(gif);
+  });
+
   it("passes SVG inputs through unchanged", async () => {
     const svg = new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" });
     const result = await cropToSquare(svg, { x: 0, y: 0, width: 100, height: 100 });
@@ -321,6 +343,11 @@ describe("cropToSquare", () => {
 });
 
 describe("isSquareWithinTolerance", () => {
+  it("routes GIFs around the static square cropper without decoding", async () => {
+    const gif = new File(["GIF89a-animated-frames"], "logo.gif", { type: "image/gif" });
+    expect(await isSquareWithinTolerance(gif)).toBe(true);
+  });
+
   it("returns true for SVG without decoding", async () => {
     const svg = new File(["<svg/>"], "logo.svg", { type: "image/svg+xml" });
     expect(await isSquareWithinTolerance(svg)).toBe(true);

@@ -276,7 +276,7 @@
     "companyLogo": "Company Logo",
     "uploadLogo": "Upload Logo",
     "replaceLogo": "Replace Logo",
-    "companyLogoHelp": "PNG, JPG, or SVG. Used in your portal sidebar and on tickets.",
+    "companyLogoHelp": "PNG, JPG, SVG, or animated GIF. Used in your portal sidebar and on tickets.",
     "uploadingLogo": "Uploading...",
     "pleaseSelectImage": "Please select an image file",
     "logoUploaded": "Logo uploaded",

@@ -74,7 +74,7 @@ export function OnboardingBrandFields(
           <div>
             <Label>Horizontal logo</Label>
             <p className="text-xs text-gray-500 mb-1">
-              Used in the sidebar and ticket headers.
+              PNG, JPG, SVG, or animated GIF. Used in the sidebar and ticket headers.
             </p>
             <div className="flex items-center gap-3">
               <input
@@ -100,7 +100,7 @@ export function OnboardingBrandFields(
           <div>
             <Label>Square logo</Label>
             <p className="text-xs text-gray-500 mb-1">
-              Used in 64×64 badges and the visitor portal poster.
+              PNG, JPG, SVG, or animated GIF. Used in 64×64 badges and the visitor portal poster. GIFs display proportionally without cropping.
             </p>
             <div className="flex items-center gap-3">
               <input
@@ -128,8 +128,8 @@ export function OnboardingBrandFields(
         <div>
           <Label>Company logo</Label>
           <p className="text-xs text-gray-500 mb-1">
-            Upload your logo — we&apos;ll suggest brand colors and update the
-            header preview.
+            Upload a PNG, JPG, SVG, or animated GIF — we&apos;ll suggest brand
+            colors and update the header preview.
           </p>
           <div className="flex items-center gap-3">
             <input

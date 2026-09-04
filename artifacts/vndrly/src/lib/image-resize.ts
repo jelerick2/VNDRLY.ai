@@ -31,6 +31,12 @@
 const DEFAULT_SQUARE_PX = 512;
 const DEFAULT_MAIN_LONGEST_EDGE_PX = 1024;
 
+// Canvas preserves only one raster frame. Keep formats that must not be
+// rasterized intact so SVGs stay vector and animated GIFs stay animated.
+function mustPreserveOriginal(file: File): boolean {
+  return file.type === "image/svg+xml" || file.type === "image/gif";
+}
+
 /**
  * Loads a File/Blob into an HTMLImageElement via an object URL. The
  * caller is responsible for cleanup; we revoke as soon as the image
@@ -69,7 +75,7 @@ export async function fitImageIntoSquare(
   file: File,
   size: number = DEFAULT_SQUARE_PX,
 ): Promise<File> {
-  if (file.type === "image/svg+xml") {
+  if (mustPreserveOriginal(file)) {
     return file;
   }
 
@@ -140,7 +146,7 @@ export async function compressMainLogo(
   file: File,
   maxLongestEdge: number = DEFAULT_MAIN_LONGEST_EDGE_PX,
 ): Promise<File> {
-  if (file.type === "image/svg+xml") {
+  if (mustPreserveOriginal(file)) {
     return file;
   }
 
@@ -202,7 +208,7 @@ export async function cropToSquare(
   crop: { x: number; y: number; width: number; height: number },
   outSize: number = DEFAULT_SQUARE_PX,
 ): Promise<File> {
-  if (file.type === "image/svg+xml") {
+  if (mustPreserveOriginal(file)) {
     return file;
   }
 
@@ -258,8 +264,9 @@ export async function isSquareWithinTolerance(
   file: File,
   tolerance: number = 0.02,
 ): Promise<boolean> {
-  if (file.type === "image/svg+xml") {
-    // Vector inputs scale to whatever box you give them; treat as square.
+  if (mustPreserveOriginal(file)) {
+    // Vector inputs scale to their box. Animated GIFs also bypass the static
+    // canvas cropper and render proportionally in square display surfaces.
     return true;
   }
   const img = await loadImageFromFile(file);

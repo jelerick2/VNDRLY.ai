@@ -424,7 +424,7 @@ export default function AdminVndrly() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <div className="text-sm font-medium mb-1">Main Logo</div>
-              <p className="text-xs text-muted-foreground mb-3">Used in modal headers and other irregular slots. Any aspect ratio.</p>
+              <p className="text-xs text-muted-foreground mb-3">PNG, JPG, SVG, or animated GIF. Used in modal headers and other irregular slots. Any aspect ratio.</p>
               <div className="w-32 h-32 rounded-lg border bg-muted flex items-center justify-center overflow-hidden mb-2">
                 {settings?.logoUrl ? (
                   <img src={settings.logoUrl} alt="VNDRLY Logo" className="w-full h-full object-contain" data-testid="img-platform-logo" />
@@ -447,7 +447,7 @@ export default function AdminVndrly() {
 
             <div>
               <div className="text-sm font-medium mb-1">Square Logo (1:1)</div>
-              <p className="text-xs text-muted-foreground mb-3">Used in the navigation sidebar at 64×64. Falls back to main logo when not set.</p>
+              <p className="text-xs text-muted-foreground mb-3">PNG, JPG, SVG, or animated GIF. Used in the navigation sidebar at 64×64. GIFs display proportionally without cropping. Falls back to main logo when not set.</p>
               <div className="w-32 h-32 rounded-lg border bg-muted flex items-center justify-center overflow-hidden mb-2">
                 {settings?.logoSquareUrl ? (
                   <img src={settings.logoSquareUrl} alt="VNDRLY Square Logo" className="w-full h-full object-contain" data-testid="img-platform-logo-square" />

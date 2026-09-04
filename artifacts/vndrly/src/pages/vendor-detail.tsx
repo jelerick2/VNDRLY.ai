@@ -790,7 +790,7 @@ export default function VendorDetail({ id }: { id: number }) {
                       </div>
                       <div className="flex-1">
                         <div className="text-sm font-medium mb-1">Company Logo</div>
-                        <p className="text-xs text-muted-foreground mb-2">PNG, JPG, or SVG. Used in your portal sidebar and on tickets.</p>
+                        <p className="text-xs text-muted-foreground mb-2">PNG, JPG, SVG, or animated GIF. Used in your portal sidebar and on tickets.</p>
                         <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} data-testid="input-logo-file" />
                         <div className="flex gap-2 flex-wrap">
                           {/* Logo actions converted to TogglePill family per
@@ -825,7 +825,7 @@ export default function VendorDetail({ id }: { id: number }) {
                       <div className="flex-1">
                         <div className="text-sm font-medium mb-1">Square Logo (1:1)</div>
                         <p className="text-xs text-muted-foreground mb-2">
-                          PNG, JPG, or SVG, ideally a 1:1 square mark/icon. Shown at 64×64 in the navigation sidebar. Optional — if you don't upload one, the main logo will be used.
+                          PNG, JPG, SVG, or animated GIF, ideally a 1:1 square mark/icon. Animated GIFs display proportionally without cropping. Shown at 64×64 in the navigation sidebar. Optional — if you don't upload one, the main logo will be used.
                         </p>
                         <input
                           ref={squareLogoInputRef}

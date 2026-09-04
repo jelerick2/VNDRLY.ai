@@ -1846,7 +1846,7 @@ export default function PartnerDetail({ id }: { id: number }) {
                       </div>
                       <div className="flex-1">
                         <div className="text-sm font-medium mb-1">{t("partners.companyLogo", { defaultValue: "Main Logo (any shape)" })}</div>
-                        <p className="text-xs text-muted-foreground mb-2">{t("partners.companyLogoHelp", { defaultValue: "PNG, JPG, or SVG. Used on tickets, posters, and inside dialogs. Wordmarks (wide logos) work great here." })}</p>
+                        <p className="text-xs text-muted-foreground mb-2">{t("partners.companyLogoHelp", { defaultValue: "PNG, JPG, SVG, or animated GIF. Used on tickets, posters, and inside dialogs. Wordmarks (wide logos) work great here." })}</p>
                         <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} data-testid="input-logo-file" />
                         <div className="flex gap-2 flex-wrap">
                           <PngPillButton color="blue" type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo} data-testid="button-upload-logo">
@@ -1876,7 +1876,7 @@ export default function PartnerDetail({ id }: { id: number }) {
                       <div className="flex-1">
                         <div className="text-sm font-medium mb-1">{t("partners.squareLogo", { defaultValue: "Square Logo (1:1)" })}</div>
                         <p className="text-xs text-muted-foreground mb-2">
-                          {t("partners.squareLogoHelp", { defaultValue: "PNG, JPG, or SVG, ideally a 1:1 square mark/icon. Shown at 64×64 in the navigation sidebar. Optional — if you don't upload one, the main logo will be used." })}
+                          {t("partners.squareLogoHelp", { defaultValue: "PNG, JPG, SVG, or animated GIF, ideally a 1:1 square mark/icon. Animated GIFs display proportionally without cropping. Shown at 64×64 in the navigation sidebar. Optional — if you don't upload one, the main logo will be used." })}
                         </p>
                         <input
                           ref={squareLogoInputRef}

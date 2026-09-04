@@ -276,7 +276,7 @@
     "companyLogo": "Logotipo de la Empresa",
     "uploadLogo": "Subir Logotipo",
     "replaceLogo": "Reemplazar Logotipo",
-    "companyLogoHelp": "PNG, JPG o SVG. Se usa en la barra lateral del portal y en los tickets.",
+    "companyLogoHelp": "PNG, JPG, SVG o GIF animado. Se usa en la barra lateral del portal y en los tickets.",
     "uploadingLogo": "Subiendo...",
     "pleaseSelectImage": "Por favor selecciona un archivo de imagen",
     "logoUploaded": "Logotipo subido",
