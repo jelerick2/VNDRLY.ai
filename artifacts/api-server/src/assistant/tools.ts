@@ -831,6 +831,219 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "prepare_visitor_check_in",
+    description:
+      "Collect visitor check-in fields and report what is still missing. Does not commit the visit. Use for gate check-in. Ask for missing first name, last name, company, plate, state, purpose, notes, duration, or site.",
+    input_schema: {
+      type: "object",
+      properties: {
+        firstName: { type: "string" },
+        lastName: { type: "string" },
+        company: { type: "string" },
+        vehiclePlate: { type: "string" },
+        plateState: { type: "string" },
+        purpose: { type: "string" },
+        notes: { type: "string" },
+        expectedDurationMinutes: { type: "number" },
+        siteLocationId: { type: "number" },
+        hostType: { type: "string", enum: ["partner", "vendor"] },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "confirm_visitor_check_in",
+    description:
+      "Commit a visitor check-in after a spoken summary and confirmation. Pass confirmed:true only after the user confirms the exact visitor, site, and plate.",
+    input_schema: {
+      type: "object",
+      properties: {
+        firstName: { type: "string" },
+        lastName: { type: "string" },
+        company: { type: "string" },
+        vehiclePlate: { type: "string" },
+        plateState: { type: "string" },
+        purpose: { type: "string" },
+        notes: { type: "string" },
+        expectedDurationMinutes: { type: "number" },
+        siteLocationId: { type: "number" },
+        hostType: { type: "string", enum: ["partner", "vendor"] },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        idempotencyKey: { type: "string" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["firstName", "lastName", "siteLocationId", "hostType", "confirmed"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "find_active_visitors",
+    description: "Find active (not checked out) visitors by name, plate, company, or site for check-out disambiguation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string" },
+        siteLocationId: { type: "number" },
+        vehiclePlate: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "prepare_visitor_check_out",
+    description: "Match active visits for check-out and report whether confirmation or a short choice is needed.",
+    input_schema: {
+      type: "object",
+      properties: {
+        visitId: { type: "number" },
+        query: { type: "string" },
+        siteLocationId: { type: "number" },
+        notes: { type: "string" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "confirm_visitor_check_out",
+    description: "Commit visitor check-out after spoken confirmation. Pass confirmed:true only after the user confirms the exact visit.",
+    input_schema: {
+      type: "object",
+      properties: {
+        visitId: { type: "number" },
+        notes: { type: "string" },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        idempotencyKey: { type: "string" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["visitId", "confirmed"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_ticket_lifecycle",
+    description:
+      "Mark a ticket en_route, on_location, on_site, work_complete, or off_site using existing ticket lifecycle rules. High-impact close-for-review is a different tool.",
+    input_schema: {
+      type: "object",
+      properties: {
+        ticketId: { type: "number" },
+        phase: {
+          type: "string",
+          enum: ["en_route", "on_location", "on_site", "work_complete", "off_site"],
+        },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        idempotencyKey: { type: "string" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["ticketId", "phase"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "close_ticket_for_review",
+    description: "Close a ticket for review after spoken confirmation. Pass confirmed:true only after the user confirms the exact ticket.",
+    input_schema: {
+      type: "object",
+      properties: {
+        ticketId: { type: "number" },
+        idempotencyKey: { type: "string" },
+        confirmed: { type: "boolean" },
+      },
+      required: ["ticketId", "confirmed"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "draft_safety_report",
+    description:
+      "Create a safety-report draft from dictated facts. Does not submit the final safety workflow. Ask for missing site, title, and event type.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        eventType: { type: "string" },
+        siteLocationId: { type: "number" },
+        ticketId: { type: "number" },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "open_screen",
+    description: "Client capability: open a permitted VNDRLY screen. Returns an intent; the client performs navigation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        screen: { type: "string" },
+        id: { type: "number" },
+      },
+      required: ["screen"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "focus_control",
+    description: "Client capability: focus or highlight a control on the current screen.",
+    input_schema: {
+      type: "object",
+      properties: { controlId: { type: "string" } },
+      required: ["controlId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "prefill_draft",
+    description: "Client capability: prefill a draft form without bypassing validation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        form: { type: "string" },
+        values: { type: "string", description: "JSON object of known draft fields." },
+      },
+      required: ["form"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "launch_camera",
+    description: "Client capability: open the device camera.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "launch_maps",
+    description: "Client capability: open maps for a destination.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string" }, latitude: { type: "number" }, longitude: { type: "number" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "launch_scanner",
+    description: "Client capability: open the QR/scanner flow.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
+    name: "start_ticket_entry",
+    description:
+      "Client capability: start photo, parts, labor, or mileage entry with known context. Ask for missing facts; do not invent them.",
+    input_schema: {
+      type: "object",
+      properties: {
+        ticketId: { type: "number" },
+        kind: { type: "string", enum: ["photo", "parts", "labor", "mileage"] },
+      },
+      required: ["kind"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "deep_link_to",
     description:
       "Returns a URL the user can navigate to in this web app for a given screen. When the user says 'take me to', 'just take me', 'open the X list', or 'go to' a screen, you MUST call this tool this turn. Do not reply with only a hand-written markdown path. Use this instead of describing 'click X then Y' when a single link will do. Detail screens (ticket-detail, vendor-detail, partner-detail, invoice-detail, vendor-analytics, partner-analytics, crew-replay) require `id`. Field-employee onboarding requires the invite `token`. For Reports, pass reportCard (e.g. salesTaxByState) and optional reportPreset (ytd, this_year, …) plus highlightState (e.g. TX) to open the matching card scrolled into view.",

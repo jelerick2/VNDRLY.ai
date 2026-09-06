@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { readAskVTextOnly, writeAskVTextOnly } from "../askvVoicePreferences";
+import {
+  readAskVAcrossVndrly,
+  readAskVMuted,
+  readAskVTextOnly,
+  writeAskVAcrossVndrly,
+  writeAskVMuted,
+  writeAskVTextOnly,
+} from "../askvVoicePreferences";
 
 const store = new Map<string, string>();
 
@@ -24,6 +31,16 @@ describe("mobile AskV voice preferences", () => {
     expect(await readAskVTextOnly(11)).toBe(true);
     expect(await readAskVTextOnly(12)).toBe(false);
     await writeAskVTextOnly(11, false);
+    expect(await readAskVTextOnly(11)).toBe(false);
+  });
+
+  it("remembers mute and across-VNDRLY separately from text-only", async () => {
+    expect(await readAskVMuted(11)).toBe(false);
+    expect(await readAskVAcrossVndrly(11)).toBe(false);
+    await writeAskVMuted(11, true);
+    await writeAskVAcrossVndrly(11, true);
+    expect(await readAskVMuted(11)).toBe(true);
+    expect(await readAskVAcrossVndrly(11)).toBe(true);
     expect(await readAskVTextOnly(11)).toBe(false);
   });
 });

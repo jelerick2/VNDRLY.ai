@@ -11,6 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { TICKET_STATUS_PILL_ASPECT } from "@/lib/ticket-status-palette";
 import { cn } from "@/lib/utils";
 import lightGreySquareSrc from "@assets/900x229_Light-grey_v2r_square_1778256462232.png";
+import AskVStatusIndicator from "@/components/askv-status-indicator";
+import { useAskVVoiceSession } from "@/hooks/use-askv-voice-session";
+import { writeAskVAcrossVndrly } from "@/lib/askv-voice-preferences";
 import { useAuth } from "@/hooks/use-auth";
 import { useBrand } from "@/hooks/use-brand";
 import {
@@ -258,7 +261,12 @@ function pickAskVRecordingMimeType(): string | undefined {
 export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: AssistantPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const voiceSession = useAskVVoiceSession();
   const brand = useBrand();
+  useEffect(() => {
+    if (!open || tokenMode || signupMode || voiceSession.muted) return;
+    void voiceSession.startConversation("open AskV", location);
+  }, [open, tokenMode, signupMode, voiceSession.muted, location, voiceSession.startConversation]);
   const [location] = useLocation();
   const sendHoverPillSrc = brandImagePillSrc(brand.primary, brand.name);
   const pageContext = useMemo(
@@ -503,8 +511,9 @@ export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: As
       const orgLabel = progress.orgType === "field_employee" ? "field-employee" : progress.orgType;
       return `Hi ${name}! Looks like you're mid-way through ${orgLabel} onboarding — currently on "${stepLabel}". I can help you finish it from here.`;
     }
+    if (voiceSession.greeting && !signupMode && !tokenMode) return voiceSession.greeting;
     return `Hi ${name}! I can answer how-to questions about VNDRLY and walk you through onboarding. What can I help with?`;
-  }, [user, progress, tokenMode, tokenName, signupMode, signupLang]);
+  }, [user, progress, tokenMode, tokenName, signupMode, signupLang, voiceSession.greeting]);
 
   // Auto-scroll to bottom on new content.
   useEffect(() => {
@@ -895,14 +904,33 @@ export function AssistantPanel({ open, onOpenChange, tokenMode, signupMode }: As
               </>
             )}
             {!tokenMode && !signupMode && askVUserId != null && (
-              <HeaderIconButton
-                onClick={handleToggleTextOnly}
-                testId="assistant-text-only"
-                title={textOnly ? "Text only is on" : "Voice responses are on"}
-                pressed={textOnly}
-              >
-                {textOnly ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              </HeaderIconButton>
+              <>
+                <AskVStatusIndicator />
+                <HeaderIconButton
+                  onClick={() => voiceSession.setMuted(!voiceSession.muted)}
+                  testId="assistant-mute"
+                  title={voiceSession.muted ? "Unmute AskV" : "Mute AskV"}
+                  pressed={voiceSession.muted}
+                >
+                  {voiceSession.muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </HeaderIconButton>
+                <HeaderIconButton
+                  onClick={() => writeAskVAcrossVndrly(askVUserId, !voiceSession.acrossVndrly)}
+                  testId="assistant-across-vndrly"
+                  title={voiceSession.acrossVndrly ? "AskV across VNDRLY is on" : "AskV across VNDRLY is off"}
+                  pressed={voiceSession.acrossVndrly}
+                >
+                  <Sparkles className="w-4 h-4" />
+                </HeaderIconButton>
+                <HeaderIconButton
+                  onClick={handleToggleTextOnly}
+                  testId="assistant-text-only"
+                  title={textOnly ? "Text only is on" : "Voice responses are on"}
+                  pressed={textOnly}
+                >
+                  {textOnly ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </HeaderIconButton>
+              </>
             )}
             <HeaderIconButton
               onClick={handleClose}

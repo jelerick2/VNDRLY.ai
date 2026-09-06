@@ -20,6 +20,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import SafeKeyboardProvider from "@/components/SafeKeyboardProvider";
 import SplashLogo from "@/components/SplashLogo";
 import { AuthProvider } from "@/hooks/use-auth";
+import { AskVVoiceProvider } from "@/hooks/use-askv-voice-session";
 import { BrandProvider } from "@/hooks/use-brand";
 import ContextPickerModal from "@/components/ContextPickerModal";
 import { initApi } from "@/lib/api";
@@ -254,6 +255,7 @@ function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+            <AskVVoiceProvider>
             <BrandProvider>
               <GestureHandlerRootView style={{ flex: 1 }}>
                 <SafeKeyboardProvider>
@@ -264,6 +266,7 @@ function RootLayout() {
                 </SafeKeyboardProvider>
               </GestureHandlerRootView>
             </BrandProvider>
+            </AskVVoiceProvider>
           </AuthProvider>
         </QueryClientProvider>
       </ErrorBoundary>

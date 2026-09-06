@@ -2,6 +2,8 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 const STORAGE_PREFIX = "askv:text-only";
+const MUTE_PREFIX = "askv:muted";
+const ACROSS_PREFIX = "askv:across";
 const memoryStore: Record<string, string> = {};
 
 export function askvTextOnlyKey(userId: number): string {
@@ -36,4 +38,30 @@ export async function readAskVTextOnly(userId: number): Promise<boolean> {
 export async function writeAskVTextOnly(userId: number, enabled: boolean): Promise<void> {
   if (enabled) await setItem(askvTextOnlyKey(userId), "1");
   else await removeItem(askvTextOnlyKey(userId));
+}
+
+async function readFlag(prefix: string, userId: number): Promise<boolean> {
+  return (await getItem(`${prefix}:${userId}`)) === "1";
+}
+
+async function writeFlag(prefix: string, userId: number, enabled: boolean): Promise<void> {
+  const key = `${prefix}:${userId}`;
+  if (enabled) await setItem(key, "1");
+  else await removeItem(key);
+}
+
+export async function readAskVMuted(userId: number): Promise<boolean> {
+  return readFlag(MUTE_PREFIX, userId);
+}
+
+export async function writeAskVMuted(userId: number, enabled: boolean): Promise<void> {
+  return writeFlag(MUTE_PREFIX, userId, enabled);
+}
+
+export async function readAskVAcrossVndrly(userId: number): Promise<boolean> {
+  return readFlag(ACROSS_PREFIX, userId);
+}
+
+export async function writeAskVAcrossVndrly(userId: number, enabled: boolean): Promise<void> {
+  return writeFlag(ACROSS_PREFIX, userId, enabled);
 }

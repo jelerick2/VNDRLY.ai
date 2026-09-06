@@ -53,7 +53,6 @@ export function buildAppNavigation({
     return [
       item("gate", "/(tabs)/gate", labels.gate, "truck"),
       item("askv", "/(tabs)/askv", labels.askv, "zap", "askv"),
-      item("gate-voice", "/(tabs)/gate", labels.voice, "mic", "gate-voice"),
       item("gate-history", "/(tabs)/gate-history", labels.history, "clock"),
       item("profile", "/(tabs)/profile", labels.profile, "user"),
     ];

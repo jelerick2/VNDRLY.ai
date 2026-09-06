@@ -20,11 +20,6 @@ import {
   portalDisplayLogo,
   shouldUseLayeredPortalLogo,
 } from "@/lib/portal-branding";
-import {
-  queueGateVoiceEntry,
-  requestGateVoiceEntry,
-  subscribeGateVoiceListening,
-} from "@/lib/gate-voice-launch";
 import { VNDRLY_LOGO_SQUARE as vndrlyLogo } from "@/lib/vndrly-brand-assets";
 import {
   useGetVendor,
@@ -44,7 +39,8 @@ const AssistantLauncher = lazy(() =>
     default: mod.AssistantLauncher,
   })),
 );
-const AskVVoiceController = lazy(() => import("@/components/askv-voice-controller"));
+import AskVStatusIndicator from "@/components/askv-status-indicator";
+import { AskVVoiceProvider, useAskVVoiceSession } from "@/hooks/use-askv-voice-session";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -83,9 +79,7 @@ export function FieldOpsPortalShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [vendorName, setVendorName] = useState<string | null>(null);
   const [employeeName, setEmployeeName] = useState<string | null>(null);
-  const [gateVoiceListening, setGateVoiceListening] = useState(false);
 
-  useEffect(() => subscribeGateVoiceListening(setGateVoiceListening), []);
 
   const vendorId = user?.vendorId ?? null;
   const { data: vendor } = useGetVendor(vendorId ?? 0, {
@@ -174,15 +168,11 @@ export function FieldOpsPortalShell({
   );
 
   return (
+    <AskVVoiceProvider>
     <div
       className={cn("flex", FIXED_APP_CHROME ? "h-screen overflow-hidden" : "min-h-screen")}
       style={brandStyleVars(brand)}
     >
-      {user && (
-        <Suspense fallback={null}>
-          <AskVVoiceController />
-        </Suspense>
-      )}
       <aside
         style={navPaneStyle}
         className={cn(
@@ -242,23 +232,7 @@ export function FieldOpsPortalShell({
             const isActive = tab.match(location);
             const Icon = tab.icon;
             if (tab.voiceEntry) {
-              return (
-                <div key={tab.href} className="flex justify-center py-3">
-                  <GateVoiceCircleButton
-                    active={gateVoiceListening}
-                    onClick={() => {
-                      const launch = () => requestGateVoiceEntry();
-                      if (!location.startsWith("/gate") || location.startsWith("/gate/history")) {
-                        queueGateVoiceEntry();
-                        setLocation("/gate");
-                      } else launch();
-                      setSidebarOpen(false);
-                    }}
-                    testId={tab.testId}
-                    label={t(tab.labelKey)}
-                  />
-                </div>
-              );
+              return <AskVMuteCircle key={tab.href} testId={tab.testId} />;
             }
             return (
               <Link key={tab.href} href={tab.href} onClick={() => setSidebarOpen(false)}>
@@ -330,7 +304,8 @@ export function FieldOpsPortalShell({
           className="flex min-h-[48px] shrink-0 items-center justify-end gap-4 overflow-visible px-4 py-2"
           data-testid="askv-pane"
         >
-          <div className="flex items-center overflow-visible">
+          <div className="flex items-center gap-3 overflow-visible">
+            <AskVStatusIndicator />
             <Suspense fallback={null}>
               <AssistantLauncher placement="askv-pane" />
             </Suspense>
@@ -401,6 +376,22 @@ export function FieldOpsPortalShell({
           </ul>
         </nav>
       </div>
+    </div>
+    </AskVVoiceProvider>
+  );
+}
+
+function AskVMuteCircle({ testId }: { testId: string }) {
+  const { muted, state, setMuted } = useAskVVoiceSession();
+  const listening = !muted && (state === "listening" || state === "thinking" || state === "speaking");
+  return (
+    <div className="flex justify-center py-3">
+      <GateVoiceCircleButton
+        active={listening}
+        onClick={() => setMuted(!muted)}
+        testId={testId}
+        label={muted ? "Unmute AskV" : "Mute AskV"}
+      />
     </div>
   );
 }

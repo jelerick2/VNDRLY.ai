@@ -31,9 +31,22 @@ export interface WriteAskVActionAuditArgs {
   errorMessage?: string | null;
 }
 
+const RAW_AUDIO_KEY = /audio|pcm|wav|webm|base64/i;
+
+export function excludeRawAudio(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => excludeRawAudio(item));
+  if (!value || typeof value !== "object") return value;
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (RAW_AUDIO_KEY.test(key)) continue;
+    cleaned[key] = excludeRawAudio(child);
+  }
+  return cleaned;
+}
+
 function jsonOrNull(value: unknown): unknown | null {
   if (value == null) return null;
-  return value;
+  return excludeRawAudio(value);
 }
 
 function numericOrNull(value: unknown): number | null {

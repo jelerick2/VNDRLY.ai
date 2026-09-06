@@ -19,12 +19,18 @@ import {
   normalizeAskVRole,
   toRealtimeToolMetadata,
   toRealtimeTools,
-  toolsForRole,
 } from "../assistant/tool-registry";
+import { toolsForRealtime } from "../assistant/tool-packs";
 import { classifyConfirmation, requiresVoiceConfirmation } from "../assistant/action-classifier";
 import { writeAskVActionAudit, type AskVClientSurface, type AskVInputMode } from "../assistant/action-audit";
 import { classifyToolResult } from "../assistant/tool-result";
 import { runTool } from "./assistant";
+import { buildAskVGreeting } from "../assistant/voice-greeting";
+import { mutationIdempotencyKey } from "../assistant/askv-idempotency";
+import {
+  askvPendingConfirmations,
+  organizationKeyFromSession,
+} from "../assistant/askv-pending-confirmation";
 
 const router: IRouter = Router();
 const parseRealtimeSdp = text({ type: ["application/sdp", "text/plain"], limit: "1mb" });
@@ -86,6 +92,20 @@ function toolInputWithConfirmation(input: unknown, confirmed: boolean): unknown 
   return { ...input, confirmed: true };
 }
 
+function withIdempotencyKey(toolName: string, input: unknown, session: SessionPayload): unknown {
+  const base = input && typeof input === "object" && !Array.isArray(input)
+    ? { ...(input as Record<string, unknown>) }
+    : {};
+  if (typeof base.idempotencyKey === "string" && base.idempotencyKey.trim()) return base;
+  return {
+    ...base,
+    idempotencyKey: mutationIdempotencyKey(session.userId ?? 0, toolName, {
+      ...base,
+      confirmed: undefined,
+    }),
+  };
+}
+
 async function buildRealtimeInstructions(session: SessionPayload, seedMessage: string): Promise<string> {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId!)).limit(1);
   const role = normalizeRole(session.role);
@@ -137,10 +157,64 @@ async function buildRealtimeInstructions(session: SessionPayload, seedMessage: s
 VOICE MODE
 - You are AskV speaking aloud. Sound like a concise American English operations expert: direct, professional, and positive without fluff.
 - Lead with the answer or action result whenever possible. If you can do the requested action through a tool, do it after required confirmation instead of giving a manual procedure.
-- Handle one command, then end the response so the client can return to wake-phrase mode.
-- For mutating tools, ask for voice confirmation before execution. Accept natural confirmations such as "confirm", "sounds good", "execute", "do it", "yes", "send it", "submit it", and "go ahead".
+- Stay in a multi-turn conversation. After you answer, wait for the next utterance. Do not end the session after one command.
+- For high-impact mutating tools, give a spoken summary and wait for confirmation bound to that exact pending action. A generic "yes" cannot approve anything unless that confirmation is pending.
+- Low-impact reversible actions may proceed after a brief acknowledgement.
 - Do not store or request raw audio. The server audit trail records transcript plus metadata only.`;
 }
+
+function realtimeToolsForRequest(session: SessionPayload, body: Record<string, unknown> | undefined) {
+  const path = typeof body?.path === "string"
+    ? body.path
+    : typeof body?.pageContext === "object" && body.pageContext && "path" in body.pageContext
+      ? String((body.pageContext as { path?: unknown }).path ?? "")
+      : "";
+  const entityId = typeof body?.entityId === "number"
+    ? body.entityId
+    : typeof body?.pageContext === "object" && body.pageContext && "entityId" in body.pageContext
+      ? Number((body.pageContext as { entityId?: unknown }).entityId)
+      : null;
+  return toolsForRealtime({
+    role: session.role,
+    path,
+    entityId: Number.isFinite(entityId) ? entityId : null,
+  });
+}
+
+router.post("/assistant/voice/greeting", async (req, res): Promise<void> => {
+  const session = requireSession(req, res);
+  if (!session) return;
+  const timeZone = typeof req.body?.timeZone === "string" && req.body.timeZone.trim()
+    ? req.body.timeZone.trim()
+    : "UTC";
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId!)).limit(1);
+  const greeting = buildAskVGreeting({
+    displayName: user?.displayName ?? session.displayName ?? "there",
+    lastFullGreetingOn: user?.askvLastFullGreetingOn ?? null,
+    timeZone,
+  });
+  if (greeting.style === "full") {
+    await db
+      .update(usersTable)
+      .set({ askvLastFullGreetingOn: greeting.localDate })
+      .where(eq(usersTable.id, session.userId!));
+  }
+  res.json(greeting);
+});
+
+router.get("/assistant/voice/greeting", async (req, res): Promise<void> => {
+  const session = requireSession(req, res);
+  if (!session) return;
+  const timeZone = typeof req.query?.timeZone === "string" && req.query.timeZone.trim()
+    ? req.query.timeZone.trim()
+    : "UTC";
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId!)).limit(1);
+  res.json(buildAskVGreeting({
+    displayName: user?.displayName ?? session.displayName ?? "there",
+    lastFullGreetingOn: user?.askvLastFullGreetingOn ?? null,
+    timeZone,
+  }));
+});
 
 router.post("/assistant/realtime/client-secret", async (req, res): Promise<void> => {
   const session = requireSession(req, res);
@@ -152,8 +226,7 @@ router.post("/assistant/realtime/client-secret", async (req, res): Promise<void>
     return;
   }
 
-  const role = normalizeAskVRole(session.role);
-  const roleTools = toolsForRole(role);
+  const roleTools = realtimeToolsForRequest(session, req.body as Record<string, unknown> | undefined);
   const seedMessage = typeof req.body?.seedMessage === "string" ? req.body.seedMessage : "voice command";
 
   try {
@@ -196,8 +269,10 @@ router.post(
       return;
     }
 
-    const role = normalizeAskVRole(session.role);
-    const roleTools = toolsForRole(role);
+    const roleTools = realtimeToolsForRequest(session, {
+      path: typeof req.query?.path === "string" ? req.query.path : "",
+      entityId: req.query?.entityId ? Number(req.query.entityId) : null,
+    });
     const seedMessage = typeof req.query?.seedMessage === "string" ? req.query.seedMessage : "voice command";
 
     try {
@@ -240,13 +315,22 @@ router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => 
   const transcriptText = typeof req.body?.transcriptText === "string" ? req.body.transcriptText : null;
   const confirmationPhrase = typeof req.body?.confirmationPhrase === "string" ? req.body.confirmationPhrase : null;
   const decision = confirmationPhrase ? classifyConfirmation(confirmationPhrase) : "none";
-  const confirmed = req.body?.confirmed === true || decision === "confirm";
+  const orgKey = organizationKeyFromSession(session);
+  let confirmed = req.body?.confirmed === true;
+  if (!confirmed && decision === "confirm" && confirmationPhrase) {
+    const pending = askvPendingConfirmations.consume(confirmationPhrase, {
+      userId: session.userId!,
+      organizationKey: orgKey,
+    });
+    confirmed = pending?.toolName === name;
+  }
   const cancelled = decision === "cancel";
   const targetId = typeof input === "object" && input != null && "ticketId" in input
     ? (input as { ticketId?: unknown }).ticketId
     : req.body?.targetId;
 
   if (cancelled) {
+    askvPendingConfirmations.clear(session.userId!, orgKey);
     if (tool.mutating) {
       await writeAskVActionAudit({
         session,
@@ -267,6 +351,12 @@ router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => 
   }
 
   if (requiresVoiceConfirmation(name) && !confirmed) {
+    askvPendingConfirmations.set({
+      userId: session.userId!,
+      organizationKey: orgKey,
+      toolName: name,
+      arguments: input,
+    });
     if (tool.mutating) {
       await writeAskVActionAudit({
         session,
@@ -290,9 +380,11 @@ router.post("/assistant/realtime/tool-call", async (req, res): Promise<void> => 
   }
 
   try {
-    const executableInput = requiresVoiceConfirmation(name)
-      ? toolInputWithConfirmation(input, confirmed)
-      : input;
+    const executableInput = withIdempotencyKey(
+      name,
+      requiresVoiceConfirmation(name) ? toolInputWithConfirmation(input, confirmed) : input,
+      session,
+    );
     const output = await runTool(name, executableInput, session, req.headers.cookie ?? "");
     const status = classifyToolResult(output, tool.mutating);
     if (tool.mutating) {

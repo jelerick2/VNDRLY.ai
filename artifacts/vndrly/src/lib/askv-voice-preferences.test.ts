@@ -1,5 +1,13 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import { askvTextOnlyKey, readAskVTextOnly, writeAskVTextOnly } from "./askv-voice-preferences";
+import {
+  askvTextOnlyKey,
+  readAskVAcrossVndrly,
+  readAskVMuted,
+  readAskVTextOnly,
+  writeAskVAcrossVndrly,
+  writeAskVMuted,
+  writeAskVTextOnly,
+} from "./askv-voice-preferences";
 
 describe("AskV web voice preferences", () => {
   beforeEach(() => {
@@ -20,5 +28,15 @@ describe("AskV web voice preferences", () => {
     writeAskVTextOnly(11, true);
     expect(listener).toHaveBeenCalledTimes(1);
     window.removeEventListener("askv:text-only-changed", listener);
+  });
+
+  it("remembers mute and across-VNDRLY separately from text-only", () => {
+    expect(readAskVMuted(11)).toBe(false);
+    expect(readAskVAcrossVndrly(11)).toBe(false);
+    writeAskVMuted(11, true);
+    writeAskVAcrossVndrly(11, true);
+    expect(readAskVMuted(11)).toBe(true);
+    expect(readAskVAcrossVndrly(11)).toBe(true);
+    expect(readAskVTextOnly(11)).toBe(false);
   });
 });

@@ -53,6 +53,7 @@ import { classifyToolResult } from "../assistant/tool-result";
 import { findAskVTool } from "../assistant/tool-registry";
 import { isDataTool, runDataTool } from "../assistant/data-tools";
 import { isWriteTool, runWriteTool } from "../assistant/write-tools";
+import { isClientTool, runClientTool } from "../assistant/client-tools";
 import {
   consumeDailyBudget,
   getClientIp,
@@ -785,6 +786,9 @@ export async function runTool(
   }
   if (isWriteTool(name)) {
     return runWriteTool(name, input, session);
+  }
+  if (isClientTool(name)) {
+    return runClientTool(name, input);
   }
   try {
     switch (name) {

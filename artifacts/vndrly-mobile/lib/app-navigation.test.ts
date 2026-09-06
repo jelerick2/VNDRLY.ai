@@ -27,7 +27,7 @@ const user = (role: string, vendorRole?: string): StoredUser => ({
 });
 
 describe("buildAppNavigation", () => {
-  it("places Gate Voice exactly in the center of five Gate actions", () => {
+  it("uses four Gate actions with AskV as the voice entry", () => {
     const items = buildAppNavigation({
       user: user("vendor", "gatekeeper"),
       labels,
@@ -36,11 +36,10 @@ describe("buildAppNavigation", () => {
     expect(items.map((entry) => entry.key)).toEqual([
       "gate",
       "askv",
-      "gate-voice",
       "gate-history",
       "profile",
     ]);
-    expect(items[2]).toMatchObject({ kind: "gate-voice", label: "Voice" });
+    expect(items.some((entry) => entry.kind === "gate-voice")).toBe(false);
   });
 
   it("adds crew map, crews, and communications for foremen", () => {

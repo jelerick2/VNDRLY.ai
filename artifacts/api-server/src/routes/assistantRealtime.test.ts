@@ -90,6 +90,20 @@ describe("AskV Realtime routes", () => {
     mocks.writeAudit.mockClear();
   });
 
+  it("returns a timezone-aware greeting without exposing raw audio", async () => {
+    const res = await request(app())
+      .get("/assistant/voice/greeting")
+      .query({ timeZone: "America/Chicago" })
+      .expect(200);
+
+    expect(res.body).toEqual(expect.objectContaining({
+      style: expect.stringMatching(/^(full|short)$/),
+      text: expect.any(String),
+      localDate: expect.any(String),
+    }));
+    expect(JSON.stringify(res.body)).not.toMatch(/audio|wav|webm|pcm/i);
+  });
+
   it("creates a server-mediated Realtime WebRTC call from browser SDP", async () => {
     vi.stubEnv("OPENAI_API_KEY", "sk-test");
     vi.stubEnv("ASKV_REALTIME_MODEL", "");
@@ -112,7 +126,7 @@ describe("AskV Realtime routes", () => {
         tools: expect.arrayContaining([
           expect.objectContaining({
             type: "function",
-            name: "query_ticket_route_eta",
+            name: "query_tickets",
           }),
         ]),
       }),
@@ -130,14 +144,14 @@ describe("AskV Realtime routes", () => {
 
     expect(res.body.clientSecret).toEqual({ value: "ek_test", expires_at: 123 });
     expect(res.body.toolMetadata).toContainEqual({
-      name: "schedule_ticket_crew",
-      mutating: true,
-      confirmation: "required",
+      name: "query_tickets",
+      mutating: false,
+      confirmation: "none",
       auditTarget: "ticket",
     });
     expect(res.body.toolMetadata).toContainEqual(
       expect.objectContaining({
-        name: "query_ticket_route_eta",
+        name: "query_attention_briefing",
         mutating: false,
         confirmation: "none",
       }),
@@ -198,6 +212,15 @@ describe("AskV Realtime routes", () => {
   });
 
   it("passes confirmed:true into realtime voice write tools after confirmation", async () => {
+    await request(app())
+      .post("/assistant/realtime/tool-call")
+      .send({
+        name: "mark_notifications_read",
+        arguments: { markAll: true },
+        clientSurface: "ios",
+      })
+      .expect(200);
+
     const res = await request(app())
       .post("/assistant/realtime/tool-call")
       .send({
@@ -211,7 +234,7 @@ describe("AskV Realtime routes", () => {
     expect(res.body).toMatchObject({ ok: true });
     expect(mocks.runTool).toHaveBeenCalledWith(
       "mark_notifications_read",
-      { markAll: true, confirmed: true },
+      expect.objectContaining({ markAll: true, confirmed: true, idempotencyKey: expect.any(String) }),
       expect.objectContaining({ userId: 10, role: "vendor" }),
       expect.any(String),
     );
@@ -220,10 +243,28 @@ describe("AskV Realtime routes", () => {
         inputMode: "ios_voice",
         toolName: "mark_notifications_read",
         confirmationPhrase: "yes",
-        toolInput: { markAll: true, confirmed: true },
+        toolInput: expect.objectContaining({ markAll: true, confirmed: true }),
         resultStatus: "success",
       }),
     );
+  });
+
+  it("does not treat a generic yes as approval when nothing is pending", async () => {
+    const res = await request(app())
+      .post("/assistant/realtime/tool-call")
+      .send({
+        name: "confirm_visitor_check_in",
+        arguments: { firstName: "Bob", lastName: "Villa", siteLocationId: 9, hostType: "vendor" },
+        confirmationPhrase: "yes",
+        clientSurface: "web",
+      })
+      .expect(200);
+
+    expect(res.body).toMatchObject({
+      ok: false,
+      requiresConfirmation: true,
+    });
+    expect(mocks.runTool).not.toHaveBeenCalled();
   });
 
   it("audits structured confirmation refusals from realtime tools", async () => {
@@ -231,6 +272,15 @@ describe("AskV Realtime routes", () => {
       error: "AskV needs explicit confirmation before marking notifications read.",
       requiresConfirmation: true,
     }));
+
+    await request(app())
+      .post("/assistant/realtime/tool-call")
+      .send({
+        name: "mark_notifications_read",
+        arguments: { markAll: true },
+        clientSurface: "web",
+      })
+      .expect(200);
 
     const res = await request(app())
       .post("/assistant/realtime/tool-call")

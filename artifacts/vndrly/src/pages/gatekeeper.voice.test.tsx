@@ -43,6 +43,7 @@ vi.mock("@/lib/visits-api", () => ({
 }));
 
 import GatekeeperPage from "./gatekeeper";
+import { ASKV_NATURAL_VOICE_FLAG } from "@/lib/askv-natural-voice";
 import { requestGateVoiceEntry } from "@/lib/gate-voice-launch";
 
 class FakeMediaRecorder {
@@ -101,6 +102,7 @@ beforeEach(() => {
   mocks.transcribe.mockResolvedValue(
     "check in Bob Villa from NewCo plate ABC123 for equipment delivery",
   );
+  window.localStorage.setItem(ASKV_NATURAL_VOICE_FLAG, "0");
   vi.stubGlobal("MediaRecorder", FakeMediaRecorder);
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
@@ -114,11 +116,22 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  window.localStorage.removeItem(ASKV_NATURAL_VOICE_FLAG);
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 
 describe("GatekeeperPage voice entry", () => {
+  it("leaves the legacy parser unused when AskV natural voice is on", async () => {
+    window.localStorage.setItem(ASKV_NATURAL_VOICE_FLAG, "1");
+    renderPage();
+    await screen.findByTestId("input-gate-first-name");
+    act(() => requestGateVoiceEntry());
+    await new Promise((resolve) => window.setTimeout(resolve, 50));
+    expect(FakeMediaRecorder.instances).toHaveLength(0);
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+  });
+
   it("does not replay a persisted microphone request after a page refresh", async () => {
     sessionStorage.setItem("vndrly:gate-voice-pending", "1");
 

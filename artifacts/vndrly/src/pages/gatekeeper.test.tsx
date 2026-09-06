@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ASKV_NATURAL_VOICE_FLAG } from "@/lib/askv-natural-voice";
 
 const api = vi.hoisted(() => ({
   gateCheckIn: vi.fn(),
@@ -171,6 +172,7 @@ async function selectState(name: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.setItem(ASKV_NATURAL_VOICE_FLAG, "0");
   liveMonitor.flash = null;
   api.list.mockResolvedValue([]);
   api.listAllVisits.mockResolvedValue([]);

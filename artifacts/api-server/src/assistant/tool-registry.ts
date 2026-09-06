@@ -3,6 +3,9 @@ import { DEEP_LINK_SCREENS, TOOLS } from "./tools";
 
 export type AskVRole = "admin" | "partner" | "vendor" | "field_employee" | "any";
 export type AskVConfirmationMode = "none" | "required";
+export type AskVRiskLevel = "read" | "low" | "high";
+export type AskVExecution = "server" | "client";
+export type AskVToolPack = "core" | "role" | "screen";
 export type AskVAuditTarget =
   | "ticket"
   | "notification"
@@ -21,6 +24,9 @@ export interface AskVToolDefinition {
   roles: AskVRole[];
   mutating: boolean;
   confirmation: AskVConfirmationMode;
+  risk?: AskVRiskLevel;
+  execution?: AskVExecution;
+  pack?: AskVToolPack;
   auditTarget?: AskVAuditTarget;
 }
 
@@ -50,6 +56,9 @@ const DEFAULT_METADATA: ToolMetadata = {
   roles: ALL_SIGNED_IN_ROLES,
   mutating: false,
   confirmation: "none",
+  risk: "read",
+  execution: "server",
+  pack: "role",
 };
 
 const TOOL_METADATA: Record<string, Partial<ToolMetadata>> = {
@@ -106,6 +115,42 @@ const TOOL_METADATA: Record<string, Partial<ToolMetadata>> = {
   lookup_ticket_payment_status: { roles: OFFICE_ROLES, auditTarget: "ticket" },
   lookup_accounting_connection: { roles: ["admin", "vendor"] },
   query_active_visitors: { roles: OFFICE_ROLES },
+  prepare_visitor_check_in: { roles: OFFICE_ROLES, pack: "screen", auditTarget: "site" },
+  confirm_visitor_check_in: {
+    roles: OFFICE_ROLES,
+    mutating: true,
+    confirmation: "required",
+    risk: "high",
+    pack: "screen",
+    auditTarget: "site",
+  },
+  find_active_visitors: { roles: OFFICE_ROLES, pack: "screen", auditTarget: "site" },
+  prepare_visitor_check_out: { roles: OFFICE_ROLES, pack: "screen", auditTarget: "site" },
+  confirm_visitor_check_out: {
+    roles: OFFICE_ROLES,
+    mutating: true,
+    confirmation: "required",
+    risk: "high",
+    pack: "screen",
+    auditTarget: "site",
+  },
+  set_ticket_lifecycle: { roles: VENDOR_FIELD_ROLES, mutating: true, pack: "screen", auditTarget: "ticket" },
+  close_ticket_for_review: {
+    roles: VENDOR_FIELD_ROLES,
+    mutating: true,
+    confirmation: "required",
+    risk: "high",
+    pack: "screen",
+    auditTarget: "ticket",
+  },
+  draft_safety_report: { mutating: true, pack: "screen", auditTarget: "safety" },
+  open_screen: { execution: "client", pack: "core" },
+  focus_control: { execution: "client", pack: "core" },
+  prefill_draft: { execution: "client", pack: "core" },
+  launch_camera: { execution: "client", pack: "core" },
+  launch_maps: { execution: "client", pack: "core" },
+  launch_scanner: { execution: "client", pack: "core" },
+  start_ticket_entry: { execution: "client", pack: "screen", auditTarget: "ticket" },
   mark_notifications_read: { mutating: true, confirmation: "required", auditTarget: "notification" },
   schedule_ticket_crew: { roles: OFFICE_ROLES, mutating: true, confirmation: "required", auditTarget: "ticket" },
   set_ticket_flag: { mutating: true, confirmation: "required", auditTarget: "ticket" },
@@ -123,6 +168,9 @@ export const ASK_V_TOOL_REGISTRY: AskVToolDefinition[] = TOOLS.map((tool) => {
     roles: metadata.roles,
     mutating: metadata.mutating,
     confirmation: metadata.confirmation,
+    risk: metadata.risk,
+    execution: metadata.execution,
+    pack: metadata.pack,
     auditTarget: metadata.auditTarget,
   };
 });

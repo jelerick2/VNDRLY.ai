@@ -55,13 +55,14 @@ import {
 import { OnboardingProgressBanner } from "@/components/finish-setup-widget";
 import { withGateLogNav, canViewGateLog } from "@/lib/gate-ops-nav";
 import { visitsApi } from "@/lib/visits-api";
+import AskVStatusIndicator from "@/components/askv-status-indicator";
+import { AskVVoiceProvider } from "@/hooks/use-askv-voice-session";
 
 const AssistantLauncher = React.lazy(() =>
   import("@/components/assistant-panel").then((mod) => ({
     default: mod.AssistantLauncher,
   })),
 );
-const AskVVoiceController = React.lazy(() => import("@/components/askv-voice-controller"));
 
 function useNavItems(user: {
   role: string;
@@ -216,15 +217,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const navPaneStyle = { backgroundColor: NAV_PANE_DARK_BG } as const;
 
   return (
+    <AskVVoiceProvider>
     <div
       className={cn("flex", FIXED_APP_CHROME ? "h-screen overflow-hidden" : "min-h-screen")}
       style={brandStyleVars(brand)}
     >
-      {user && (
-        <Suspense fallback={null}>
-          <AskVVoiceController />
-        </Suspense>
-      )}
       <aside
         style={navPaneStyle}
         className={cn(
@@ -403,7 +400,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           className="flex min-h-[48px] shrink-0 items-center justify-end gap-4 overflow-visible px-4 py-2"
           data-testid="askv-pane"
         >
-          <div className="flex items-center overflow-visible">
+          <div className="flex items-center gap-3 overflow-visible">
+            <AskVStatusIndicator />
             <Suspense fallback={null}>
               <AssistantLauncher placement="askv-pane" />
             </Suspense>
@@ -438,5 +436,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+    </AskVVoiceProvider>
   );
 }

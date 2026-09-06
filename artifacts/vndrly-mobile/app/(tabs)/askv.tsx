@@ -24,6 +24,7 @@ import AssistantSendToModal, {
 } from "@/components/AssistantSendToModal";
 import InPageHeader from "@/components/InPageHeader";
 import LayeredPillButton from "@/components/LayeredPillButton";
+import { useAskVVoiceSession } from "@/hooks/use-askv-voice-session";
 import { useAuth } from "@/hooks/use-auth";
 import {
   useAssistant,
@@ -93,6 +94,13 @@ export default function AskVScreen() {
   const brand = useBrand();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const voiceSession = useAskVVoiceSession();
+  const startedVoiceRef = useRef(false);
+  useEffect(() => {
+    if (startedVoiceRef.current || voiceSession.muted) return;
+    startedVoiceRef.current = true;
+    void voiceSession.startConversation("open AskV", "/askv");
+  }, [voiceSession.muted, voiceSession.startConversation]);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{ prompt?: string | string[] }>();
@@ -429,8 +437,31 @@ export default function AskVScreen() {
     }
   };
 
+  const voiceStatusLabel = voiceSession.muted
+    ? "Muted"
+    : voiceSession.state === "listening"
+      ? "Listening"
+      : voiceSession.state === "thinking"
+        ? "Thinking"
+        : voiceSession.state === "speaking"
+          ? "Speaking"
+          : voiceSession.state === "wake-idle" && voiceSession.acrossVndrly && voiceSession.wakeSupported
+            ? "Wake enabled"
+            : null;
+
   const headerIcons = (
     <View style={styles.headerIcons}>
+      <Pressable
+        onPress={() => voiceSession.setMuted(!voiceSession.muted)}
+        hitSlop={8}
+        testID="askv-mute"
+      >
+        <Feather
+          name={voiceSession.muted ? "mic-off" : "mic"}
+          size={18}
+          color={voiceSession.muted ? colors.mutedForeground : brand.primary}
+        />
+      </Pressable>
       <Pressable
         onPress={toggleReadAloud}
         hitSlop={8}
@@ -509,6 +540,11 @@ export default function AskVScreen() {
         <Text style={[styles.subtitle, { color: colors.mutedForeground }, SCREEN_SUBTITLE_TEXT]}>
           {t("askv.subtitle")}
         </Text>
+        {voiceStatusLabel ? (
+          <Text testID="askv-status-indicator" style={[styles.subtitle, { color: brand.primary }]}>
+            {voiceStatusLabel}
+          </Text>
+        ) : null}
       </View>
 
       <ScrollView

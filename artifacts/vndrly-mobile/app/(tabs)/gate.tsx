@@ -58,6 +58,7 @@ import {
   setGateVoiceListening,
   subscribeGateVoiceEntry,
 } from "@/lib/gate-voice-launch";
+import { isAskVNaturalVoiceEnabled } from "@/lib/askv-natural-voice";
 import { transcribeAskVRecording } from "@/lib/askv-transcribe";
 import {
   createPttRecorder,
@@ -371,17 +372,16 @@ export default function GatekeeperScreen() {
     else await startGateVoiceEntry();
   };
 
-  useEffect(
-    () =>
-      subscribeGateVoiceEntry(() => {
-        const toggle = () => voiceToggleRef.current();
-        voiceOperationRef.current = voiceOperationRef.current.then(
-          toggle,
-          toggle,
-        );
-      }),
-    [],
-  );
+  useEffect(() => {
+    if (isAskVNaturalVoiceEnabled()) return;
+    return subscribeGateVoiceEntry(() => {
+      const toggle = () => voiceToggleRef.current();
+      voiceOperationRef.current = voiceOperationRef.current.then(
+        toggle,
+        toggle,
+      );
+    });
+  }, []);
 
   useEffect(() => {
     voiceMountedRef.current = true;

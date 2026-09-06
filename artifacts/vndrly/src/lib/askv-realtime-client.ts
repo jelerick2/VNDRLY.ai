@@ -9,6 +9,9 @@ export interface AskVRealtimeToolCall {
 export interface AskVRealtimeClient {
   connect(): Promise<void>;
   close(): void;
+  interrupt(): void;
+  setMicEnabled(enabled: boolean): void;
+  updateContext(context: { path?: string; entityId?: number | null; org?: string | null; location?: string | null }): void;
 }
 
 function parseEvent(data: string): Record<string, unknown> | null {
@@ -58,8 +61,13 @@ function maybeFunctionCall(payload: Record<string, unknown>): AskVRealtimeToolCa
 
 export async function createAskVRealtimeClient(args: {
   seedMessage?: string;
+  path?: string;
+  entityId?: number | null;
   onToolCall: (call: AskVRealtimeToolCall) => Promise<string>;
   onDone?: () => void;
+  onSpeechStarted?: () => void;
+  onSpeechStopped?: () => void;
+  onAudio?: () => void;
   onError?: (message: string) => void;
 }): Promise<AskVRealtimeClient> {
   const pc = new RTCPeerConnection();
@@ -78,6 +86,11 @@ export async function createAskVRealtimeClient(args: {
     void (async () => {
       const payload = parseEvent(String(event.data));
       if (!payload) return;
+      if (payload.type === "input_audio_buffer.speech_started") args.onSpeechStarted?.();
+      if (payload.type === "input_audio_buffer.speech_stopped") args.onSpeechStopped?.();
+      if (payload.type === "response.output_audio.delta" || payload.type === "response.audio.delta") {
+        args.onAudio?.();
+      }
       if (payload.type === "response.done") args.onDone?.();
       if (payload.type === "error") {
         const error = payload.error as { message?: string } | undefined;
@@ -103,6 +116,8 @@ export async function createAskVRealtimeClient(args: {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       const params = new URLSearchParams({ seedMessage: args.seedMessage ?? "voice command" });
+      if (args.path) params.set("path", args.path);
+      if (args.entityId != null) params.set("entityId", String(args.entityId));
       const sdpRes = await fetch(`${BASE}/api/assistant/realtime/call?${params.toString()}`, {
         method: "POST",
         body: offer.sdp ?? "",
@@ -113,6 +128,38 @@ export async function createAskVRealtimeClient(args: {
       });
       if (!sdpRes.ok) throw new Error("assistant.realtime_sdp_failed");
       await pc.setRemoteDescription({ type: "answer", sdp: await sdpRes.text() });
+    },
+    interrupt() {
+      audio.pause();
+      if (channel.readyState === "open") {
+        channel.send(JSON.stringify({ type: "response.cancel" }));
+      }
+    },
+    setMicEnabled(enabled: boolean) {
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = enabled;
+      });
+      if (!enabled) {
+        audio.pause();
+        audio.muted = true;
+      } else {
+        audio.muted = false;
+        void audio.play().catch(() => undefined);
+      }
+    },
+    updateContext(context) {
+      if (channel.readyState !== "open") return;
+      channel.send(JSON.stringify({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{
+            type: "input_text",
+            text: `Context update: ${JSON.stringify(context)}`,
+          }],
+        },
+      }));
     },
     close() {
       stream.getTracks().forEach((track) => track.stop());

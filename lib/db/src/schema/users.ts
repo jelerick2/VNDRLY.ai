@@ -62,6 +62,7 @@ export const usersTable = pgTable("users", {
   emailVerifyToken: text("email_verify_token"),
   // Expiration for the current emailVerifyToken (24h from issuance).
   emailVerifyTokenExpiresAt: timestamp("email_verify_token_expires_at", { withTimezone: true }),
+  askvLastFullGreetingOn: text("askv_last_full_greeting_on"),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });

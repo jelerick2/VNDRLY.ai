@@ -15,6 +15,16 @@ import {
   ticketParticipantUserIdsExpanded,
 } from "../lib/field-ticket-access";
 import { findPartnerUserIds, findVendorUserIds, notifyUsers } from "../routes/notifications";
+import {
+  closeTicketForReview,
+  confirmVisitorCheckIn,
+  confirmVisitorCheckOut,
+  draftSafetyReport,
+  findActiveVisitors,
+  prepareVisitorCheckIn,
+  prepareVisitorCheckOut,
+  setTicketLifecycle,
+} from "./natural-voice-write-tools";
 
 function err(message: string): string {
   return JSON.stringify({ error: message });
@@ -29,6 +39,14 @@ export const WRITE_TOOL_NAMES = [
   "schedule_ticket_crew",
   "set_ticket_flag",
   "post_ticket_comment",
+  "prepare_visitor_check_in",
+  "confirm_visitor_check_in",
+  "find_active_visitors",
+  "prepare_visitor_check_out",
+  "confirm_visitor_check_out",
+  "set_ticket_lifecycle",
+  "close_ticket_for_review",
+  "draft_safety_report",
 ] as const;
 export type WriteToolName = (typeof WRITE_TOOL_NAMES)[number];
 
@@ -452,5 +470,21 @@ export async function runWriteTool(
       return setTicketFlag(args as SetTicketFlagInput, session);
     case "post_ticket_comment":
       return postTicketComment(args as PostTicketCommentInput, session);
+    case "prepare_visitor_check_in":
+      return prepareVisitorCheckIn(args);
+    case "confirm_visitor_check_in":
+      return confirmVisitorCheckIn(args, session);
+    case "find_active_visitors":
+      return findActiveVisitors(args);
+    case "prepare_visitor_check_out":
+      return prepareVisitorCheckOut(args);
+    case "confirm_visitor_check_out":
+      return confirmVisitorCheckOut(args, session);
+    case "set_ticket_lifecycle":
+      return setTicketLifecycle(args, session);
+    case "close_ticket_for_review":
+      return closeTicketForReview(args, session);
+    case "draft_safety_report":
+      return draftSafetyReport(args);
   }
 }

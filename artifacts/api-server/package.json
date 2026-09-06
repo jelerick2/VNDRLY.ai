@@ -13,6 +13,7 @@
     "test:no-isolated-db": "corepack pnpm --filter @workspace/db run check-schema && corepack pnpm exec vitest run",
     "migrate:plate-state": "node scripts/apply-plate-state-migration.mjs",
     "migrate:notes-admission": "node scripts/apply-notes-admission-migration.mjs",
+    "migrate:askv-greeting": "node scripts/apply-askv-greeting-migration.mjs",
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:tool-use": "vitest run --config vitest.eval.config.ts src/assistant/__evals__/tool-use.eval.ts",
     "eval:tone": "vitest run --config vitest.eval.config.ts src/assistant/__evals__/tone.eval.ts",

@@ -129,7 +129,13 @@
         }
       ],
       "expo-build-properties",
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-webrtc",
+        {
+          "microphonePermission": "VNDRLY uses the microphone for AskV voice conversations."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

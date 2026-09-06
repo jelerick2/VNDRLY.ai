@@ -1,6 +1,10 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/askv-natural-voice", () => ({
+  isAskVNaturalVoiceEnabled: () => false,
+}));
+
 vi.mock("@/hooks/useColors", () => ({
   useColors: () => ({
     background: "#fff",

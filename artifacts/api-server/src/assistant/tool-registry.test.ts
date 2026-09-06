@@ -20,6 +20,9 @@ describe("AskV tool registry", () => {
     expect(names).toContain("schedule_ticket_crew");
     expect(names).toContain("set_ticket_flag");
     expect(names).toContain("post_ticket_comment");
+    expect(names).toContain("confirm_visitor_check_in");
+    expect(names).toContain("set_ticket_lifecycle");
+    expect(names).toContain("open_screen");
     expect(new Set(names).size).toBe(names.length);
   });
 
@@ -82,6 +85,19 @@ describe("AskV tool registry", () => {
     expect(schedule?.confirmation).toBe("required");
     expect(markRead?.mutating).toBe(true);
     expect(markRead?.confirmation).toBe("required");
+    const checkIn = ASK_V_TOOL_REGISTRY.find((tool) => tool.name === "confirm_visitor_check_in");
+    const openScreen = ASK_V_TOOL_REGISTRY.find((tool) => tool.name === "open_screen");
+    expect(checkIn).toMatchObject({
+      mutating: true,
+      confirmation: "required",
+      risk: "high",
+      execution: "server",
+      pack: "screen",
+    });
+    expect(openScreen).toMatchObject({
+      execution: "client",
+      pack: "core",
+    });
   });
 
   it("role-filters office-only tools before a Realtime session is minted", () => {
