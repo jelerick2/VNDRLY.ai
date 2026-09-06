@@ -92,6 +92,17 @@ vi.mock("@/lib/tabBadges", () => ({
   useTabBadges: () => ({ home: 0, schedule: 0 }),
 }));
 
+vi.mock("@/hooks/use-askv-voice-session", () => ({
+  AskVVoiceProvider: ({ children }: { children: React.ReactNode }) => children,
+  useAskVVoiceSession: () => ({
+    state: "stopped",
+    muted: false,
+    startConversation: async () => undefined,
+    stop: () => undefined,
+    setMuted: () => undefined,
+  }),
+}));
+
 vi.mock("@/hooks/use-auth", () => ({
   useAuth: () => ({
     availableMemberships: [
