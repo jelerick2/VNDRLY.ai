@@ -54,7 +54,7 @@ export function AskVVoiceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const startConversation = async (seed?: string, path?: string) => {
-    const user = getUser();
+    const user = await getUser();
     if (!user || muted) return;
     apply("open");
     try {
@@ -129,20 +129,22 @@ export function AskVVoiceProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const user = getUser();
-    if (!user) return;
-    void readAskVMuted(user.id).then(setMutedState);
-    void readAskVAcrossVndrly(user.id).then((value) => {
-      acrossRef.current = value;
-      setAcross(value);
+    void getUser().then((user) => {
+      if (!user) return;
+      void readAskVMuted(user.id).then(setMutedState);
+      void readAskVAcrossVndrly(user.id).then((value) => {
+        acrossRef.current = value;
+        setAcross(value);
+      });
     });
   }, []);
 
   useEffect(() => {
-    return subscribeAskVAppState(
+    const sub = subscribeAskVAppState(
       () => undefined,
       () => stop(),
     );
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -161,8 +163,9 @@ export function AskVVoiceProvider({ children }: { children: React.ReactNode }) {
     startConversation,
     stop,
     setMuted: (next) => {
-      const user = getUser();
-      if (user) void writeAskVMuted(user.id, next);
+      void getUser().then((user) => {
+        if (user) void writeAskVMuted(user.id, next);
+      });
       setMutedState(next);
       if (next) {
         clientRef.current?.setMicEnabled(false);
